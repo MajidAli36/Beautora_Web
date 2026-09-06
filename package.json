@@ -1,0 +1,50 @@
+{
+  "name": "beautora",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test:sales": "npx tsx --test lib/sales/calculate.test.ts lib/sales/payment-balance.test.ts",
+    "db:push": "node scripts/db-push.mjs",
+    "db:link": "node scripts/db-link.mjs",
+    "db:seed": "node scripts/seed-data.mjs",
+    "db:reset-test": "node scripts/reset-for-retest.mjs",
+    "db:setup": "node scripts/setup-db.mjs",
+    "db:fix-auth": "node scripts/fix-auth.mjs",
+    "device:agent": "node scripts/device-agent.mjs",
+    "r2:init": "node scripts/r2-init.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1127.0",
+    "@aws-sdk/s3-request-presigner": "^3.1127.0",
+    "@base-ui/react": "^1.7.0",
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.114.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.39.0",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "recharts": "^3.10.1",
+    "shadcn": "^4.20.0",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "pg": "^8.23.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

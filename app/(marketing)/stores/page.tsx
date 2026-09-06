@@ -1,0 +1,43 @@
+import { listPublicStores } from "@/lib/actions/stores";
+import { StoresDirectory } from "@/components/marketing/stores-directory";
+import type { Metadata } from "next";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Stores",
+  description: `Browse live salons on Beautora by SyncOps — search by name or city, view services, and book online.`,
+  openGraph: {
+    title: "Stores · Beautora by SyncOps",
+    description: `Browse live salons on Beautora by SyncOps — search by name or city, view services, and book online.`,
+  },
+};
+
+export default async function StoresPage() {
+  const stores = await listPublicStores();
+
+  return (
+    <div className="pt-[var(--m-chrome)]">
+      <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
+        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
+            Directory
+          </p>
+          <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl lg:text-6xl">
+            Stores
+          </h1>
+          <p className="mt-4 max-w-xl text-lg text-[var(--m-muted)]">
+            Search live salons by name or city. Open a store for the full menu, team, and
+            booking.
+          </p>
+        </div>
+      </div>
+
+      <section className="bg-[var(--m-paper)] pt-10 pb-24 sm:pt-12 sm:pb-28">
+        <div className="mx-auto max-w-6xl px-6">
+          <StoresDirectory stores={stores} />
+        </div>
+      </section>
+    </div>
+  );
+}
