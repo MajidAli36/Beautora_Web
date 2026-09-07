@@ -213,11 +213,14 @@ export async function uploadStoreProfileImage(input: {
   });
   if (!uploaded.ok) return { error: uploaded.error };
 
-  const column = input.kind === "logo" ? "logo_path" : "cover_path";
+  const patch =
+    input.kind === "logo"
+      ? { logo_path: uploaded.result.path }
+      : { cover_path: uploaded.result.path };
   const supabase = await createClient();
   const { data: updated, error } = await supabase
     .from("organizations")
-    .update({ [column]: uploaded.result.path })
+    .update(patch)
     .eq("id", org.organizationId)
     .select("slug")
     .single();
@@ -231,11 +234,12 @@ export async function removeStoreProfileImage(
   kind: "logo" | "cover"
 ): Promise<ActionResult> {
   const org = await requireMinimumRole("MANAGER");
-  const column = kind === "logo" ? "logo_path" : "cover_path";
+  const patch =
+    kind === "logo" ? { logo_path: null } : { cover_path: null };
   const supabase = await createClient();
   const { data: updated, error } = await supabase
     .from("organizations")
-    .update({ [column]: null })
+    .update(patch)
     .eq("id", org.organizationId)
     .select("slug")
     .single();
