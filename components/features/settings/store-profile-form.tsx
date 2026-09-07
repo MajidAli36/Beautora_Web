@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ImagePlus, Loader2, Trash2, Upload } from "lucide-react";
 import { notify } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import {
   removeStoreProfileImage,
   updateStoreProfile,
@@ -21,6 +23,169 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+type BrandKind = "logo" | "cover";
+
+function BrandImageControl({
+  kind,
+  label,
+  hint,
+  imageUrl,
+  busy,
+  disabled,
+  onUpload,
+  onRemove,
+}: {
+  kind: BrandKind;
+  label: string;
+  hint: string;
+  imageUrl: string | null;
+  busy: boolean;
+  disabled: boolean;
+  onUpload: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const isLogo = kind === "logo";
+
+  function takeFile(file: File | undefined | null) {
+    if (!file || disabled || busy) return;
+    onUpload(file);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={inputId} className="text-sm font-medium">
+          {label}
+        </Label>
+        {imageUrl ? (
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+            Live on booking page
+          </span>
+        ) : (
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+            Recommended
+          </span>
+        )}
+      </div>
+
+      <label
+        htmlFor={inputId}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragging(true);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          setDragging(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          takeFile(e.dataTransfer.files?.[0] ?? null);
+        }}
+        className={cn(
+          "group relative flex cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition-all outline-none",
+          "focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/40",
+          isLogo ? "aspect-square max-w-[220px]" : "aspect-[16/9] w-full",
+          imageUrl
+            ? "border-border bg-muted"
+            : "border-primary/35 bg-gradient-to-br from-muted/80 via-background to-primary/5",
+          dragging && "border-primary bg-primary/5 scale-[1.01]",
+          (disabled || busy) && "pointer-events-none opacity-70"
+        )}
+      >
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={label}
+            className={cn("size-full", isLogo ? "object-cover" : "object-cover")}
+          />
+        ) : (
+          <div className="flex size-full flex-col items-center justify-center gap-2 px-4 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/15">
+              <ImagePlus className="size-6" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">
+                {isLogo ? "Upload salon logo" : "Upload cover photo"}
+              </p>
+              <p className="text-xs text-muted-foreground">{hint}</p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm">
+              <Upload className="size-3.5" />
+              Choose image
+            </span>
+          </div>
+        )}
+
+        {imageUrl && !busy && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-foreground shadow">
+              <Upload className="size-3.5" />
+              Replace {isLogo ? "logo" : "cover"}
+            </span>
+            <span className="text-[11px] text-white/85">Click or drop a new image</span>
+          </div>
+        )}
+
+        {busy && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 backdrop-blur-[1px]">
+            <Loader2 className="size-6 animate-spin text-primary" />
+            <span className="text-xs font-medium text-foreground">
+              {imageUrl ? "Updating…" : "Uploading…"}
+            </span>
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={disabled || busy}
+          className="sr-only"
+          onChange={(e) => {
+            takeFile(e.target.files?.[0] ?? null);
+            e.target.value = "";
+          }}
+        />
+      </label>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={disabled || busy}
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="size-3.5" />
+          {imageUrl ? "Replace" : "Upload"}
+        </Button>
+        {imageUrl && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled || busy}
+            onClick={onRemove}
+          >
+            <Trash2 className="size-3.5" />
+            Remove
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
   const router = useRouter();
   const [name, setName] = useState(profile.name);
@@ -32,7 +197,7 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
   const [whatsapp, setWhatsapp] = useState(profile.whatsapp_phone ?? "");
   const [arrivalNotes, setArrivalNotes] = useState(profile.arrival_notes ?? "");
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<"logo" | "cover" | null>(null);
+  const [uploading, setUploading] = useState<BrandKind | null>(null);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -56,8 +221,7 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
     router.refresh();
   }
 
-  async function onUpload(kind: "logo" | "cover", file: File | null) {
-    if (!file) return;
+  async function onUpload(kind: BrandKind, file: File) {
     setUploading(kind);
     const result = await uploadStoreProfileImage({ kind, file });
     setUploading(null);
@@ -69,7 +233,7 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
     router.refresh();
   }
 
-  async function onRemove(kind: "logo" | "cover") {
+  async function onRemove(kind: BrandKind) {
     setUploading(kind);
     const result = await removeStoreProfileImage(kind);
     setUploading(null);
@@ -90,68 +254,28 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
             Logo and cover appear on your public booking page and store listing.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 sm:grid-cols-2">
-          <div className="space-y-3">
-            <Label>Logo</Label>
-            <div className="flex size-24 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-              {profile.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.logoUrl} alt="Store logo" className="size-full object-cover" />
-              ) : (
-                <span className="text-xs text-muted-foreground">No logo</span>
-              )}
-            </div>
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={uploading !== null}
-              onChange={(e) => onUpload("logo", e.target.files?.[0] ?? null)}
-            />
-            {profile.logoUrl && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={uploading !== null}
-                onClick={() => onRemove("logo")}
-              >
-                Remove logo
-              </Button>
-            )}
-          </div>
-          <div className="space-y-3">
-            <Label>Cover photo</Label>
-            <div className="flex h-24 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-              {profile.coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.coverUrl}
-                  alt="Store cover"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="text-xs text-muted-foreground">No cover</span>
-              )}
-            </div>
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={uploading !== null}
-              onChange={(e) => onUpload("cover", e.target.files?.[0] ?? null)}
-            />
-            {profile.coverUrl && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={uploading !== null}
-                onClick={() => onRemove("cover")}
-              >
-                Remove cover
-              </Button>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground sm:col-span-2">
+        <CardContent className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <BrandImageControl
+            kind="logo"
+            label="Logo"
+            hint="Square works best · drag & drop ok"
+            imageUrl={profile.logoUrl}
+            busy={uploading === "logo"}
+            disabled={uploading !== null}
+            onUpload={(file) => onUpload("logo", file)}
+            onRemove={() => onRemove("logo")}
+          />
+          <BrandImageControl
+            kind="cover"
+            label="Cover photo"
+            hint="Wide image · drag & drop ok"
+            imageUrl={profile.coverUrl}
+            busy={uploading === "cover"}
+            disabled={uploading !== null}
+            onUpload={(file) => onUpload("cover", file)}
+            onRemove={() => onRemove("cover")}
+          />
+          <p className="text-xs text-muted-foreground lg:col-span-2">
             JPG, PNG, or WebP · max 5 MB. Booking URL stays{" "}
             <span className="font-mono">/book/{profile.slug}</span>
           </p>
