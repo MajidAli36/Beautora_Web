@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Lock } from "lucide-react";
 import { notify } from "@/lib/toast";
-import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
+// import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
 import { confirmUserEmail } from "@/lib/actions/auth";
 import { ensureHardcodedPlatformAdmin } from "@/lib/actions/platform-auth";
 import { PLATFORM_HARDCODED_ADMIN } from "@/lib/platform/admin";
@@ -189,10 +189,13 @@ export function LoginForm() {
         </button>
       </form>
 
+      {/* Social login — enable later when OAuth providers are configured
       <div className="mt-7">
         <AuthSocialButtons />
       </div>
+      */}
 
+      {/* Platform admin shortcut — keep hidden from UI; credentials in lib/platform/admin.ts
       <div className="mt-6 space-y-2 border-t border-[var(--m-line)] pt-5 text-xs text-[var(--m-muted)]">
         <p className="font-medium text-[var(--m-ink-soft)]">Platform admin (SyncOps)</p>
         <p>
@@ -209,6 +212,7 @@ export function LoginForm() {
           Fill admin login
         </button>
       </div>
+      */}
     </div>
   );
 }

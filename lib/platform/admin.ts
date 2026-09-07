@@ -1,5 +1,6 @@
-/** Hardcoded Beautora platform admin (SyncOps). */
-
+/** Hardcoded Beautora platform admin (SyncOps).
+ *  Not shown in UI — ask the agent / check this file when you need login.
+ */
 export const PLATFORM_HARDCODED_ADMIN = {
   email: "admin@syncops.tech",
   password: "Admin123!",
