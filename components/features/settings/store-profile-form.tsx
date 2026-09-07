@@ -1,10 +1,12 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Loader2, Trash2, Upload } from "lucide-react";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { checkSlugAvailable } from "@/lib/actions/onboarding";
+import { slugify } from "@/lib/onboarding/slug";
 import {
   removeStoreProfileImage,
   updateStoreProfile,
@@ -22,7 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
 
 type BrandKind = "logo" | "cover";
 
@@ -98,17 +99,13 @@ function BrandImageControl({
           imageUrl
             ? "border-border bg-muted"
             : "border-primary/35 bg-gradient-to-br from-muted/80 via-background to-primary/5",
-          dragging && "border-primary bg-primary/5 scale-[1.01]",
+          dragging && "scale-[1.01] border-primary bg-primary/5",
           (disabled || busy) && "pointer-events-none opacity-70"
         )}
       >
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt={label}
-            className={cn("size-full", isLogo ? "object-cover" : "object-cover")}
-          />
+          <img src={imageUrl} alt={label} className="size-full object-cover" />
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-2 px-4 text-center">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/15">
@@ -190,6 +187,7 @@ function BrandImageControl({
 export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
   const router = useRouter();
   const [name, setName] = useState(profile.name);
+  const [slug, setSlug] = useState(profile.slug);
   const [tagline, setTagline] = useState(profile.tagline ?? "");
   const [address, setAddress] = useState(profile.address ?? "");
   const [city, setCity] = useState(profile.city ?? "");
@@ -199,12 +197,55 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
   const [arrivalNotes, setArrivalNotes] = useState(profile.arrival_notes ?? "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<BrandKind | null>(null);
+  const [slugHint, setSlugHint] = useState<string | null>(null);
+  const [slugOk, setSlugOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setSlug(profile.slug);
+  }, [profile.slug]);
+
+  useEffect(() => {
+    const normalized = slugify(slug);
+    if (!normalized) {
+      setSlugOk(false);
+      setSlugHint("Enter a booking URL (letters, numbers, and hyphens).");
+      return;
+    }
+    if (normalized === profile.slug) {
+      setSlugOk(true);
+      setSlugHint("This is your current booking URL.");
+      return;
+    }
+    const handle = window.setTimeout(async () => {
+      const result = await checkSlugAvailable(normalized, {
+        excludeOrganizationId: profile.id,
+        currentSlug: profile.slug,
+      });
+      setSlugOk(result.available);
+      setSlugHint(
+        result.available
+          ? `Available — customers will use /book/${result.slug}`
+          : result.error ?? "This booking URL is not available."
+      );
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [slug, profile.id, profile.slug]);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
+    const normalized = slugify(slug);
+    if (!normalized) {
+      notify.error("Enter a valid booking URL before saving.");
+      return;
+    }
+    if (slugOk === false) {
+      notify.error(slugHint ?? "That booking URL is already taken.");
+      return;
+    }
     setSaving(true);
     const result = await updateStoreProfile({
       name,
+      slug: normalized,
       tagline,
       address,
       city,
@@ -216,9 +257,15 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
     setSaving(false);
     if (result.error) {
       notify.error(result.error);
+      setSlugOk(false);
+      setSlugHint(result.error);
       return;
     }
-    notify.success("Store profile saved — online booking updated");
+    notify.success(
+      normalized !== profile.slug
+        ? `Store saved — booking URL is now /book/${normalized}`
+        : "Store profile saved — online booking updated"
+    );
     router.refresh();
   }
 
@@ -277,8 +324,7 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
             onRemove={() => onRemove("cover")}
           />
           <p className="text-xs text-muted-foreground lg:col-span-2">
-            JPG, PNG, or WebP · max 5 MB. Booking URL stays{" "}
-            <span className="font-mono">/book/{profile.slug}</span>
+            JPG, PNG, or WebP · max 5 MB
           </p>
         </CardContent>
       </Card>
@@ -301,6 +347,45 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
                 required
               />
             </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="store-slug">Booking URL</Label>
+              <div className="flex overflow-hidden rounded-lg border border-input focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+                <span className="flex items-center bg-muted px-3 text-sm text-muted-foreground">
+                  /book/
+                </span>
+                <Input
+                  id="store-slug"
+                  value={slug}
+                  onChange={(e) =>
+                    setSlug(slugify(e.target.value) || e.target.value.toLowerCase())
+                  }
+                  required
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="rounded-none border-0 focus-visible:ring-0"
+                  placeholder="your-salon"
+                />
+              </div>
+              {slugHint && (
+                <p
+                  className={cn(
+                    "text-xs",
+                    slugOk === false
+                      ? "font-medium text-destructive"
+                      : slugOk
+                        ? "text-emerald-700"
+                        : "text-muted-foreground"
+                  )}
+                >
+                  {slugHint}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Unique per store. If another salon already uses this link, you cannot take it.
+              </p>
+            </div>
+
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="tagline">Tagline</Label>
               <Input
@@ -367,12 +452,14 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
                 value={arrivalNotes}
                 onChange={(e) => setArrivalNotes(e.target.value)}
                 rows={4}
-                placeholder={"Arrive five minutes early\nBring inspiration photos\nCall 24 hours ahead to cancel"}
+                placeholder={
+                  "Arrive five minutes early\nBring inspiration photos\nCall 24 hours ahead to cancel"
+                }
               />
               <p className="text-xs text-muted-foreground">One tip per line works best.</p>
             </div>
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving || slugOk === false}>
                 {saving ? "Saving…" : "Save store profile"}
               </Button>
             </div>

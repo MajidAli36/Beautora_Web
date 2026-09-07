@@ -1,7 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { slugify } from "@/lib/onboarding/slug";
+import {
+  isSlugUniqueViolation,
+  slugTakenMessage,
+  slugUniqueViolationMessage,
+  validateStoreSlug,
+} from "@/lib/onboarding/slug";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/types/commerce";
@@ -23,9 +28,29 @@ export async function createSalonOrganization(
     return { error: "Salon name must be at least 2 characters" };
   }
 
-  const baseSlug = slugify(input.slug?.trim() || salonName);
-  if (!baseSlug) {
-    return { error: "Enter a valid salon name or URL slug" };
+  const explicitSlug = Boolean(input.slug?.trim());
+  const rawBase = input.slug?.trim() || salonName;
+  let baseSlug = "";
+
+  if (explicitSlug) {
+    const validated = validateStoreSlug(rawBase);
+    if (!validated.ok) return { error: validated.error };
+    baseSlug = validated.slug;
+  } else {
+    const validated = validateStoreSlug(rawBase);
+    if (validated.ok) {
+      baseSlug = validated.slug;
+    } else {
+      // Name mapped to reserved/invalid — force a free suffix candidate base
+      const fromName = validateStoreSlug(`${salonName}-salon`);
+      if (!fromName.ok) {
+        return {
+          error:
+            "Could not build a booking URL from this salon name. Try a more unique name.",
+        };
+      }
+      baseSlug = fromName.slug;
+    }
   }
 
   const slotMinutes = Number(input.bookingSlotMinutes ?? 30);
@@ -76,9 +101,7 @@ export async function createSalonOrganization(
     };
   }
 
-  const nameTaken = await admin
-    .from("organizations")
-    .select("id, name");
+  const nameTaken = await admin.from("organizations").select("id, name");
 
   if (nameTaken.error) {
     return { error: nameTaken.error.message };
@@ -91,21 +114,39 @@ export async function createSalonOrganization(
     return { error: "This salon name is already taken. Choose a different name." };
   }
 
+  // Explicit slug request: hard-fail if taken. Name-derived: try suffix variants.
   let slug = baseSlug;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
+  if (explicitSlug) {
     const { data: clash } = await admin
       .from("organizations")
       .select("id")
-      .eq("slug", candidate)
+      .eq("slug", baseSlug)
       .maybeSingle();
-
-    if (!clash) {
-      slug = candidate;
-      break;
+    if (clash) {
+      return { error: slugTakenMessage(baseSlug) };
     }
-    if (attempt === 5) {
-      return { error: "That booking URL is taken. Try a different slug." };
+  } else {
+    let found = false;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
+      if (!validateStoreSlug(candidate).ok) continue;
+      const { data: clash } = await admin
+        .from("organizations")
+        .select("id")
+        .eq("slug", candidate)
+        .maybeSingle();
+
+      if (!clash) {
+        slug = candidate;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      return {
+        error:
+          "Could not create a free booking URL from this salon name. Try a more unique name.",
+      };
     }
   }
 
@@ -128,6 +169,9 @@ export async function createSalonOrganization(
     .single();
 
   if (orgError || !org) {
+    if (isSlugUniqueViolation(orgError?.message)) {
+      return { error: slugUniqueViolationMessage(slug) };
+    }
     return { error: orgError?.message ?? "Could not create salon" };
   }
 
@@ -198,13 +242,21 @@ export async function createSalonOrganization(
   return { success: true, slug: org.slug, organizationId: org.id };
 }
 
-export async function checkSlugAvailable(slugInput: string): Promise<{
+export async function checkSlugAvailable(
+  slugInput: string,
+  opts?: { excludeOrganizationId?: string; currentSlug?: string }
+): Promise<{
   available: boolean;
   slug: string;
   error?: string;
 }> {
-  const slug = slugify(slugInput);
-  if (!slug) return { available: false, slug: "", error: "Enter a valid slug" };
+  const validated = validateStoreSlug(slugInput, {
+    allowCurrent: opts?.currentSlug,
+  });
+  if (!validated.ok) {
+    return { available: false, slug: validated.slug, error: validated.error };
+  }
+  const slug = validated.slug;
 
   let admin;
   try {
@@ -213,13 +265,16 @@ export async function checkSlugAvailable(slugInput: string): Promise<{
     return { available: false, slug, error: "Server misconfigured" };
   }
 
-  const { data } = await admin
-    .from("organizations")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
+  let query = admin.from("organizations").select("id").eq("slug", slug);
+  if (opts?.excludeOrganizationId) {
+    query = query.neq("id", opts.excludeOrganizationId);
+  }
+  const { data } = await query.maybeSingle();
 
-  return { available: !data, slug };
+  if (data) {
+    return { available: false, slug, error: slugTakenMessage(slug) };
+  }
+  return { available: true, slug };
 }
 
 export async function checkSalonNameAvailable(nameInput: string): Promise<{

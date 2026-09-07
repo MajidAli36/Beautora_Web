@@ -15,6 +15,13 @@ import {
   type PaymentAccount,
   type PaymentAccountType,
 } from "@/lib/store/profile";
+import {
+  isSlugUniqueViolation,
+  slugTakenMessage,
+  slugUniqueViolationMessage,
+  validateStoreSlug,
+} from "@/lib/onboarding/slug";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/types/commerce";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -121,6 +128,7 @@ export async function getStoreProfile(): Promise<StoreProfile | null> {
 
 export async function updateStoreProfile(input: {
   name: string;
+  slug?: string;
   tagline?: string;
   address?: string;
   city?: string;
@@ -135,6 +143,42 @@ export async function updateStoreProfile(input: {
 
   const supabase = await createClient();
 
+  const { data: current } = await supabase
+    .from("organizations")
+    .select("slug")
+    .eq("id", org.organizationId)
+    .single();
+
+  const currentSlug = current?.slug ?? "";
+  const wantsSlugChange = input.slug !== undefined;
+  let nextSlug = currentSlug;
+
+  if (wantsSlugChange) {
+    const validated = validateStoreSlug(input.slug ?? "", {
+      allowCurrent: currentSlug,
+    });
+    if (!validated.ok) return { error: validated.error };
+    nextSlug = validated.slug;
+
+    if (nextSlug !== currentSlug) {
+      let admin;
+      try {
+        admin = createAdminClient();
+      } catch {
+        return { error: "Server misconfigured — cannot verify booking URL" };
+      }
+      const { data: slugClash } = await admin
+        .from("organizations")
+        .select("id")
+        .eq("slug", nextSlug)
+        .neq("id", org.organizationId)
+        .maybeSingle();
+      if (slugClash) {
+        return { error: slugTakenMessage(nextSlug) };
+      }
+    }
+  }
+
   const { data: clash } = await supabase
     .from("organizations")
     .select("id")
@@ -148,22 +192,45 @@ export async function updateStoreProfile(input: {
 
   const { data: updated, error } = await supabase
     .from("organizations")
-    .update({
-      name,
-      tagline: input.tagline?.trim() || null,
-      address: input.address?.trim() || null,
-      city,
-      phone: input.phone?.trim() || null,
-      email: input.email?.trim() || null,
-      whatsapp_phone: input.whatsappPhone?.trim() || null,
-      arrival_notes: input.arrivalNotes?.trim() || null,
-    })
+    .update(
+      wantsSlugChange
+        ? {
+            name,
+            slug: nextSlug,
+            tagline: input.tagline?.trim() || null,
+            address: input.address?.trim() || null,
+            city,
+            phone: input.phone?.trim() || null,
+            email: input.email?.trim() || null,
+            whatsapp_phone: input.whatsappPhone?.trim() || null,
+            arrival_notes: input.arrivalNotes?.trim() || null,
+          }
+        : {
+            name,
+            tagline: input.tagline?.trim() || null,
+            address: input.address?.trim() || null,
+            city,
+            phone: input.phone?.trim() || null,
+            email: input.email?.trim() || null,
+            whatsapp_phone: input.whatsappPhone?.trim() || null,
+            arrival_notes: input.arrivalNotes?.trim() || null,
+          }
+    )
     .eq("id", org.organizationId)
     .select("slug")
     .single();
 
-  if (error) return { error: error.message };
-  revalidateStoreSurfaces(updated?.slug);
+  if (error) {
+    if (isSlugUniqueViolation(error.message)) {
+      return { error: slugUniqueViolationMessage(nextSlug) };
+    }
+    return { error: error.message };
+  }
+
+  revalidateStoreSurfaces(currentSlug);
+  if (updated?.slug && updated.slug !== currentSlug) {
+    revalidateStoreSurfaces(updated.slug);
+  }
   return { success: true };
 }
 

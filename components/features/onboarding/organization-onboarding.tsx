@@ -8,7 +8,6 @@ import {
   checkSalonNameAvailable,
   createSalonOrganization,
 } from "@/lib/actions/onboarding";
-import { slugify } from "@/lib/onboarding/slug";
 import { cn } from "@/lib/utils";
 
 type OrganizationOnboardingProps = {
@@ -59,7 +58,6 @@ export function OrganizationOnboarding({
     setLoading(true);
     const result = await createSalonOrganization({
       salonName: name,
-      slug: slugify(name),
       seedStarterServices,
       // Quiet defaults — online booking can be configured later
       bookingSlotMinutes: 30,
