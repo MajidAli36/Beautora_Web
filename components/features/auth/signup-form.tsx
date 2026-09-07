@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { notify } from "@/lib/toast";
-import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
+// import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
 import {
   checkEmailAvailable,
   checkSalonNameAvailable,
@@ -19,6 +19,7 @@ export function SignupForm() {
   const [salonName, setSalonName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [nameHint, setNameHint] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState<string | null>(null);
@@ -188,15 +189,22 @@ export function SignupForm() {
           <div className="relative">
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
               autoComplete="new-password"
-              className={cn(fieldClassName, "pr-10")}
+              className={cn(fieldClassName, "pr-11")}
             />
-            <Lock className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-[var(--m-muted)]" />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute top-1/2 right-2.5 flex size-8 -translate-y-1/2 items-center justify-center text-[var(--m-muted)] transition-colors hover:text-[var(--m-ink)]"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
           </div>
           <p className="text-xs text-[var(--m-muted)]">At least 8 characters</p>
         </div>
@@ -211,9 +219,11 @@ export function SignupForm() {
         </button>
       </form>
 
+      {/* Social login — enable later when OAuth providers are configured
       <div className="mt-7">
         <AuthSocialButtons />
       </div>
+      */}
     </div>
   );
 }

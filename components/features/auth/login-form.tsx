@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { notify } from "@/lib/toast";
 // import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
 import { confirmUserEmail } from "@/lib/actions/auth";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -158,14 +159,21 @@ export function LoginForm() {
           <div className="relative">
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className={cn(fieldClassName, "pr-10")}
+              className={cn(fieldClassName, "pr-11")}
             />
-            <Lock className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-[var(--m-muted)]" />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute top-1/2 right-2.5 flex size-8 -translate-y-1/2 items-center justify-center text-[var(--m-muted)] transition-colors hover:text-[var(--m-ink)]"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
           </div>
         </div>
 
