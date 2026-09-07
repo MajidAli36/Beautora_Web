@@ -28,14 +28,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       url: absoluteUrl("/syncops"),
       lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.8,
+      changeFrequency: "weekly",
+      priority: 0.9,
     },
     {
       url: absoluteUrl("/ceo"),
       lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.75,
+      changeFrequency: "weekly",
+      priority: 0.88,
     },
     {
       url: absoluteUrl("/signup"),

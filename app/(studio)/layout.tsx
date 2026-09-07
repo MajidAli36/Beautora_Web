@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Fraunces, Manrope } from "next/font/google";
-import { SITE_SEO } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
 const display = Fraunces({
@@ -22,7 +21,11 @@ export const metadata: Metadata = {
     default: `${SYNCOPS.builder.name} · Studio behind ${SYNCOPS.name}`,
     template: `%s · ${SYNCOPS.builder.name}`,
   },
-  description: `${SYNCOPS.builder.name} builds ${SYNCOPS.name} — salon POS, booking, and operations software. ${SITE_SEO.shortDescription}`,
+  description: `${SYNCOPS.builder.name} builds ${SYNCOPS.name} — salon POS, booking, and operations software. Official site ${SYNCOPS.builder.domain}. Founded by ${SYNCOPS.ceo.name}.`,
+  authors: [
+    { name: SYNCOPS.builder.name, url: SYNCOPS.builder.url },
+    { name: SYNCOPS.ceo.name, url: "/ceo" },
+  ],
   robots: {
     index: true,
     follow: true,

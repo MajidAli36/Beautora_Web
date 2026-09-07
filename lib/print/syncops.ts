@@ -25,8 +25,10 @@ export const SYNCOPS = {
     platform: "Platform Beautora",
   },
   social: {
-    linkedin: "https://www.linkedin.com",
-    github: "https://github.com",
+    linkedin: "https://www.linkedin.com/in/majidali-syncops/",
+    github: "https://github.com/MajidAli36",
+    website: "https://majidali.tech",
+    email: "majid@majidali.tech",
     instagram: "https://www.instagram.com",
   },
   ceo: {
@@ -34,6 +36,13 @@ export const SYNCOPS = {
     role: "Founder & CEO",
     photo: "/brand/ceo-majid-ali.png",
     initials: "MA",
+    /** Personal / professional presence */
+    links: {
+      linkedin: "https://www.linkedin.com/in/majidali-syncops/",
+      website: "https://majidali.tech",
+      github: "https://github.com/MajidAli36",
+      email: "majid@majidali.tech",
+    },
     /** Short line for the marketing top bar */
     ticker:
       "We build partnerships that drive lasting success — Majid Ali, Founder & CEO",

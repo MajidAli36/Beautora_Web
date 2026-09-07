@@ -133,25 +133,25 @@ export function AuthBrandPanel({ slide = 0 }: AuthBrandPanelProps) {
         </div>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <SocialIcon href="https://www.linkedin.com" label="LinkedIn">
+          <SocialIcon href={SYNCOPS.ceo.links.linkedin} label="LinkedIn">
             <LinkedInIcon className="size-4" />
           </SocialIcon>
-          <SocialIcon href={SYNCOPS.url} label="Website">
+          <SocialIcon href={SYNCOPS.ceo.links.website} label="Website">
             <Globe className="size-4" />
           </SocialIcon>
-          <SocialIcon href="https://github.com" label="GitHub">
+          <SocialIcon href={SYNCOPS.ceo.links.github} label="GitHub">
             <GitHubIcon className="size-4" />
           </SocialIcon>
-          <SocialIcon href={`mailto:${SYNCOPS.email}`} label="Email">
+          <SocialIcon href={`mailto:${SYNCOPS.ceo.links.email}`} label="Email">
             <Mail className="size-4" />
           </SocialIcon>
-          <a
+          <Link
             href="/ceo"
             className="ml-1 inline-flex items-center gap-1.5 text-sm font-medium text-white/75 transition-colors hover:text-white"
           >
             Full message
             <ArrowUpRight className="size-3.5" />
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -189,11 +189,12 @@ function SocialIcon({
   label: string;
   children: React.ReactNode;
 }) {
+  const external = !href.startsWith("mailto:");
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
       aria-label={label}
       className="inline-flex size-9 items-center justify-center rounded-full bg-white/5 text-white/70 ring-1 ring-white/10 transition-colors hover:bg-white/10 hover:text-white"
     >

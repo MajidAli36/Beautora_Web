@@ -18,6 +18,7 @@ export const SYNCOPS_PAGE = {
     {
       title: "Beautora",
       body: "Salon OS for modern stores — online booking, POS, queue, WhatsApp, attendance, and reports.",
+      href: "/",
     },
     {
       title: "Craft & discipline",
@@ -26,6 +27,32 @@ export const SYNCOPS_PAGE = {
     {
       title: "Built to scale",
       body: "One store today, a multi-location brand tomorrow — without rewriting your stack.",
+    },
+  ],
+  backlinks: [
+    {
+      label: "Official website",
+      href: SYNCOPS.builder.url,
+      external: true,
+      hint: SYNCOPS.builder.domain,
+    },
+    {
+      label: "Beautora product",
+      href: "/",
+      external: false,
+      hint: SYNCOPS.domain,
+    },
+    {
+      label: "Founder & CEO",
+      href: "/ceo",
+      external: false,
+      hint: SYNCOPS.ceo.name,
+    },
+    {
+      label: "LinkedIn",
+      href: SYNCOPS.ceo.links.linkedin,
+      external: true,
+      hint: "Majid Ali",
     },
   ],
   ceoPath: "/ceo",

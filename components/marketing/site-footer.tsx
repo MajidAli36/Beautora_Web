@@ -76,12 +76,32 @@ export function SiteFooter() {
             </li>
             <li>
               <a
-                href={SYNCOPS.url}
+                href={SYNCOPS.builder.url}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener noreferrer me author"
                 className="hover:text-white"
               >
-                {SYNCOPS.domain}
+                {SYNCOPS.builder.domain}
+              </a>
+            </li>
+            <li>
+              <a
+                href={SYNCOPS.ceo.links.linkedin}
+                target="_blank"
+                rel="noopener noreferrer me"
+                className="hover:text-white"
+              >
+                LinkedIn
+              </a>
+            </li>
+            <li>
+              <a
+                href={SYNCOPS.ceo.links.website}
+                target="_blank"
+                rel="noopener noreferrer me"
+                className="hover:text-white"
+              >
+                majidali.tech
               </a>
             </li>
           </ul>
