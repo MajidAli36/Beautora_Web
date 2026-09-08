@@ -156,6 +156,7 @@ export function AccountReceivePaymentDialog({
                   notify.error(result.error);
                   return;
                 }
+                notify.success("Account payment recorded.");
                 onOpenChange(false);
                 router.refresh();
               });

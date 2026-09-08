@@ -245,20 +245,16 @@ export function PosTerminal({
 
   async function runCheckout() {
     if (depositCredit > 0 && !appointmentId) {
-      notify.error("Select the appointment linked to this advance before completing sale.");
-      return;
+      return { error: "Select the appointment linked to this advance before completing sale." };
     }
     if (isWalkIn && isPartial) {
-      notify.error("Walk-in customers must pay the full amount.");
-      return;
+      return { error: "Walk-in customers must pay the full amount." };
     }
     if (isPartial && !confirmPartial) {
-      notify.error("Confirm that the remaining balance will be customer due.");
-      return;
+      return { error: "Confirm that the remaining balance will be customer due." };
     }
     if (isUnpaid && (!allowUnpaid || !canManage)) {
-      notify.error("Creating an unpaid invoice requires a manager.");
-      return;
+      return { error: "Creating an unpaid invoice requires a manager." };
     }
     const result = await completeCheckout({
       items: cart,
@@ -274,14 +270,15 @@ export function PosTerminal({
       allowUnpaid: allowUnpaid && canManage,
     });
     if (result.error) {
-      notify.error(result.error);
-      return;
+      return result;
     }
+    notify.success("Sale completed.");
     if (result.saleId) {
       await printSaleReceipt(result.saleId);
       router.push(`/sales/${result.saleId}`);
       router.refresh();
     }
+    return result;
   }
 
   const checkoutLabel =
@@ -537,6 +534,7 @@ export function PosTerminal({
                     variant="ghost"
                     size="icon"
                     className="size-10 sm:size-7"
+                    successMessage="Item removed."
                     onConfirm={async () => {
                       setCart((prev) =>
                         prev.filter(
@@ -794,6 +792,7 @@ export function PosTerminal({
           className="w-full"
           disabled={cart.length === 0 || (isPartial && !isWalkIn && !confirmPartial)}
           onConfirm={runCheckout}
+          successMessage=""
         >
           {checkoutLabel}
         </ConfirmAction>

@@ -191,7 +191,7 @@ function TeamMemberRow({
   const [pending, startTransition] = useTransition();
   const [role, setRole] = useState(member.role);
   const [updateState, updateAction] = useActionState(updateTeamMemberRole, {} as ActionResult);
-  useActionToast(updateState);
+  useActionToast(updateState, { successMessage: "Role updated." });
 
   const isOwner = member.role === "OWNER";
 
@@ -240,9 +240,8 @@ function TeamMemberRow({
               variant="ghost"
               className="text-destructive"
               disabled={pending}
-              onConfirm={async () => {
-                await removeTeamMember(member.id);
-              }}
+              onConfirm={async () => removeTeamMember(member.id)}
+              successMessage="Team member removed."
             >
               Remove
             </ConfirmAction>

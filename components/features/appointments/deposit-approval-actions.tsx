@@ -4,7 +4,6 @@ import { approveAppointmentDeposit, rejectAppointmentDeposit } from "@/lib/actio
 import { Badge } from "@/components/ui/badge";
 import { ConfirmAction } from "@/components/ui/confirm-action";
 import { formatCurrency } from "@/lib/format";
-import { notify } from "@/lib/toast";
 
 type DepositApprovalProps = {
   depositId: string;
@@ -59,16 +58,13 @@ export function DepositApprovalActions({
           confirmLabel="Approve"
           pendingLabel="Approving…"
           variant="default"
+          successMessage="Advance approved."
           onConfirm={async () => {
             const result = await approveAppointmentDeposit(depositId);
-            if (result.error) {
-              notify.error(result.error);
-              return;
-            }
-            notify.success("Advance approved");
-            if (appointmentId) {
+            if (!result.error && appointmentId) {
               onResolved?.(appointmentId, depositId, "APPROVED");
             }
+            return result;
           }}
         >
           Approve
@@ -79,16 +75,13 @@ export function DepositApprovalActions({
           confirmLabel="Reject"
           pendingLabel="Rejecting…"
           variant="outline"
+          successMessage="Advance rejected."
           onConfirm={async () => {
             const result = await rejectAppointmentDeposit(depositId);
-            if (result.error) {
-              notify.error(result.error);
-              return;
-            }
-            notify.success("Advance rejected");
-            if (appointmentId) {
+            if (!result.error && appointmentId) {
               onResolved?.(appointmentId, depositId, "REJECTED");
             }
+            return result;
           }}
         >
           Reject

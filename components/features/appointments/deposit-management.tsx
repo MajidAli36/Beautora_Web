@@ -159,9 +159,11 @@ function DepositRow({
               confirmLabel="Approve"
               pendingLabel="Approving…"
               variant="default"
+              successMessage="Advance approved."
               onConfirm={async () => {
                 const result = await approveAppointmentDeposit(deposit.id!);
                 if (!result.error) onUpdated?.(appointmentId, deposit.id!, "APPROVED");
+                return result;
               }}
             >
               Approve
@@ -172,9 +174,11 @@ function DepositRow({
               confirmLabel="Reject"
               pendingLabel="Rejecting…"
               variant="outline"
+              successMessage="Advance rejected."
               onConfirm={async () => {
                 const result = await rejectAppointmentDeposit(deposit.id!);
                 if (!result.error) onUpdated?.(appointmentId, deposit.id!, "REJECTED");
+                return result;
               }}
             >
               Reject
@@ -266,7 +270,7 @@ function RefundDepositDialog({
     [onRefunded]
   );
   const [state, formAction, isPending] = useActionState(refundAction, {} as ActionResult);
-  useActionToast(state);
+  useActionToast(state, { successMessage: "Advance refunded." });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

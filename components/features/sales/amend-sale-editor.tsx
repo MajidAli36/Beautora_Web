@@ -428,6 +428,7 @@ export function AmendSaleEditor({
                         notify.error(res.error);
                         return;
                       }
+                      notify.success("Amendment saved.");
                       router.push(`/sales/${saleId}?tab=history`);
                       router.refresh();
                     })

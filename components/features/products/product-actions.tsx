@@ -26,9 +26,8 @@ export function DeleteProductButton({ id, name }: { id: string; name?: string })
       pendingLabel="Deleting…"
       variant="outline"
       className={deleteBtnClass}
-      onConfirm={async () => {
-        await deleteProduct(id);
-      }}
+      onConfirm={async () => deleteProduct(id)}
+      successMessage="Product deleted."
     >
       <Trash2 className="size-3.5" />
       Delete
@@ -49,9 +48,8 @@ export function DeleteProductCategoryButton({ id, name }: { id: string; name?: s
       pendingLabel="Deleting…"
       variant="outline"
       className={deleteBtnClass}
-      onConfirm={async () => {
-        await deleteProductCategory(id);
-      }}
+      onConfirm={async () => deleteProductCategory(id)}
+      successMessage="Category deleted."
     >
       <Trash2 className="size-3.5" />
       Delete

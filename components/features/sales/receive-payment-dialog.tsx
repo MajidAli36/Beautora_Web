@@ -40,7 +40,6 @@ export function ReceivePaymentDialog({
   const [tendered, setTendered] = useState(String(amountDue));
   const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [notes, setNotes] = useState("");
-  const [changeMsg, setChangeMsg] = useState<string | null>(null);
 
   const payAmt = Number(amount) || 0;
   const tenderAmt = Number(tendered) || 0;
@@ -52,7 +51,6 @@ export function ReceivePaymentDialog({
     setTendered(String(amountDue));
     setMethod("CASH");
     setNotes("");
-    setChangeMsg(null);
   }
 
   return (
@@ -149,7 +147,6 @@ export function ReceivePaymentDialog({
               This will fully settle the invoice.
             </p>
           )}
-          {changeMsg ? <p className="text-sm text-muted-foreground">{changeMsg}</p> : null}
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -172,9 +169,11 @@ export function ReceivePaymentDialog({
                   notify.error(result.error);
                   return;
                 }
-                if (result.changeGiven && result.changeGiven > 0) {
-                  setChangeMsg(`Change given: ${formatCurrency(result.changeGiven)}`);
-                }
+                const changeNote =
+                  result.changeGiven && result.changeGiven > 0
+                    ? ` Change given: ${formatCurrency(result.changeGiven)}.`
+                    : "";
+                notify.success(`Payment received.${changeNote}`);
                 onOpenChange(false);
                 router.refresh();
               });

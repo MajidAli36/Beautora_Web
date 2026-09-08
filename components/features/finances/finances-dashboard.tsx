@@ -437,9 +437,8 @@ function ExpenseRowItem({ expense }: { expense: ExpenseRow }) {
           variant="ghost"
           size="icon-sm"
           className="text-destructive"
-          onConfirm={async () => {
-            await deleteExpense(expense.id);
-          }}
+          onConfirm={async () => deleteExpense(expense.id)}
+          successMessage="Expense deleted."
         >
           <Trash2 className="size-3.5" />
         </ConfirmAction>

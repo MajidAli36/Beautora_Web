@@ -11,7 +11,7 @@ export function AppToaster() {
       closeButton
       expand
       visibleToasts={5}
-      duration={4200}
+      duration={3200}
       gap={12}
       offset={{ top: 16, right: 16 }}
       toastOptions={{

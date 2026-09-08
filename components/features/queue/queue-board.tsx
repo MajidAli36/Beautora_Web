@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ActionResult } from "@/types/commerce";
 import { formatDate, formatTime } from "@/lib/format";
 import { PaginatedList } from "@/components/ui/table-pagination";
+import { notify } from "@/lib/toast";
 import Link from "next/link";
 
 type Token = {
@@ -91,7 +92,7 @@ export function QueueBoard({
       queueDate?: string;
     }
   );
-  useActionToast(state);
+  useActionToast(state, { successMessage: "Token issued." });
   const [drawerPending, startDrawer] = useTransition();
   const lastPrintedToken = useRef<number | null>(null);
   const [tokenTime, setTokenTime] = useState(currentTimeValue);
@@ -377,7 +378,9 @@ function TokenCard({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await updateTokenStatus(token.id, "CALLED");
+                const result = await updateTokenStatus(token.id, "CALLED");
+                if (result?.error) notify.error(result.error);
+                else notify.success("Customer called.");
               })
             }
           >
@@ -390,7 +393,9 @@ function TokenCard({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await updateTokenStatus(token.id, "SERVING");
+                const result = await updateTokenStatus(token.id, "SERVING");
+                if (result?.error) notify.error(result.error);
+                else notify.success("Now serving.");
               })
             }
           >
@@ -404,7 +409,9 @@ function TokenCard({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await updateTokenStatus(token.id, "COMPLETED");
+                const result = await updateTokenStatus(token.id, "COMPLETED");
+                if (result?.error) notify.error(result.error);
+                else notify.success("Token completed.");
               })
             }
           >

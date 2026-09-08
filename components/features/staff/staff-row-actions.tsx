@@ -6,6 +6,7 @@ import { deleteStaff, setStaffActive } from "@/lib/actions/staff";
 import { setStaffOnlineBooking } from "@/lib/actions/scheduling";
 import { ConfirmAction } from "@/components/ui/confirm-action";
 import { Button } from "@/components/ui/button";
+import { notify } from "@/lib/toast";
 
 export function StaffRowActions({
   staffId,
@@ -37,7 +38,14 @@ export function StaffRowActions({
         }
         onClick={() =>
           startTransition(async () => {
-            await setStaffOnlineBooking(staffId, !onlineBookingEnabled);
+            const result = await setStaffOnlineBooking(staffId, !onlineBookingEnabled);
+            if (result?.error) {
+              notify.error(result.error);
+              return;
+            }
+            notify.success(
+              onlineBookingEnabled ? "Hidden from online booking." : "Shown on online booking."
+            );
             router.refresh();
           })
         }
@@ -51,7 +59,12 @@ export function StaffRowActions({
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
-            await setStaffActive(staffId, !isActive);
+            const result = await setStaffActive(staffId, !isActive);
+            if (result?.error) {
+              notify.error(result.error);
+              return;
+            }
+            notify.success(isActive ? "Staff disabled." : "Staff enabled.");
             router.refresh();
           })
         }
@@ -66,9 +79,10 @@ export function StaffRowActions({
         variant="ghost"
         onConfirm={async () => {
           const result = await deleteStaff(staffId);
-          if (result.error) throw new Error(result.error);
-          router.refresh();
+          if (!result.error) router.refresh();
+          return result;
         }}
+        successMessage="Staff deleted."
       >
         Delete
       </ConfirmAction>

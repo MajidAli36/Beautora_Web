@@ -48,6 +48,7 @@ function RenameRow({ chair }: { chair: ChairRow }) {
       fd.set("name", trimmed);
       const result = await renameChair({} as ActionResult, fd);
       if (result.error) notify.error(result.error);
+      else notify.success("Chair renamed.");
     });
   }
 
@@ -147,7 +148,15 @@ export function ChairsManager({ chairs, canManage }: Props) {
                                 disabled={pending}
                                 onClick={() =>
                                   startTransition(async () => {
-                                    await setChairActive(chair.id, !chair.is_active);
+                                    const result = await setChairActive(
+                                      chair.id,
+                                      !chair.is_active
+                                    );
+                                    if (result?.error) notify.error(result.error);
+                                    else
+                                      notify.success(
+                                        chair.is_active ? "Chair disabled." : "Chair enabled."
+                                      );
                                   })
                                 }
                               >
@@ -159,9 +168,8 @@ export function ChairsManager({ chairs, canManage }: Props) {
                                 confirmLabel="Delete"
                                 pendingLabel="Deleting…"
                                 variant="ghost"
-                                onConfirm={async () => {
-                                  await deleteChair(chair.id);
-                                }}
+                                onConfirm={async () => deleteChair(chair.id)}
+                                successMessage="Chair deleted."
                               >
                                 Delete
                               </ConfirmAction>

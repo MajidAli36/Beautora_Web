@@ -97,9 +97,8 @@ export function CustomersTable({
                         variant="outline"
                         size="sm"
                         className="gap-1.5 border-destructive/25 bg-destructive/5 text-destructive shadow-sm transition-all hover:border-destructive/50 hover:bg-destructive hover:text-destructive-foreground hover:shadow-md"
-                        onConfirm={async () => {
-                          await deleteCustomer(customer.id);
-                        }}
+                        onConfirm={async () => deleteCustomer(customer.id)}
+                        successMessage="Customer deleted."
                       >
                         <Trash2 className="size-3.5" />
                         Delete

@@ -5,6 +5,7 @@ import { setStaffOnlineBooking } from "@/lib/actions/scheduling";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { notify } from "@/lib/toast";
 
 type StaffRow = {
   id: string;
@@ -32,7 +33,10 @@ export function StaffOnlineToggle({ staff, onStaffChange }: StaffOnlineTogglePro
       const result = await setStaffOnlineBooking(staffId, enabled);
       if (result.error) {
         onStaffChange?.(previous);
+        notify.error(result.error);
+        return;
       }
+      notify.success(enabled ? "Shown on online booking." : "Hidden from online booking.");
     });
   }
 

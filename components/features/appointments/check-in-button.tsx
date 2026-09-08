@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { checkInAppointment } from "@/lib/actions/appointments";
 import { getTokenReceiptHtml } from "@/lib/actions/print";
 import { printThermalHtml } from "@/lib/print/browser";
+import { notify } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 
 type CheckInButtonProps = {
@@ -26,6 +27,15 @@ export function CheckInButton({
       onClick={() =>
         startTransition(async () => {
           const result = await checkInAppointment(appointmentId);
+          if (result.error) {
+            notify.error(result.error);
+            return;
+          }
+          notify.success(
+            result.tokenNumber
+              ? `Checked in · token #${result.tokenNumber}`
+              : "Checked in."
+          );
           if (result.tokenNumber) {
             const html = await getTokenReceiptHtml({
               tokenNumber: result.tokenNumber,
@@ -33,8 +43,6 @@ export function CheckInButton({
               customerPhone,
             });
             printThermalHtml(html);
-          } else if (result.error) {
-            alert(result.error);
           }
         })
       }

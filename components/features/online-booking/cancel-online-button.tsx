@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { cancelOnlineAppointment } from "@/lib/actions/appointments";
+import { notify } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 
 type CancelOnlineButtonProps = {
@@ -22,9 +23,12 @@ export function CancelOnlineButton({ appointmentId, onCancelled }: CancelOnlineB
         if (!confirm("Cancel this online booking? The slot will become available again.")) return;
         startTransition(async () => {
           const result = await cancelOnlineAppointment(appointmentId);
-          if (!result.error) {
-            onCancelled?.(appointmentId);
+          if (result.error) {
+            notify.error(result.error);
+            return;
           }
+          notify.success("Booking cancelled.");
+          onCancelled?.(appointmentId);
         });
       }}
     >

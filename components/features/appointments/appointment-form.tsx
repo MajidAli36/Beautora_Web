@@ -22,7 +22,7 @@ type Props = {
 
 export function AppointmentForm({ customers, staff, services }: Props) {
   const [state, formAction, pending] = useActionState(createAppointment, {} as ActionResult);
-  useActionToast(state);
+  useActionToast(state, { successMessage: "Appointment booked." });
   const [date, setDate] = useState(getLocalDateString);
   const [staffId, setStaffId] = useState("none");
   const [serviceIds, setServiceIds] = useState<string[]>([]);

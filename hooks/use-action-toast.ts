@@ -9,9 +9,9 @@ type ActionLike = {
 };
 
 type UseActionToastOptions = {
-  /** Shown when `state.success` is true. Omit to skip the success toast. */
+  /** Shown when `state.success` is true. Defaults to "Saved successfully." */
   successMessage?: string;
-  /** Called after a success toast (or when success has no message). */
+  /** Called after a success toast. Use to close dialogs / reset forms. */
   onSuccess?: () => void;
   /** Override the error toast body. Defaults to `state.error`. */
   errorMessage?: string | ((error: string) => string);
@@ -20,6 +20,7 @@ type UseActionToastOptions = {
 /**
  * Turns `useActionState` / ActionResult into Sonner toasts.
  * Dedupes by state object identity so the same result is not toasted twice.
+ * Success toasts auto-dismiss via AppToaster duration.
  */
 export function useActionToast(
   state: ActionLike | null | undefined,
@@ -46,7 +47,7 @@ export function useActionToast(
     }
 
     if (state.success) {
-      if (successMessage) notify.success(successMessage);
+      notify.success(successMessage ?? "Saved successfully.");
       onSuccess?.();
     }
   }, [state]);

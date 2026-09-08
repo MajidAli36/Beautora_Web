@@ -2,22 +2,25 @@ import { toast } from "sonner";
 
 type NotifyOptions = {
   description?: string;
+  /** Auto-dismiss ms. Defaults to 3200. */
   duration?: number;
   id?: string | number;
 };
 
+const DEFAULT_DURATION = 3200;
+
 export const notify = {
   success(message: string, options?: NotifyOptions) {
-    return toast.success(message, options);
+    return toast.success(message, { duration: DEFAULT_DURATION, ...options });
   },
   error(message: string, options?: NotifyOptions) {
-    return toast.error(message, options);
+    return toast.error(message, { duration: 5200, ...options });
   },
   info(message: string, options?: NotifyOptions) {
-    return toast.info(message, options);
+    return toast.info(message, { duration: DEFAULT_DURATION, ...options });
   },
   warning(message: string, options?: NotifyOptions) {
-    return toast.warning(message, options);
+    return toast.warning(message, { duration: 4500, ...options });
   },
   loading(message: string, options?: NotifyOptions) {
     return toast.loading(message, options);

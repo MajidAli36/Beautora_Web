@@ -247,6 +247,7 @@ export function SalesActionsMenu({
                     notify.error(res.error);
                     return;
                   }
+                  notify.success("Refund recorded.");
                   setRefundOpen(false);
                   router.refresh();
                 })

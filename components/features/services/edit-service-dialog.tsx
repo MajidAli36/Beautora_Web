@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { updateService } from "@/lib/actions/services";
 import { useActionToast } from "@/hooks/use-action-toast";
@@ -94,14 +95,20 @@ function EditServiceForm({
   consumables: ConsumableProductOption[];
   onDone: () => void;
 }) {
+  const router = useRouter();
   const action = useMemo(
-    () => updateService.bind(null, service.id),
+    () =>
+      async (_prev: ActionResult, formData: FormData) =>
+        updateService(service.id, _prev, formData),
     [service.id]
   );
   const [state, formAction, pending] = useActionState(action, {} as ActionResult);
   useActionToast(state, {
     successMessage: "Service updated.",
-    onSuccess: onDone,
+    onSuccess: () => {
+      onDone();
+      router.refresh();
+    },
   });
 
   return (

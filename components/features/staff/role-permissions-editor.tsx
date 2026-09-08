@@ -124,7 +124,7 @@ function NavPermissionRow({
   enabled: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updateRoleNavPermission, {} as ActionResult);
-  useActionToast(state);
+  useActionToast(state, { successMessage: "Permissions saved." });
 
   return (
     <TableRow>

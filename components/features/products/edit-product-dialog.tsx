@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { updateProduct } from "@/lib/actions/products";
 import { useActionToast } from "@/hooks/use-action-toast";
@@ -75,14 +76,20 @@ function EditProductForm({
   categories: ProductCategory[];
   onDone: () => void;
 }) {
+  const router = useRouter();
   const action = useMemo(
-    () => updateProduct.bind(null, product.id),
+    () =>
+      async (_prev: ActionResult, formData: FormData) =>
+        updateProduct(product.id, _prev, formData),
     [product.id]
   );
   const [state, formAction, pending] = useActionState(action, {} as ActionResult);
   useActionToast(state, {
     successMessage: "Product updated.",
-    onSuccess: onDone,
+    onSuccess: () => {
+      onDone();
+      router.refresh();
+    },
   });
 
   return (

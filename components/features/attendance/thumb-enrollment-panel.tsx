@@ -109,9 +109,8 @@ export function ThumbEnrollmentPanel({ staff, canManage, enrolledCount }: ThumbE
                         confirmLabel="Remove thumb"
                         pendingLabel="Removing…"
                         variant="outline"
-                        onConfirm={async () => {
-                          await removeStaffThumb(s.id);
-                        }}
+                        onConfirm={async () => removeStaffThumb(s.id)}
+                        successMessage="Thumb enrollment removed."
                       >
                         <Trash2 className="mr-1.5 size-3.5" />
                         Remove thumb

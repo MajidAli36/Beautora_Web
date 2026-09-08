@@ -13,6 +13,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { notify } from "@/lib/toast";
+
+type ConfirmResult = { error?: string; success?: boolean } | void;
 
 type ConfirmActionProps = {
   title: string;
@@ -20,11 +23,13 @@ type ConfirmActionProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   pendingLabel?: string;
+  /** Toast on success. Pass empty string to skip toast. Default: "Done." */
+  successMessage?: string;
   variant?: "default" | "destructive" | "outline" | "ghost" | "secondary";
   size?: "default" | "sm" | "lg" | "icon" | "icon-sm" | "xs";
   className?: string;
   disabled?: boolean;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: () => ConfirmResult | Promise<ConfirmResult>;
   children: React.ReactNode;
 };
 
@@ -34,6 +39,7 @@ export function ConfirmAction({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   pendingLabel,
+  successMessage = "Done.",
   variant = "destructive",
   size = "sm",
   className,
@@ -46,15 +52,34 @@ export function ConfirmAction({
 
   function handleConfirm() {
     startTransition(async () => {
-      await onConfirm();
-      setOpen(false);
+      try {
+        const result = await onConfirm();
+        if (result && typeof result === "object" && result.error) {
+          notify.error(result.error);
+          return;
+        }
+        if (successMessage) {
+          notify.success(successMessage);
+        }
+        setOpen(false);
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : "Something went wrong");
+      }
     });
   }
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger
-        render={<Button type="button" variant={variant} size={size} className={className} disabled={disabled} />}
+        render={
+          <Button
+            type="button"
+            variant={variant}
+            size={size}
+            className={className}
+            disabled={disabled}
+          />
+        }
       >
         {children}
       </AlertDialogTrigger>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmAction } from "@/components/ui/confirm-action";
 import { PaginatedList } from "@/components/ui/table-pagination";
+import { notify } from "@/lib/toast";
 import {
   Table,
   TableBody,
@@ -91,7 +92,12 @@ export function DevicesTable({
                             disabled={pending}
                             onClick={() =>
                               startTransition(async () => {
-                                await setDeviceActive(d.id, !active);
+                                const result = await setDeviceActive(d.id, !active);
+                                if (result?.error) {
+                                  notify.error(result.error);
+                                  return;
+                                }
+                                notify.success(active ? "Device disabled." : "Device enabled.");
                                 router.refresh();
                               })
                             }
@@ -105,9 +111,11 @@ export function DevicesTable({
                             pendingLabel="Deleting…"
                             variant="ghost"
                             onConfirm={async () => {
-                              await deleteDevice(d.id);
-                              router.refresh();
+                              const result = await deleteDevice(d.id);
+                              if (!result.error) router.refresh();
+                              return result;
                             }}
+                            successMessage="Device deleted."
                           >
                             Delete
                           </ConfirmAction>
