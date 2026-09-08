@@ -153,9 +153,9 @@ export function FinancesDashboard({
               variant="in"
               detail="Cash/card sales + advances"
             />
-            <FlowItem label="Money out" value={summary.totalOutflow} variant="out" detail="Expenses + staff + product COGS" />
+            <FlowItem label="Money out" value={summary.totalOutflow} variant="out" detail="Expenses + staff + refunds (cash)" />
             <FlowItem label="Net cash flow" value={summary.netCashFlow} variant={summary.netCashFlow >= 0 ? "profit" : "loss"} />
-            <FlowItem label="Net profit" value={summary.netProfit} variant={summary.netProfit >= 0 ? "profit" : "loss"} detail="Sales − all costs − COGS" />
+            <FlowItem label="Net profit" value={summary.netProfit} variant={summary.netProfit >= 0 ? "profit" : "loss"} detail="Sales − costs − retail COGS − in-house usage" />
           </div>
         </CardContent>
       </Card>
@@ -186,7 +186,7 @@ export function FinancesDashboard({
         <SummaryCard
           title="Net profit"
           value={formatCurrency(summary.netProfit)}
-          subtitle="Sales − expenses − staff − COGS"
+          subtitle="Sales − expenses − staff − retail COGS − in-house usage"
           variant={summary.netProfit >= 0 ? "profit" : "loss"}
         />
         <SummaryCard

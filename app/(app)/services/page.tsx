@@ -2,8 +2,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import {
   getPackages,
   getServiceCategories,
-  getServices,
+  getServicesWithUsage,
 } from "@/lib/actions/services";
+import { getConsumableProducts } from "@/lib/actions/products";
 import { canManageRecords } from "@/lib/auth/permissions";
 import { CategoryForm } from "@/components/features/services/category-form";
 import { PackageForm } from "@/components/features/services/package-form";
@@ -23,18 +24,38 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function ServicesPage() {
-  const [categories, services, packages, canManage] = await Promise.all([
+  const [categories, servicesRaw, packages, consumables, canManage] = await Promise.all([
     getServiceCategories(),
-    getServices(),
+    getServicesWithUsage(),
     getPackages(),
+    getConsumableProducts(),
     canManageRecords(),
   ]);
+
+  const services = (servicesRaw ?? []).map((s) => {
+    const usage = s.usage ?? [];
+    return {
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      price: Number(s.price),
+      duration_minutes: s.duration_minutes,
+      is_active: s.is_active,
+      category_id: s.category_id,
+      category: s.category as { id: string; name: string } | null,
+      usageCount: usage.length,
+      usageRows: usage.map((u) => ({
+        productId: u.product_id,
+        quantity: Number(u.quantity_per_service),
+      })),
+    };
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Services"
-        description="Manage service categories, individual services, and packages."
+        description="Manage service categories, individual services, packages, and in-house products used during each service."
       />
 
       <Tabs defaultValue="services">
@@ -49,10 +70,13 @@ export default async function ServicesPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Add service</CardTitle>
-                <CardDescription>Create a new salon service.</CardDescription>
+                <CardDescription>
+                  Create a salon service and optionally link in-house products used each time it
+                  is performed.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <ServiceForm categories={categories} />
+                <ServiceForm categories={categories} consumables={consumables} />
               </CardContent>
             </Card>
           )}
@@ -62,7 +86,12 @@ export default async function ServicesPage() {
               <CardTitle>All services</CardTitle>
             </CardHeader>
             <CardContent>
-              <ServicesTable services={services} canManage={canManage} />
+              <ServicesTable
+                services={services}
+                categories={categories}
+                consumables={consumables}
+                canManage={canManage}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -93,13 +122,10 @@ export default async function ServicesPage() {
           {canManage && (
             <Card>
               <CardHeader>
-                <CardTitle>Create package</CardTitle>
-                <CardDescription>
-                  Bundle multiple services at a package price.
-                </CardDescription>
+                <CardTitle>Add package</CardTitle>
               </CardHeader>
               <CardContent>
-                <PackageForm services={services} />
+                <PackageForm services={services as never} />
               </CardContent>
             </Card>
           )}

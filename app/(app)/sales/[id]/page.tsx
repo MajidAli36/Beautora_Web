@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getSale } from "@/lib/actions/sales";
 import { getSaleRefunds, getSaleVersions } from "@/lib/actions/sales-lifecycle";
 import { canManageRecords, canUsePos } from "@/lib/auth/permissions";
-import { isPostedSaleStatus } from "@/lib/sales/lifecycle";
+import { isDeletedSaleStatus, isPostedSaleStatus, saleStatusLabel } from "@/lib/sales/lifecycle";
 import { VoidSaleButton } from "@/components/features/sales/void-sale-button";
 import { PrintReceiptButton } from "@/components/features/sales/print-receipt-button";
 import { InvoiceHistoryPanel } from "@/components/features/sales/invoice-history-panel";
@@ -61,8 +61,9 @@ export default async function SaleDetailPage({ params, searchParams }: SaleDetai
   };
   const amountDue = Number(saleAny.amount_due ?? 0);
   const amountPaid = Number(saleAny.amount_paid ?? 0);
+  const deleted = isDeletedSaleStatus(sale.status);
   const canReceive =
-    (canPos || canManage) && isPostedSaleStatus(sale.status) && amountDue > 0;
+    (canPos || canManage) && isPostedSaleStatus(sale.status) && amountDue > 0 && !deleted;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -72,7 +73,7 @@ export default async function SaleDetailPage({ params, searchParams }: SaleDetai
           saleAny.current_version && saleAny.current_version > 1
             ? ` · Version ${saleAny.current_version}`
             : ""
-        }`}
+        }${deleted ? " · Soft-deleted (disabled)" : ""}`}
         actions={
           <>
             {canReceive ? (
@@ -83,7 +84,7 @@ export default async function SaleDetailPage({ params, searchParams }: SaleDetai
                 invoiceLabel={invoiceData?.invoice_number}
               />
             ) : null}
-            {canManage && isPostedSaleStatus(sale.status) ? (
+            {canManage && isPostedSaleStatus(sale.status) && !deleted ? (
               <Button variant="outline" render={<Link href={`/sales/${id}/edit`} />}>
                 Edit
               </Button>
@@ -103,6 +104,16 @@ export default async function SaleDetailPage({ params, searchParams }: SaleDetai
         }
       />
 
+      {deleted ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+          <p className="font-medium text-destructive">Deleted invoice — disabled</p>
+          <p className="mt-1 text-muted-foreground">
+            This invoice is soft-deleted. It stays in history but does not count toward staff,
+            revenue, or reports
+            {saleAny.void_reason ? ` · Reason: ${saleAny.void_reason}` : ""}.
+          </p>
+        </div>
+      ) : null}
       {showHistory ? (
         <InvoiceHistoryPanel versions={versions ?? []} refunds={refunds ?? []} />
       ) : (
@@ -112,25 +123,39 @@ export default async function SaleDetailPage({ params, searchParams }: SaleDetai
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle>Summary</CardTitle>
                 <div className="flex gap-2">
-                  <Badge variant={isPostedSaleStatus(sale.status) ? "default" : "secondary"}>
-                    {sale.status}
-                  </Badge>
                   <Badge
                     variant={
-                      saleAny.payment_status === "PAID"
-                        ? "default"
-                        : saleAny.payment_status === "UNPAID"
-                          ? "destructive"
+                      deleted
+                        ? "destructive"
+                        : isPostedSaleStatus(sale.status)
+                          ? "default"
                           : "secondary"
                     }
                   >
-                    {(saleAny.payment_status ?? "PAID").replaceAll("_", " ")}
+                    {saleStatusLabel(sale.status)}
                   </Badge>
+                  {deleted ? (
+                    <Badge variant="outline">Disabled</Badge>
+                  ) : (
+                    <Badge
+                      variant={
+                        saleAny.payment_status === "PAID"
+                          ? "default"
+                          : saleAny.payment_status === "UNPAID"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {(saleAny.payment_status ?? "PAID").replaceAll("_", " ")}
+                    </Badge>
+                  )}
                 </div>
               </div>
               <CardDescription>
                 {sale.completed_at && `Completed ${formatDateTime(sale.completed_at)}`}
-                {saleAny.void_reason ? ` · Void: ${saleAny.void_reason}` : ""}
+                {saleAny.void_reason
+                  ? ` · ${deleted ? "Deleted" : "Void"}: ${saleAny.void_reason}`
+                  : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -278,7 +303,7 @@ export default async function SaleDetailPage({ params, searchParams }: SaleDetai
                 invoiceLabel={invoiceData?.invoice_number}
               />
             ) : null}
-            {canManage && isPostedSaleStatus(sale.status) ? (
+            {canManage && isPostedSaleStatus(sale.status) && !deleted ? (
               <>
                 <Button variant="outline" render={<Link href={`/sales/${sale.id}/edit`} />}>
                   Edit / Amend

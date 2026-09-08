@@ -9,12 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionResult } from "@/lib/actions/customers";
 import type { ServiceCategory } from "@/types";
+import {
+  ServiceUsageRecipeFields,
+  type ConsumableProductOption,
+} from "@/components/features/services/service-usage-recipe-fields";
 
 type ServiceFormProps = {
   categories: ServiceCategory[];
+  consumables: ConsumableProductOption[];
 };
 
-export function ServiceForm({ categories }: ServiceFormProps) {
+export function ServiceForm({ categories, consumables }: ServiceFormProps) {
   const [state, formAction, pending] = useActionState(createService, {} as ActionResult);
   useActionToast(state, { successMessage: "Service added." });
 
@@ -49,12 +54,26 @@ export function ServiceForm({ categories }: ServiceFormProps) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="duration_minutes">Duration (minutes) *</Label>
-        <Input id="duration_minutes" name="duration_minutes" type="number" min={1} required defaultValue={30} />
+        <Input
+          id="duration_minutes"
+          name="duration_minutes"
+          type="number"
+          min={1}
+          required
+          defaultValue={30}
+        />
       </div>
       <div className="flex items-center gap-2">
-        <input id="is_active" name="is_active" type="checkbox" defaultChecked className="size-4 rounded border" />
+        <input
+          id="is_active"
+          name="is_active"
+          type="checkbox"
+          defaultChecked
+          className="size-4 rounded border"
+        />
         <Label htmlFor="is_active">Active</Label>
       </div>
+      <ServiceUsageRecipeFields consumables={consumables} idPrefix="new_svc" />
       <div className="sm:col-span-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Adding…" : "Add service"}

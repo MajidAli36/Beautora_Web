@@ -6,20 +6,22 @@ import { requireMinimumRole } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
-import type { Product, ProductCategory } from "@/types";
+import type { Product, ProductCategory, ProductKind } from "@/types";
 import {
   getInventorySummary,
   type InventorySummary,
 } from "@/lib/inventory/valuation";
+import { isProductKind, isSellableProductKind } from "@/lib/products/kinds";
 
 const productSchema = z.object({
   name: z.string().min(1),
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.string().optional(),
+  product_kind: z.enum(["RETAIL", "IN_HOUSE", "BOTH"]).default("RETAIL"),
   cost_price: z.coerce.number().min(0),
   retail_price: z.coerce.number().min(0),
-  stock_quantity: z.coerce.number().int().min(0).default(0),
+  stock_quantity: z.coerce.number().min(0).default(0),
   low_stock_threshold: z.coerce.number().int().min(0).default(5),
   is_active: z.coerce.boolean().default(true),
 });
@@ -78,11 +80,13 @@ export async function createProduct(
 ): Promise<ActionResult> {
   const org = await requireMinimumRole("MANAGER");
   const categoryId = formData.get("category_id") as string;
+  const kindRaw = String(formData.get("product_kind") ?? "RETAIL");
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
     sku: formData.get("sku") || undefined,
     description: formData.get("description") || undefined,
     category_id: categoryId && categoryId !== "none" ? categoryId : undefined,
+    product_kind: isProductKind(kindRaw) ? kindRaw : "RETAIL",
     cost_price: formData.get("cost_price"),
     retail_price: formData.get("retail_price"),
     stock_quantity: formData.get("stock_quantity") ?? 0,
@@ -91,6 +95,14 @@ export async function createProduct(
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
+  if (
+    isSellableProductKind(parsed.data.product_kind) &&
+    parsed.data.product_kind !== "IN_HOUSE" &&
+    parsed.data.retail_price < 0
+  ) {
+    return { error: "Retail price is required for sellable products" };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.from("products").insert({
     organization_id: org.organizationId,
@@ -98,14 +110,63 @@ export async function createProduct(
     sku: parsed.data.sku ?? null,
     name: parsed.data.name,
     description: parsed.data.description ?? null,
+    product_kind: parsed.data.product_kind,
     cost_price: parsed.data.cost_price,
-    retail_price: parsed.data.retail_price,
+    retail_price: parsed.data.product_kind === "IN_HOUSE" ? parsed.data.retail_price : parsed.data.retail_price,
     stock_quantity: parsed.data.stock_quantity,
     low_stock_threshold: parsed.data.low_stock_threshold,
     is_active: parsed.data.is_active,
   });
   if (error) return { error: error.message };
   revalidatePath("/products");
+  revalidatePath("/services");
+  return { success: true };
+}
+
+const productUpdateSchema = productSchema.omit({ stock_quantity: true });
+
+export async function updateProduct(
+  id: string,
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const org = await requireMinimumRole("MANAGER");
+  const categoryId = formData.get("category_id") as string;
+  const kindRaw = String(formData.get("product_kind") ?? "RETAIL");
+  const parsed = productUpdateSchema.safeParse({
+    name: formData.get("name"),
+    sku: formData.get("sku") || undefined,
+    description: formData.get("description") || undefined,
+    category_id: categoryId && categoryId !== "none" ? categoryId : undefined,
+    product_kind: isProductKind(kindRaw) ? kindRaw : "RETAIL",
+    cost_price: formData.get("cost_price"),
+    retail_price: formData.get("retail_price"),
+    low_stock_threshold: formData.get("low_stock_threshold") ?? 5,
+    is_active: formData.get("is_active") === "on",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("products")
+    .update({
+      category_id: parsed.data.category_id ?? null,
+      sku: parsed.data.sku ?? null,
+      name: parsed.data.name,
+      description: parsed.data.description ?? null,
+      product_kind: parsed.data.product_kind,
+      cost_price: parsed.data.cost_price,
+      retail_price: parsed.data.retail_price,
+      low_stock_threshold: parsed.data.low_stock_threshold,
+      is_active: parsed.data.is_active,
+    })
+    .eq("id", id)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null);
+
+  if (error) return { error: error.message };
+  revalidatePath("/products");
+  revalidatePath("/services");
   return { success: true };
 }
 
@@ -213,6 +274,7 @@ export async function getInventoryTransactions(limit = 20) {
     id: string;
     type: string;
     quantity: number;
+    reference_type: string | null;
     created_at: string;
     product: {
       id: string;
@@ -269,10 +331,11 @@ export async function getPosCatalog() {
       .order("name"),
     supabase
       .from("products")
-      .select("id, name, retail_price, stock_quantity")
+      .select("id, name, retail_price, stock_quantity, product_kind")
       .eq("organization_id", org.organizationId)
       .eq("is_active", true)
       .is("deleted_at", null)
+      .in("product_kind", ["RETAIL", "BOTH"])
       .order("name"),
     supabase
       .from("packages")
@@ -299,9 +362,27 @@ export async function getPosCatalog() {
 
   return {
     services: services.data ?? [],
-    products: products.data ?? [],
+    products: (products.data ?? []).filter((p) =>
+      isSellableProductKind((p as { product_kind?: ProductKind }).product_kind)
+    ),
     packages: packages.data ?? [],
     customers: customers.data ?? [],
     staff: staff.data ?? [],
   };
+}
+
+/** Products that can be attached to a service recipe (in-house or both). */
+export async function getConsumableProducts() {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, cost_price, stock_quantity, product_kind, sku")
+    .eq("organization_id", org.organizationId)
+    .eq("is_active", true)
+    .is("deleted_at", null)
+    .in("product_kind", ["IN_HOUSE", "BOTH"])
+    .order("name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }

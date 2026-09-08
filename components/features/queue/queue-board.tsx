@@ -7,7 +7,8 @@ import { useActionToast } from "@/hooks/use-action-toast";
 import { getTokenReceiptHtml } from "@/lib/actions/print";
 import { printThermalHtml } from "@/lib/print/browser";
 import { getLocalDateString, getLocalTimeString } from "@/lib/dates/local";
-import { CustomerPicker } from "@/components/features/queue/customer-picker";
+import { CustomerPicker } from "@/components/features/customers/customer-picker";
+import { StaffPicker } from "@/components/features/customers/staff-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -222,19 +223,14 @@ export function QueueBoard({
             </div>
             <div className="space-y-2">
               <Label htmlFor="staff_id">Staff (optional)</Label>
-              <select
+              <StaffPicker
                 id="staff_id"
                 name="staff_id"
-                className="flex h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-                defaultValue=""
-              >
-                <option value="">Any / unassigned</option>
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name}
-                  </option>
-                ))}
-              </select>
+                staff={staff}
+                allowEmpty
+                emptyLabel="Any / unassigned"
+                placeholder="Search staff…"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="chair_id">Chair (optional)</Label>

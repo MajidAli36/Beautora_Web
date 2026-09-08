@@ -15,6 +15,16 @@ export function isPostedSaleStatus(status: string): boolean {
   return (POSTED_SALE_STATUSES as readonly string[]).includes(status);
 }
 
+/** Soft-deleted / voided invoices — kept visible but disabled for edits and excluded from revenue. */
+export function isDeletedSaleStatus(status: string): boolean {
+  return status === "VOID";
+}
+
+export function saleStatusLabel(status: string): string {
+  if (status === "VOID") return "Deleted";
+  return status.replaceAll("_", " ");
+}
+
 export type SaleVersionSnapshot = {
   versionNumber: number;
   customerId: string | null;

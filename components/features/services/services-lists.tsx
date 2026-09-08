@@ -5,6 +5,10 @@ import {
   DeletePackageButton,
   DeleteServiceButton,
 } from "@/components/features/services/delete-buttons";
+import {
+  EditServiceButton,
+  type EditableService,
+} from "@/components/features/services/edit-service-dialog";
 import { Badge } from "@/components/ui/badge";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import {
@@ -16,15 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDuration } from "@/lib/format";
-
-type ServiceRow = {
-  id: string;
-  name: string;
-  price: number;
-  duration_minutes: number;
-  is_active: boolean;
-  category: { name: string } | null;
-};
+import type { ServiceCategory } from "@/types";
+import type { ConsumableProductOption } from "@/components/features/services/service-usage-recipe-fields";
 
 type CategoryRow = {
   id: string;
@@ -47,9 +44,13 @@ type PackageRow = {
 
 export function ServicesTable({
   services,
+  categories,
+  consumables,
   canManage,
 }: {
-  services: ServiceRow[];
+  services: EditableService[];
+  categories: ServiceCategory[];
+  consumables: ConsumableProductOption[];
   canManage: boolean;
 }) {
   return (
@@ -58,7 +59,7 @@ export function ServicesTable({
       empty={<p className="text-sm text-muted-foreground">No services yet.</p>}
     >
       {(slice) => (
-        <div className="rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -66,8 +67,9 @@ export function ServicesTable({
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Duration</TableHead>
+                <TableHead>In-house</TableHead>
                 <TableHead>Status</TableHead>
-                {canManage && <TableHead className="w-[80px]" />}
+                {canManage && <TableHead className="min-w-[160px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -78,13 +80,27 @@ export function ServicesTable({
                   <TableCell>{formatCurrency(service.price)}</TableCell>
                   <TableCell>{formatDuration(service.duration_minutes)}</TableCell>
                   <TableCell>
+                    {(service.usageCount ?? 0) > 0 ? (
+                      <Badge variant="outline">{service.usageCount} product(s)</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge variant={service.is_active ? "default" : "secondary"}>
                       {service.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   {canManage && (
                     <TableCell>
-                      <DeleteServiceButton id={service.id} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <EditServiceButton
+                          service={service}
+                          categories={categories}
+                          consumables={consumables}
+                        />
+                        <DeleteServiceButton id={service.id} name={service.name} />
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -126,7 +142,7 @@ export function ServiceCategoriesTable({
                   <TableCell>{cat.sort_order}</TableCell>
                   {canManage && (
                     <TableCell>
-                      <DeleteCategoryButton id={cat.id} />
+                      <DeleteCategoryButton id={cat.id} name={cat.name} />
                     </TableCell>
                   )}
                 </TableRow>
@@ -155,19 +171,19 @@ export function PackagesList({
         <div className="space-y-4">
           {slice.map((pkg) => (
             <div key={pkg.id} className="rounded-lg border p-4">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="font-semibold">{pkg.name}</h3>
                   {pkg.description && (
                     <p className="text-sm text-muted-foreground">{pkg.description}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <span className="font-medium">{formatCurrency(pkg.price)}</span>
                   <Badge variant={pkg.is_active ? "default" : "secondary"}>
                     {pkg.is_active ? "Active" : "Inactive"}
                   </Badge>
-                  {canManage && <DeletePackageButton id={pkg.id} />}
+                  {canManage && <DeletePackageButton id={pkg.id} name={pkg.name} />}
                 </div>
               </div>
               {pkg.items && pkg.items.length > 0 && (

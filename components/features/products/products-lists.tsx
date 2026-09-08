@@ -4,6 +4,7 @@ import {
   DeleteProductButton,
   DeleteProductCategoryButton,
 } from "@/components/features/products/product-actions";
+import { EditProductButton } from "@/components/features/products/edit-product-dialog";
 import { Badge } from "@/components/ui/badge";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { getProductValuation, getTransactionValue } from "@/lib/inventory/valuation";
+import { productKindLabel } from "@/lib/products/kinds";
 import type { Product, ProductCategory } from "@/types";
 
 type ProductRow = Product & { category: { id: string; name: string } | null };
@@ -24,6 +26,7 @@ type TransactionRow = {
   id: string;
   type: string;
   quantity: number;
+  reference_type?: string | null;
   created_at: string;
   product: {
     id: string;
@@ -34,11 +37,33 @@ type TransactionRow = {
   } | null;
 };
 
+function inventoryMovementLabel(type: string, referenceType?: string | null) {
+  if (referenceType === "service_usage" || referenceType === "service_usage_amend") {
+    return "Service usage";
+  }
+  if (
+    referenceType === "service_usage_void" ||
+    referenceType === "service_usage_amend_reverse" ||
+    referenceType === "service_usage_restore"
+  ) {
+    return "Usage restore";
+  }
+  if (referenceType === "sale" || referenceType === "sale_amend") return "Sale";
+  if (referenceType === "sale_void" || referenceType === "sale_amend_reverse") {
+    return "Sale restore";
+  }
+  if (referenceType === "sale_refund_full") return "Refund restore";
+  if (referenceType === "manual") return "Manual";
+  return type;
+}
+
 export function ProductsTable({
   products,
+  categories,
   canManage,
 }: {
   products: ProductRow[];
+  categories: ProductCategory[];
   canManage: boolean;
 }) {
   return (
@@ -52,6 +77,7 @@ export function ProductsTable({
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Kind</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead className="text-right">Retail</TableHead>
@@ -59,7 +85,7 @@ export function ProductsTable({
                 <TableHead className="text-right">Stock</TableHead>
                 <TableHead className="text-right">Stock value</TableHead>
                 <TableHead>Status</TableHead>
-                {canManage && <TableHead />}
+                {canManage && <TableHead className="min-w-[160px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -68,6 +94,9 @@ export function ProductsTable({
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{productKindLabel(p.product_kind)}</Badge>
+                    </TableCell>
                     <TableCell>{p.sku ?? "—"}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {formatCurrency(v.costPrice)}
@@ -104,7 +133,10 @@ export function ProductsTable({
                     </TableCell>
                     {canManage && (
                       <TableCell>
-                        <DeleteProductButton id={p.id} />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <EditProductButton product={p} categories={categories} />
+                          <DeleteProductButton id={p.id} name={p.name} />
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -147,7 +179,7 @@ export function ProductCategoriesTable({
                   <TableCell>{c.sort_order}</TableCell>
                   {canManage && (
                     <TableCell>
-                      <DeleteProductCategoryButton id={c.id} />
+                      <DeleteProductCategoryButton id={c.id} name={c.name} />
                     </TableCell>
                   )}
                 </TableRow>
@@ -248,7 +280,7 @@ export function InventoryTransactionsTable({
                               : "outline"
                         }
                       >
-                        {t.type}
+                        {inventoryMovementLabel(t.type, t.reference_type)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">{t.quantity}</TableCell>

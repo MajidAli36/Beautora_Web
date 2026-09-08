@@ -42,7 +42,7 @@ export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps)
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <StockMetric
             label="Stock sold (period)"
             value={`${summary.productUnitsSold} units`}
@@ -59,6 +59,12 @@ export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps)
             label="Cost of stock sold (COGS)"
             value={formatCurrency(summary.productCogs)}
             detail="Qty sold × cost price"
+            variant="cost"
+          />
+          <StockMetric
+            label="In-house usage COGS"
+            value={formatCurrency(summary.serviceUsageCogs)}
+            detail="Products used during services"
             variant="cost"
           />
           <StockMetric

@@ -18,6 +18,14 @@ import {
 } from "@/lib/sales/payment-balance";
 import { syncSalePaymentDenorm } from "@/lib/sales/sync-payment-denorm";
 import { formatCurrency } from "@/lib/format";
+import {
+  applyServiceUsageInventory,
+  getPackageUnitUsageCosts,
+  getServiceUnitUsageCosts,
+  resolveServiceUsageRequirements,
+  reverseRecordedServiceUsage,
+} from "@/lib/inventory/service-usage";
+import { isSellableProductKind } from "@/lib/products/kinds";
 
 async function nextInvoiceNumber(organizationId: string) {
   const supabase = await createClient();
@@ -62,7 +70,7 @@ export async function completeCheckout(
     const productIds = [...new Set(productLines.map((i) => i.itemId))];
     const { data: stockRows } = await supabase
       .from("products")
-      .select("id, name, stock_quantity, cost_price")
+      .select("id, name, stock_quantity, cost_price, product_kind")
       .eq("organization_id", org.organizationId)
       .in("id", productIds);
     const stockMap = new Map(
@@ -72,6 +80,7 @@ export async function completeCheckout(
           name: p.name,
           stock: Number(p.stock_quantity) || 0,
           cost: Number(p.cost_price) || 0,
+          sellable: isSellableProductKind(p.product_kind),
         },
       ])
     );
@@ -82,6 +91,9 @@ export async function completeCheckout(
     for (const [productId, qty] of needed) {
       const row = stockMap.get(productId);
       if (!row) return { error: "A product in the cart was not found" };
+      if (!row.sellable) {
+        return { error: `${row.name} is in-house only and cannot be sold at POS` };
+      }
       productCostById.set(productId, row.cost);
       if (qty > row.stock) {
         return {
@@ -90,6 +102,55 @@ export async function completeCheckout(
       }
     }
   }
+
+  const usageResolved = await resolveServiceUsageRequirements(
+    org.organizationId,
+    payload.items.map((i) => ({
+      itemType: i.itemType,
+      itemId: i.itemId,
+      quantity: i.quantity,
+    }))
+  );
+  if (usageResolved.error) return { error: usageResolved.error };
+  const usageRequirements = usageResolved.requirements;
+  if (usageRequirements.length) {
+    const usageIds = usageRequirements.map((r) => r.productId);
+    const { data: usageStock } = await supabase
+      .from("products")
+      .select("id, name, stock_quantity")
+      .eq("organization_id", org.organizationId)
+      .in("id", usageIds);
+    const stockMap = new Map(
+      (usageStock ?? []).map((p) => [p.id, Number(p.stock_quantity) || 0])
+    );
+    for (const req of usageRequirements) {
+      const have = stockMap.get(req.productId) ?? 0;
+      // Also reserve against retail product lines of the same SKU on this ticket
+      const alsoSold = productLines
+        .filter((l) => l.itemId === req.productId)
+        .reduce((s, l) => s + Number(l.quantity), 0);
+      if (req.quantity + alsoSold > have) {
+        return {
+          error: `Insufficient in-house stock for ${req.productName} (have ${have}, need ${req.quantity + alsoSold})`,
+        };
+      }
+    }
+  }
+
+  const serviceIds = [
+    ...new Set(
+      payload.items.filter((i) => i.itemType === "SERVICE").map((i) => i.itemId)
+    ),
+  ];
+  const packageIds = [
+    ...new Set(
+      payload.items.filter((i) => i.itemType === "PACKAGE").map((i) => i.itemId)
+    ),
+  ];
+  const [serviceUsageCosts, packageUsageCosts] = await Promise.all([
+    getServiceUnitUsageCosts(org.organizationId, serviceIds),
+    getPackageUnitUsageCosts(org.organizationId, packageIds),
+  ]);
 
   let depositApplied = 0;
   let depositRows: { id: string; amount: number }[] = [];
@@ -237,7 +298,13 @@ export async function completeCheckout(
     unit_price: item.unitPrice,
     line_total: item.lineTotal,
     unit_cost:
-      item.itemType === "PRODUCT" ? roundMoney(productCostById.get(item.itemId) ?? 0) : 0,
+      item.itemType === "PRODUCT"
+        ? roundMoney(productCostById.get(item.itemId) ?? 0)
+        : item.itemType === "SERVICE"
+          ? roundMoney(serviceUsageCosts.get(item.itemId) ?? 0)
+          : item.itemType === "PACKAGE"
+            ? roundMoney(packageUsageCosts.get(item.itemId) ?? 0)
+            : 0,
   }));
 
   const { error: itemsError } = await supabase.from("sale_items").insert(saleItems);
@@ -380,10 +447,30 @@ export async function completeCheckout(
     }
   }
 
+  if (usageRequirements.length) {
+    const usageInv = await applyServiceUsageInventory({
+      organizationId: org.organizationId,
+      saleId: sale.id,
+      requirements: usageRequirements,
+      userId: user?.id ?? null,
+      type: "OUT",
+      referenceType: "service_usage",
+      notes: "In-house products used for service",
+    });
+    if (usageInv.error) {
+      return {
+        error: `Sale saved but in-house stock update failed: ${usageInv.error}. Void this invoice or adjust inventory.`,
+        saleId: sale.id,
+      };
+    }
+  }
+
   revalidatePath("/sales");
   revalidatePath("/reports");
   revalidatePath("/finances");
   revalidatePath("/appointments");
+  revalidatePath("/products");
+  revalidatePath("/services");
   revalidatePath("/dashboard");
   revalidatePath("/products");
   if (payload.customerId) revalidatePath(`/customers/${payload.customerId}`);
@@ -439,7 +526,7 @@ export async function voidSale(
 
   const voidReason = (reason ?? "").trim();
   if (voidReason.length < 3) {
-    return { error: "Void reason is required (min 3 characters)" };
+    return { error: "Delete reason is required (min 3 characters)" };
   }
 
   const { data: sale } = await supabase
@@ -452,7 +539,7 @@ export async function voidSale(
 
   if (!sale) return { error: "Sale not found" };
   if (sale.status !== "COMPLETED" && sale.status !== "AMENDED") {
-    return { error: "Only completed invoices can be voided" };
+    return { error: "Only completed invoices can be deleted" };
   }
 
   const { data: invoice } = await supabase
@@ -483,6 +570,16 @@ export async function voidSale(
       created_by: user?.id ?? null,
     });
     if (invErr) return { error: `Inventory restore failed: ${invErr.message}` };
+  }
+
+  const usageRestore = await reverseRecordedServiceUsage({
+    organizationId: org.organizationId,
+    saleId: id,
+    userId: user?.id ?? null,
+    referenceType: "service_usage_void",
+  });
+  if (usageRestore.error) {
+    return { error: `In-house stock restore failed: ${usageRestore.error}` };
   }
 
   // Unlink applied deposits so they can be reused or refunded separately
@@ -570,11 +667,12 @@ export async function voidSale(
     entityType: "sale",
     entityId: id,
     metadata: {
-      summary: `Voided invoice ${invoice?.invoice_number ?? id.slice(0, 8)}`,
+      summary: `Soft-deleted invoice ${invoice?.invoice_number ?? id.slice(0, 8)}`,
       reason: voidReason,
       total: sale.total,
       invoice_number: invoice?.invoice_number ?? null,
       before: { status: sale.status, total: sale.total },
+      soft_delete: true,
     },
   });
 
@@ -582,6 +680,11 @@ export async function voidSale(
   revalidatePath("/reports");
   revalidatePath("/finances");
   revalidatePath("/products");
+  revalidatePath("/dashboard");
+  revalidatePath("/staff");
+  if (sale.customer_id) {
+    revalidatePath(`/customers/${sale.customer_id}`);
+  }
   revalidatePath(`/sales/${id}`);
   return { success: true };
 }
@@ -654,6 +757,8 @@ export async function getSales(
     if (saleIds.length === 0) return [];
   }
 
+  // Include soft-deleted (VOID) invoices so they stay visible as disabled history.
+  // Revenue / staff / report queries still use COMPLETED|AMENDED only.
   let query = supabase
     .from("sales")
     .select(`
@@ -662,7 +767,6 @@ export async function getSales(
       invoice:invoices(invoice_number)
     `)
     .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (status) query = query.eq("status", status);

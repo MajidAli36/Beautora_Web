@@ -17,6 +17,7 @@ import {
   getInventoryMoneySnapshot,
   getProductSalesBreakdown,
   getRevenueSplit,
+  getServiceUsageCogs,
   type ProductSaleRow,
 } from "@/lib/inventory/sales-metrics";
 
@@ -39,6 +40,7 @@ export type FinancialSummary = {
   totalExpenses: number;
   staffPayments: number;
   productCogs: number;
+  serviceUsageCogs: number;
   productRetailRevenue: number;
   productGrossProfit: number;
   productUnitsSold: number;
@@ -193,9 +195,10 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     fromLabel,
     toLabel
   );
-  const [productSaleRows, revenueSplit] = await Promise.all([
+  const [productSaleRows, revenueSplit, serviceUsageCogs] = await Promise.all([
     getProductSalesBreakdown(org.organizationId, fromLabel, toLabel),
     getRevenueSplit(org.organizationId, fromLabel, toLabel),
+    getServiceUsageCogs(org.organizationId, fromLabel, toLabel),
   ]);
 
   const productCogs = inventory.productSales.costOfGoodsSold;
@@ -210,7 +213,12 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
   // Cash outflow excludes non-cash COGS; sale refunds are cash leaving the drawer
   const totalOutflow = roundMoney(totalExpenses + staffPayments + allSaleRefundsCash);
   const netProfit = roundMoney(
-    salesRevenue - partialSaleRefunds - totalExpenses - staffPayments - productCogs
+    salesRevenue -
+      partialSaleRefunds -
+      totalExpenses -
+      staffPayments -
+      productCogs -
+      serviceUsageCogs
   );
   const netCashFlow = roundMoney(totalInflow - totalOutflow);
 
@@ -226,6 +234,7 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     totalExpenses,
     staffPayments,
     productCogs,
+    serviceUsageCogs,
     productRetailRevenue,
     productGrossProfit,
     productUnitsSold,

@@ -109,6 +109,7 @@ export async function fetchSaleItems(
     quantity: number;
     unit_price: number;
     line_total: number;
+    unit_cost: number;
   }[]
 > {
   if (!saleIds.length) return [];
@@ -126,12 +127,13 @@ export async function fetchSaleItems(
     quantity: number;
     unit_price: number;
     line_total: number;
+    unit_cost: number;
   }[] = [];
 
   for (const chunk of chunks) {
     const { data, error } = await supabase
       .from("sale_items")
-      .select("sale_id, item_type, item_id, name, quantity, unit_price, line_total")
+      .select("sale_id, item_type, item_id, name, quantity, unit_price, line_total, unit_cost")
       .eq("organization_id", organizationId)
       .in("sale_id", chunk);
     if (error) throw new Error(error.message);
@@ -144,6 +146,7 @@ export async function fetchSaleItems(
         quantity: Number(r.quantity) || 0,
         unit_price: Number(r.unit_price) || 0,
         line_total: Number(r.line_total) || 0,
+        unit_cost: Number((r as { unit_cost?: number }).unit_cost) || 0,
       });
     }
   }

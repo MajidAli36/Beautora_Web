@@ -24,16 +24,16 @@ export function VoidSaleButton({ saleId }: { saleId: string }) {
   return (
     <>
       <Button variant="destructive" onClick={() => setOpen(true)}>
-        Void sale
+        Delete invoice
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Void this sale?</DialogTitle>
+            <DialogTitle>Delete this invoice?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Voiding restores product inventory and removes this sale from revenue reports. A reason
-            is required.
+            Soft-deletes the invoice. It remains visible as Deleted / Disabled, restores product
+            stock, and is excluded from revenue, staff, and reports. A reason is required.
           </p>
           <div className="space-y-2">
             <Label htmlFor="void-reason-btn">Reason</Label>
@@ -41,7 +41,7 @@ export function VoidSaleButton({ saleId }: { saleId: string }) {
               id="void-reason-btn"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Why is this sale being voided?"
+              placeholder="Why is this invoice being deleted?"
             />
           </div>
           <DialogFooter>
@@ -58,12 +58,13 @@ export function VoidSaleButton({ saleId }: { saleId: string }) {
                     notify.error(res.error);
                     return;
                   }
+                  notify.success("Invoice deleted (disabled)");
                   setOpen(false);
                   router.refresh();
                 })
               }
             >
-              {pending ? "Voiding…" : "Void sale"}
+              {pending ? "Deleting…" : "Delete invoice"}
             </Button>
           </DialogFooter>
         </DialogContent>

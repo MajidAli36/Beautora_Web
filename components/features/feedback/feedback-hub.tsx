@@ -32,6 +32,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { CustomerPicker } from "@/components/features/customers/customer-picker";
+import { StaffPicker } from "@/components/features/customers/staff-picker";
+import type { FeedbackListItem } from "@/lib/actions/feedback";
 
 type CustomerOption = {
   id: string;
@@ -133,7 +136,6 @@ function CollectFeedbackForm({
   const [mode, setMode] = useState<"customer" | "walkin">("customer");
   const [customerId, setCustomerId] = useState("");
   const [walkInName, setWalkInName] = useState("");
-  const [customerSearch, setCustomerSearch] = useState("");
   const [staffId, setStaffId] = useState("");
   const [ratings, setRatings] = useState<FeedbackRatings>({ ...DEFAULT_RATINGS });
   const [comment, setComment] = useState("");
@@ -150,17 +152,6 @@ function CollectFeedbackForm({
       router.refresh();
     },
   });
-
-  const filteredCustomers = useMemo(() => {
-    const q = customerSearch.trim().toLowerCase();
-    if (!q) return customers.slice(0, 40);
-    return customers
-      .filter((c) => {
-        const name = formatCustomerName(c.first_name, c.last_name).toLowerCase();
-        return name.includes(q) || (c.phone ?? "").toLowerCase().includes(q);
-      })
-      .slice(0, 40);
-  }, [customers, customerSearch]);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const guestLabel =
@@ -197,7 +188,7 @@ function CollectFeedbackForm({
               {n}
             </span>
             <span className={cn("hidden sm:inline", step === n ? "font-medium" : "text-muted-foreground")}>
-              {n === 1 ? "Customer" : n === 2 ? "Ratings" : "Review"}
+              {n === 1 ? "Who" : n === 2 ? "Ratings" : "Submit"}
             </span>
             {n < 3 && <ChevronRight className="size-3.5 text-muted-foreground" />}
           </div>
@@ -206,6 +197,10 @@ function CollectFeedbackForm({
 
       {step === 1 && (
         <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Reception can enter feedback on behalf of any guest — a registered customer or a walk-in
+            who is not in the system.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -220,7 +215,7 @@ function CollectFeedbackForm({
             >
               <p className="font-medium">Registered customer</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Link feedback to an existing profile
+                Search and link to an existing profile
               </p>
             </button>
             <button
@@ -234,55 +229,29 @@ function CollectFeedbackForm({
                 mode === "walkin" ? "border-primary bg-primary/5" : "hover:bg-muted/40"
               )}
             >
-              <p className="font-medium">Walk-in customer</p>
+              <p className="font-medium">Walk-in / guest</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                No profile — enter a name and rate the visit
+                No customer record needed — just enter a name
               </p>
             </button>
           </div>
 
           {mode === "customer" ? (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="customer-search">Find customer</Label>
-                <Input
-                  id="customer-search"
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  placeholder="Search name or phone…"
-                />
-              </div>
-              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-2">
-                {filteredCustomers.length === 0 ? (
-                  <p className="px-2 py-3 text-sm text-muted-foreground">No customers found.</p>
-                ) : (
-                  filteredCustomers.map((c) => {
-                    const selected = customerId === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setCustomerId(c.id)}
-                        className={cn(
-                          "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm",
-                          selected ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                        )}
-                      >
-                        <span className="font-medium">
-                          {formatCustomerName(c.first_name, c.last_name)}
-                        </span>
-                        <span className={cn("text-xs", selected ? "opacity-80" : "text-muted-foreground")}>
-                          {c.phone ?? "—"}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="feedback-customer">Customer</Label>
+              <CustomerPicker
+                id="feedback-customer"
+                customers={customers}
+                value={customerId}
+                onValueChange={setCustomerId}
+                required
+                placeholder="Search name or phone…"
+                limit={20}
+              />
             </div>
           ) : (
             <div className="space-y-1.5">
-              <Label htmlFor="walk-in-name">Walk-in name</Label>
+              <Label htmlFor="walk-in-name">Guest name</Label>
               <Input
                 id="walk-in-name"
                 value={walkInName}
@@ -294,20 +263,20 @@ function CollectFeedbackForm({
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="served-by-feedback">Stylist (optional)</Label>
-            <select
+            <Label htmlFor="served-by-feedback">Stylist reviewed (optional)</Label>
+            <StaffPicker
               id="served-by-feedback"
+              staff={staff}
               value={staffId}
-              onChange={(e) => setStaffId(e.target.value)}
-              className="flex h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-            >
-              <option value="">Any / not specified</option>
-              {staff.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setStaffId}
+              allowEmpty
+              emptyLabel="Salon overall / not specified"
+              placeholder="Search staff to credit this review…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave empty for a general salon review, or pick a stylist when the guest rates a
+              specific person.
+            </p>
           </div>
 
           <div className="flex justify-end">
@@ -322,8 +291,11 @@ function CollectFeedbackForm({
       {step === 2 && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Rating for <span className="font-medium text-foreground">{guestLabel}</span> — tap 0–10 on
-            each card.
+            Rating for <span className="font-medium text-foreground">{guestLabel}</span>
+            {staffId
+              ? ` · stylist ${staff.find((s) => s.id === staffId)?.full_name ?? ""}`
+              : " · salon overall"}{" "}
+            — tap 0–10 on each card.
           </p>
           <div className="grid gap-3 md:grid-cols-2">
             {FEEDBACK_DIMENSIONS.map((dim) => (
@@ -367,10 +339,10 @@ function CollectFeedbackForm({
             <CardHeader>
               <CardTitle className="text-base">Review & submit</CardTitle>
               <CardDescription>
-                {guestLabel}
+                Saving on behalf of {guestLabel}
                 {staffId
                   ? ` · ${staff.find((s) => s.id === staffId)?.full_name ?? "Staff"}`
-                  : ""}
+                  : " · salon overall"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -394,7 +366,7 @@ function CollectFeedbackForm({
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   maxLength={2000}
-                  placeholder="Anything else the customer said…"
+                  placeholder="Anything else the guest said…"
                   className="flex w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm"
                 />
               </div>
@@ -608,6 +580,114 @@ function FeedbackDashboardPanel({ data }: { data: FeedbackDashboard }) {
   );
 }
 
+function AllReviewsPanel({ reviews }: { reviews: FeedbackListItem[] }) {
+  const [filter, setFilter] = useState<"all" | "customer" | "walkin" | "staff">("all");
+  const [q, setQ] = useState("");
+
+  const filtered = useMemo(() => {
+    let rows = reviews;
+    if (filter === "customer") rows = rows.filter((r) => !r.isWalkIn);
+    if (filter === "walkin") rows = rows.filter((r) => r.isWalkIn);
+    if (filter === "staff") rows = rows.filter((r) => Boolean(r.staffName));
+    const needle = q.trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter((r) => {
+      const hay = `${r.customerName} ${r.staffName ?? ""} ${r.comment ?? ""}`.toLowerCase();
+      return hay.includes(needle);
+    });
+  }, [reviews, filter, q]);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">All reviews (open board)</CardTitle>
+          <CardDescription>
+            Every response this period — registered customers, walk-ins, and stylist-credited
+            reviews. Visible to reception and managers.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["all", "All"],
+                ["customer", "Customers"],
+                ["walkin", "Walk-ins"],
+                ["staff", "With stylist"],
+              ] as const
+            ).map(([key, label]) => (
+              <Button
+                key={key}
+                type="button"
+                size="sm"
+                variant={filter === key ? "default" : "outline"}
+                onClick={() => setFilter(key)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search guest, stylist, or comment…"
+          />
+          {!filtered.length ? (
+            <p className="text-sm text-muted-foreground">No reviews match this filter.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Guest</TableHead>
+                    <TableHead>Stylist</TableHead>
+                    <TableHead>Overall</TableHead>
+                    <TableHead className="text-right">Avg</TableHead>
+                    <TableHead>Comment</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {formatDateTime(row.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">{row.customerName}</span>
+                        {row.isWalkIn ? (
+                          <Badge variant="secondary" className="ml-2">
+                            Walk-in
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="ml-2">
+                            Customer
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.staffName ?? "Salon overall"}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{row.overall}/10</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {row.averageScore}/10
+                      </TableCell>
+                      <TableCell className="max-w-[240px] truncate text-sm text-muted-foreground">
+                        {row.comment ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function FeedbackHub({
   customers,
   staff,
@@ -621,7 +701,8 @@ export function FeedbackHub({
     <Tabs defaultValue="collect" className="space-y-4">
       <TabsList>
         <TabsTrigger value="collect">Collect feedback</TabsTrigger>
-        <TabsTrigger value="dashboard">Improvement dashboard</TabsTrigger>
+        <TabsTrigger value="reviews">All reviews</TabsTrigger>
+        <TabsTrigger value="dashboard">Insights</TabsTrigger>
       </TabsList>
 
       <TabsContent value="collect">
@@ -629,17 +710,21 @@ export function FeedbackHub({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Star className="size-5" />
-              New customer feedback
+              Collect feedback (on behalf of guest)
             </CardTitle>
             <CardDescription>
-              Choose the customer (or walk-in), then rate staff behaviour, expertise, service, and
-              more — each from 0 to 10.
+              Reception enters ratings for a registered customer or any walk-in guest. Optionally
+              credit a stylist when the review is about them.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <CollectFeedbackForm customers={customers} staff={staff} />
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="reviews">
+        <AllReviewsPanel reviews={dashboard.allReviews ?? []} />
       </TabsContent>
 
       <TabsContent value="dashboard">

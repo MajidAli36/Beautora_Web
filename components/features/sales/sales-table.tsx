@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/table";
 import { SalesActionsMenu } from "@/components/features/sales/sales-actions-menu";
 import { ReceivePaymentDialog } from "@/components/features/sales/receive-payment-dialog";
+import { isDeletedSaleStatus, saleStatusLabel } from "@/lib/sales/lifecycle";
 import { formatCurrency, formatCustomerName, formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 
@@ -31,6 +33,8 @@ type SaleRow = {
   payment_version?: number;
   completed_at: string | null;
   created_at: string;
+  void_reason?: string | null;
+  deleted_at?: string | null;
   customer: { first_name: string; last_name: string | null } | null;
   invoice: { invoice_number: string }[] | { invoice_number: string } | null;
 };
@@ -90,13 +94,30 @@ export function SalesTable({
               const when = sale.completed_at ?? sale.created_at;
               const due = Number(sale.amount_due ?? 0);
               const paid = Number(sale.amount_paid ?? 0);
+              const deleted = isDeletedSaleStatus(sale.status);
               const canPay =
                 canReceivePayment &&
+                !deleted &&
                 due > 0 &&
                 (sale.status === "COMPLETED" || sale.status === "AMENDED");
               return (
-                <TableRow key={sale.id} className="group">
-                  <TableCell className="font-medium">{invoiceNum ?? "—"}</TableCell>
+                <TableRow
+                  key={sale.id}
+                  className={cn(
+                    "group",
+                    deleted && "bg-muted/40 text-muted-foreground opacity-80"
+                  )}
+                >
+                  <TableCell className="font-medium">
+                    <span className={cn(deleted && "line-through decoration-muted-foreground/60")}>
+                      {invoiceNum ?? "—"}
+                    </span>
+                    {deleted ? (
+                      <Badge variant="outline" className="ml-2 border-destructive/40 text-destructive">
+                        Del
+                      </Badge>
+                    ) : null}
+                  </TableCell>
                   <TableCell>
                     {sale.customer
                       ? formatCustomerName(sale.customer.first_name, sale.customer.last_name)
@@ -105,7 +126,9 @@ export function SalesTable({
                   <TableCell className="text-right">{formatCurrency(sale.total)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(paid)}</TableCell>
                   <TableCell className="text-right">
-                    {due > 0 ? (
+                    {deleted ? (
+                      "—"
+                    ) : due > 0 ? (
                       <span className="font-medium text-amber-700 dark:text-amber-400">
                         {formatCurrency(due)}
                       </span>
@@ -114,19 +137,25 @@ export function SalesTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={paymentBadgeVariant(sale.payment_status)}>
-                      {(sale.payment_status ?? "PAID").replaceAll("_", " ")}
-                    </Badge>
+                    {deleted ? (
+                      <Badge variant="outline">Disabled</Badge>
+                    ) : (
+                      <Badge variant={paymentBadgeVariant(sale.payment_status)}>
+                        {(sale.payment_status ?? "PAID").replaceAll("_", " ")}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge
                       variant={
-                        sale.status === "COMPLETED" || sale.status === "AMENDED"
-                          ? "default"
-                          : "secondary"
+                        deleted
+                          ? "destructive"
+                          : sale.status === "COMPLETED" || sale.status === "AMENDED"
+                            ? "default"
+                            : "secondary"
                       }
                     >
-                      {sale.status}
+                      {saleStatusLabel(sale.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>{formatDateTime(when)}</TableCell>

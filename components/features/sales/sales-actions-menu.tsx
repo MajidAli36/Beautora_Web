@@ -17,7 +17,7 @@ import { printSaleReceipt } from "@/components/features/sales/print-receipt-butt
 import { voidSale } from "@/lib/actions/sales";
 import { refundSale } from "@/lib/actions/sales-lifecycle";
 import { notify } from "@/lib/toast";
-import { isPostedSaleStatus } from "@/lib/sales/lifecycle";
+import { isDeletedSaleStatus, isPostedSaleStatus } from "@/lib/sales/lifecycle";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -65,8 +65,9 @@ export function SalesActionsMenu({
   const [reason, setReason] = useState("");
   const [refundAmount, setRefundAmount] = useState(String(total));
 
+  const deleted = isDeletedSaleStatus(status);
   const posted = isPostedSaleStatus(status);
-  const showReceive = canReceivePayment && amountDue > 0 && posted;
+  const showReceive = canReceivePayment && amountDue > 0 && posted && !deleted;
 
   return (
     <>
@@ -86,7 +87,7 @@ export function SalesActionsMenu({
             Pay
           </Button>
         ) : null}
-        {canManage && posted ? (
+        {canManage && posted && !deleted ? (
           <Button
             variant="outline"
             size="sm"
@@ -99,8 +100,9 @@ export function SalesActionsMenu({
         ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="inline-flex h-7 items-center justify-center rounded-lg border border-border bg-background px-2 text-sm outline-none hover:bg-muted"
+            className="inline-flex h-7 items-center justify-center rounded-lg border border-border bg-background px-2 text-sm outline-none hover:bg-muted disabled:opacity-50"
             aria-label="More actions"
+            disabled={deleted && !canManage}
           >
             <MoreHorizontal className="size-3.5" />
           </DropdownMenuTrigger>
@@ -125,7 +127,7 @@ export function SalesActionsMenu({
                 Invoice history
               </DropdownMenuItem>
             ) : null}
-            {canManage && posted ? (
+            {canManage && posted && !deleted ? (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -144,7 +146,7 @@ export function SalesActionsMenu({
                   }}
                 >
                   <Ban className="size-3.5" />
-                  Void invoice
+                  Delete invoice
                 </DropdownMenuItem>
               </>
             ) : null}
@@ -155,11 +157,12 @@ export function SalesActionsMenu({
       <Dialog open={voidOpen} onOpenChange={setVoidOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Void invoice</DialogTitle>
+            <DialogTitle>Delete invoice?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Voiding restores product stock and excludes this sale from revenue. Payments remain as
-            history.
+            Soft-deletes this invoice. It stays on the sales list as Deleted / Disabled, restores
+            product stock, and is removed from revenue, staff, and report calculations. Payment
+            history is kept.
           </p>
           <div className="space-y-2">
             <Label htmlFor="void-reason">Reason</Label>
@@ -167,7 +170,7 @@ export function SalesActionsMenu({
               id="void-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Why is this invoice being voided?"
+              placeholder="Why is this invoice being deleted?"
             />
           </div>
           <DialogFooter>
@@ -184,12 +187,13 @@ export function SalesActionsMenu({
                     notify.error(res.error);
                     return;
                   }
+                  notify.success("Invoice deleted (disabled)");
                   setVoidOpen(false);
                   router.refresh();
                 })
               }
             >
-              {pending ? "Voiding…" : "Void invoice"}
+              {pending ? "Deleting…" : "Delete invoice"}
             </Button>
           </DialogFooter>
         </DialogContent>

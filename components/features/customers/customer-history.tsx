@@ -5,10 +5,12 @@ import { useState } from "react";
 import type { CustomerHistory } from "@/lib/actions/customers";
 import { AccountReceivePaymentDialog } from "@/components/features/customers/account-receive-payment-dialog";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
+import { isDeletedSaleStatus, saleStatusLabel } from "@/lib/sales/lifecycle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 type FinancialSummary = {
   totalPurchases: number;
@@ -39,7 +41,11 @@ export function CustomerHistoryPanel({
   const [payOpen, setPayOpen] = useState(false);
 
   const sales = showDueOnly
-    ? history.sales.filter((s) => Number((s as { amount_due?: number }).amount_due ?? 0) > 0)
+    ? history.sales.filter(
+        (s) =>
+          !isDeletedSaleStatus(s.status) &&
+          Number((s as { amount_due?: number }).amount_due ?? 0) > 0
+      )
     : history.sales;
 
   return (
@@ -180,8 +186,12 @@ export function CustomerHistoryPanel({
                     amount_due?: number;
                     payment_status?: string;
                   };
+                  const deleted = isDeletedSaleStatus(sale.status);
                   return (
-                    <TableRow key={sale.id}>
+                    <TableRow
+                      key={sale.id}
+                      className={cn(deleted && "bg-muted/40 text-muted-foreground opacity-80")}
+                    >
                       <TableCell>
                         {sale.completed_at ? formatDate(sale.completed_at) : "—"}
                       </TableCell>
@@ -190,7 +200,21 @@ export function CustomerHistoryPanel({
                           href={`/sales/${sale.id}`}
                           className="text-primary hover:underline"
                         >
-                          {inv?.invoice_number ?? sale.id.slice(0, 8)}
+                          <span
+                            className={cn(
+                              deleted && "line-through decoration-muted-foreground/60"
+                            )}
+                          >
+                            {inv?.invoice_number ?? sale.id.slice(0, 8)}
+                          </span>
+                          {deleted ? (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 border-destructive/40 text-destructive"
+                            >
+                              Del
+                            </Badge>
+                          ) : null}
                         </Link>
                       </TableCell>
                       <TableCell className="max-w-xs truncate text-muted-foreground">
@@ -199,17 +223,21 @@ export function CustomerHistoryPanel({
                       <TableCell>
                         <Badge
                           variant={
-                            sale.status === "COMPLETED" || sale.status === "AMENDED"
-                              ? "default"
-                              : "secondary"
+                            deleted
+                              ? "destructive"
+                              : sale.status === "COMPLETED" || sale.status === "AMENDED"
+                                ? "default"
+                                : "secondary"
                           }
                         >
-                          {sale.status}
+                          {saleStatusLabel(sale.status)}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {(s.payment_status ?? "—").replaceAll("_", " ")}
+                          {deleted
+                            ? "Disabled"
+                            : (s.payment_status ?? "—").replaceAll("_", " ")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -219,7 +247,9 @@ export function CustomerHistoryPanel({
                         {formatCurrency(s.amount_paid ?? 0)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {Number(s.amount_due ?? 0) > 0 ? (
+                        {deleted ? (
+                          "—"
+                        ) : Number(s.amount_due ?? 0) > 0 ? (
                           <span className="font-medium text-amber-700 dark:text-amber-400">
                             {formatCurrency(s.amount_due ?? 0)}
                           </span>

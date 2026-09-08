@@ -39,6 +39,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       payment_version: s.payment_version,
       completed_at: s.completed_at,
       created_at: s.created_at,
+      void_reason: (s as { void_reason?: string | null }).void_reason ?? null,
+      deleted_at: (s as { deleted_at?: string | null }).deleted_at ?? null,
       customer: s.customer as {
         first_name: string;
         last_name: string | null;
@@ -56,7 +58,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeader
         title="Sales"
-        description="View invoices, collect dues, amend, refund, or void. Payment status is separate from sale status."
+        description="View invoices, collect dues, amend, refund, or soft-delete. Deleted invoices stay listed as Disabled and are excluded from revenue and staff reports."
       />
         <Button render={<Link href="/pos" />}>New sale</Button>
       </div>

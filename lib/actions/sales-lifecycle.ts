@@ -14,6 +14,14 @@ import {
 } from "@/lib/sales/calculate";
 import { isPostedSaleStatus } from "@/lib/sales/lifecycle";
 import { syncSalePaymentDenorm } from "@/lib/sales/sync-payment-denorm";
+import {
+  calculateUsageInventoryDelta,
+  getPackageUnitUsageCosts,
+  getServiceUnitUsageCosts,
+  resolveServiceUsageRequirements,
+  reverseRecordedServiceUsage,
+} from "@/lib/inventory/service-usage";
+import { roundQty } from "@/lib/products/kinds";
 
 function revalidateSalePaths(saleId: string) {
   revalidatePath("/sales");
@@ -22,6 +30,7 @@ function revalidateSalePaths(saleId: string) {
   revalidatePath("/reports");
   revalidatePath("/finances");
   revalidatePath("/products");
+  revalidatePath("/services");
   revalidatePath("/dashboard");
   revalidatePath("/customers");
 }
@@ -346,6 +355,50 @@ export async function amendCompletedSale(
     await applyInventoryDeltas(org.organizationId, sale.id, deltas, userId);
     inventoryApplied = true;
 
+    const oldUsage = await resolveServiceUsageRequirements(
+      org.organizationId,
+      (oldItems ?? []).map((item) => ({
+        itemType: item.item_type,
+        itemId: item.item_id,
+        quantity: Number(item.quantity),
+      }))
+    );
+    if (oldUsage.error) throw new Error(oldUsage.error);
+    const newUsage = await resolveServiceUsageRequirements(
+      org.organizationId,
+      totals.lines.map((l) => ({
+        itemType: l.itemType,
+        itemId: l.itemId,
+        quantity: l.quantity,
+      }))
+    );
+    if (newUsage.error) throw new Error(newUsage.error);
+
+    const usageDeltas = calculateUsageInventoryDelta(
+      oldUsage.requirements,
+      newUsage.requirements
+    );
+    for (const { productId, delta } of usageDeltas) {
+      if (Math.abs(delta) < 0.0005) continue;
+      const type = delta > 0 ? "OUT" : "IN";
+      const quantity = roundQty(Math.abs(delta));
+      const { error: usageInvErr } = await supabase.from("inventory_transactions").insert({
+        organization_id: org.organizationId,
+        product_id: productId,
+        type,
+        quantity,
+        reference_type:
+          type === "OUT" ? "service_usage_amend" : "service_usage_amend_reverse",
+        reference_id: sale.id,
+        notes:
+          type === "OUT"
+            ? "Amendment in-house usage"
+            : "Amendment in-house usage restore",
+        created_by: userId,
+      });
+      if (usageInvErr) throw new Error(`In-house inventory update failed: ${usageInvErr.message}`);
+    }
+
     // Replace line items
     const { error: delErr } = await supabase
       .from("sale_items")
@@ -354,7 +407,7 @@ export async function amendCompletedSale(
       .eq("organization_id", org.organizationId);
     if (delErr) throw new Error(delErr.message);
 
-    // Snapshot costs for new product lines
+    // Snapshot costs for new product / service usage lines
     const productIds = [
       ...new Set(
         totals.lines.filter((l) => l.itemType === "PRODUCT").map((l) => l.itemId)
@@ -371,6 +424,20 @@ export async function amendCompletedSale(
         costById.set(p.id, Number(p.cost_price) || 0);
       }
     }
+    const serviceIds = [
+      ...new Set(
+        totals.lines.filter((l) => l.itemType === "SERVICE").map((l) => l.itemId)
+      ),
+    ];
+    const packageIds = [
+      ...new Set(
+        totals.lines.filter((l) => l.itemType === "PACKAGE").map((l) => l.itemId)
+      ),
+    ];
+    const [serviceUsageCosts, packageUsageCosts] = await Promise.all([
+      getServiceUnitUsageCosts(org.organizationId, serviceIds),
+      getPackageUnitUsageCosts(org.organizationId, packageIds),
+    ]);
 
     const { error: insErr } = await supabase.from("sale_items").insert(
       totals.lines.map((line) => ({
@@ -383,7 +450,13 @@ export async function amendCompletedSale(
         unit_price: line.unitPrice,
         line_total: line.lineTotal,
         unit_cost:
-          line.itemType === "PRODUCT" ? roundMoney(costById.get(line.itemId) ?? 0) : 0,
+          line.itemType === "PRODUCT"
+            ? roundMoney(costById.get(line.itemId) ?? 0)
+            : line.itemType === "SERVICE"
+              ? roundMoney(serviceUsageCosts.get(line.itemId) ?? 0)
+              : line.itemType === "PACKAGE"
+                ? roundMoney(packageUsageCosts.get(line.itemId) ?? 0)
+                : 0,
       }))
     );
     if (insErr) throw new Error(insErr.message);
@@ -700,6 +773,13 @@ export async function refundSale(input: {
         user?.id ?? null,
         "sale_refund_full"
       );
+      const usageRestore = await reverseRecordedServiceUsage({
+        organizationId: org.organizationId,
+        saleId: sale.id,
+        userId: user?.id ?? null,
+        referenceType: "service_usage_restore",
+      });
+      if (usageRestore.error) throw new Error(usageRestore.error);
     } catch (e) {
       return { error: e instanceof Error ? e.message : "Inventory restore failed" };
     }

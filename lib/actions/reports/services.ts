@@ -16,6 +16,9 @@ export type ServiceRow = {
   category: string | null;
   qty: number;
   revenue: number;
+  usageCost: number;
+  grossProfit: number;
+  marginPercent: number;
   avgPrice: number;
   pctOfServiceRevenue: number;
 };
@@ -29,6 +32,8 @@ export type ServicesReport = {
     servicesSold: CompareResult;
     avgServiceValue: CompareResult;
     uniqueServices: CompareResult;
+    usageCogs: CompareResult;
+    serviceGrossProfit: CompareResult;
     serviceDiscountsNote: string;
   };
   top10: ServiceRow[];
@@ -36,7 +41,7 @@ export type ServicesReport = {
   byCategory: { name: string; value: number }[];
   byHour: { label: string; value: number }[];
   detail: ServiceRow[];
-  unavailable: { profit: string };
+  unavailable: { profit?: string };
 };
 
 export async function getServicesReport(from?: string, to?: string): Promise<ServicesReport> {
@@ -71,7 +76,14 @@ export async function getServicesReport(from?: string, to?: string): Promise<Ser
 
   const agg = new Map<
     string,
-    { serviceId: string; name: string; category: string | null; qty: number; revenue: number }
+    {
+      serviceId: string;
+      name: string;
+      category: string | null;
+      qty: number;
+      revenue: number;
+      usageCost: number;
+    }
   >();
   for (const item of curSvc) {
     const meta = serviceMeta.get(item.item_id);
@@ -81,23 +93,35 @@ export async function getServicesReport(from?: string, to?: string): Promise<Ser
       category: meta?.category ?? null,
       qty: 0,
       revenue: 0,
+      usageCost: 0,
     };
     cur.qty += item.quantity;
     cur.revenue += item.line_total;
+    cur.usageCost += item.quantity * (item.unit_cost ?? 0);
     agg.set(item.item_id, cur);
   }
 
   const totalRevenue = [...agg.values()].reduce((a, r) => a + r.revenue, 0);
+  const totalUsageCost = [...agg.values()].reduce((a, r) => a + r.usageCost, 0);
   const prevRevenue = prevSvc.reduce((a, i) => a + i.line_total, 0);
+  const prevUsageCost = prevSvc.reduce(
+    (a, i) => a + i.quantity * (i.unit_cost ?? 0),
+    0
+  );
   const qty = curSvc.reduce((a, i) => a + i.quantity, 0);
   const prevQty = prevSvc.reduce((a, i) => a + i.quantity, 0);
 
   const detail: ServiceRow[] = [...agg.values()]
-    .map((r) => ({
-      ...r,
-      avgPrice: r.qty ? r.revenue / r.qty : 0,
-      pctOfServiceRevenue: totalRevenue ? (r.revenue / totalRevenue) * 100 : 0,
-    }))
+    .map((r) => {
+      const grossProfit = r.revenue - r.usageCost;
+      return {
+        ...r,
+        grossProfit,
+        marginPercent: r.revenue > 0 ? Math.round((grossProfit / r.revenue) * 100) : 0,
+        avgPrice: r.qty ? r.revenue / r.qty : 0,
+        pctOfServiceRevenue: totalRevenue ? (r.revenue / totalRevenue) * 100 : 0,
+      };
+    })
     .sort((a, b) => b.revenue - a.revenue);
 
   const catMap: Record<string, number> = {};
@@ -115,8 +139,13 @@ export async function getServicesReport(from?: string, to?: string): Promise<Ser
       servicesSold: cmp(qty, prevQty),
       avgServiceValue: cmp(qty ? totalRevenue / qty : 0, prevQty ? prevRevenue / prevQty : 0),
       uniqueServices: cmp(detail.length, new Set(prevSvc.map((i) => i.item_id)).size),
+      usageCogs: cmp(totalUsageCost, prevUsageCost),
+      serviceGrossProfit: cmp(
+        totalRevenue - totalUsageCost,
+        prevRevenue - prevUsageCost
+      ),
       serviceDiscountsNote:
-        "Sale-level discounts are not allocated to individual services.",
+        "Sale-level discounts are not allocated to individual services. Usage COGS uses snapshotted in-house product costs at sale time.",
     },
     top10: detail.slice(0, 10),
     bottom10: [...detail].reverse().slice(0, 10),
@@ -125,9 +154,7 @@ export async function getServicesReport(from?: string, to?: string): Promise<Ser
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([hour, value]) => ({ label: `${hour}:00`, value })),
     detail,
-    unavailable: {
-      profit: "Services have no cost_price in the catalog — service profit/margin cannot be calculated.",
-    },
+    unavailable: {},
   };
 }
 

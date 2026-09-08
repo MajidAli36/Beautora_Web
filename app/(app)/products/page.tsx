@@ -31,7 +31,7 @@ export default async function ProductsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Products"
-        description="Retail catalog, stock levels, and inventory value (cost vs retail)."
+        description="Retail and in-house catalog, stock levels, and inventory value (cost vs retail)."
       />
 
       <Tabs defaultValue="products">
@@ -64,7 +64,11 @@ export default async function ProductsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ProductsTable products={products} canManage={canManage} />
+              <ProductsTable
+                products={products}
+                categories={categories}
+                canManage={canManage}
+              />
             </CardContent>
           </Card>
         </TabsContent>

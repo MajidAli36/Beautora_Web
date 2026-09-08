@@ -64,6 +64,8 @@ export type FeedbackDashboard = {
   }[];
   recent: FeedbackListItem[];
   lowScores: FeedbackListItem[];
+  /** Full period list for open review board */
+  allReviews: FeedbackListItem[];
 };
 
 function emptyRatings(): number[] {
@@ -316,5 +318,6 @@ export async function getFeedbackDashboard(
     needsImprovement,
     recent: items.slice(0, 20),
     lowScores: items.filter((i) => i.averageScore < IMPROVEMENT_THRESHOLD).slice(0, 10),
+    allReviews: items,
   };
 }

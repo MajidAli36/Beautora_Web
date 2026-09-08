@@ -204,6 +204,43 @@ export async function getRevenueSplit(
   return split;
 }
 
+/** COGS from in-house products consumed via SERVICE/PACKAGE lines (snapshotted unit_cost). */
+export async function getServiceUsageCogs(
+  organizationId: string,
+  from?: string,
+  to?: string
+): Promise<number> {
+  const supabase = await createClient();
+  const { start, end } = parseLocalDateRange(from, to);
+
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .in("status", ["COMPLETED", "AMENDED"])
+    .is("deleted_at", null)
+    .gte("completed_at", start.toISOString())
+    .lte("completed_at", end.toISOString());
+
+  const saleIds = (sales ?? []).map((s) => s.id);
+  if (!saleIds.length) return 0;
+
+  const { data: lines } = await supabase
+    .from("sale_items")
+    .select("item_type, quantity, unit_cost")
+    .eq("organization_id", organizationId)
+    .in("item_type", ["SERVICE", "PACKAGE"])
+    .in("sale_id", saleIds);
+
+  let cogs = 0;
+  for (const line of lines ?? []) {
+    const qty = Number(line.quantity) || 0;
+    const unitCost = Number(line.unit_cost) || 0;
+    cogs += qty * unitCost;
+  }
+  return Math.round(cogs * 100) / 100;
+}
+
 /** COGS & product revenue from completed POS sales in a date range. */
 export async function getProductSalesMetrics(
   organizationId: string,

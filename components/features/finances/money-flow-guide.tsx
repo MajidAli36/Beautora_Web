@@ -17,8 +17,8 @@ export function SalonMoneyFlowGuide() {
           <FlowBlock
             title="1 · Catalog (Services & Products)"
             lines={[
-              "Services → price only (no stock). Sold at POS → full amount is revenue.",
-              "Products → cost price + retail price + stock. Stock In adds units; POS sale reduces stock.",
+              "Services → price + optional in-house product recipe. Sold at POS → revenue; recipe products reduce stock.",
+              "Products → Retail (POS), In-house (services only), or Both. Cost price drives COGS and usage cost.",
             ]}
           />
           <FlowBlock
@@ -26,14 +26,14 @@ export function SalonMoneyFlowGuide() {
             lines={[
               "Customer pays retail price (services + products + packages).",
               "Recorded as Sales revenue → Dashboard, Reports, Finances.",
-              "Product sale also records COGS = qty sold × cost price.",
+              "Product sale records retail COGS = qty × cost. Service sales record in-house usage COGS from the recipe.",
             ]}
           />
           <FlowBlock
             title="3 · Inventory (stock on hand)"
             lines={[
-              "Value at cost = Σ (stock × cost) — money tied up in products.",
-              "Not cash out today; becomes COGS when sold at POS.",
+              "Value at cost = Σ (stock × cost) — money tied up in retail and in-house products.",
+              "Not cash out today; becomes COGS when sold or used in a service.",
               "Use Products → Inventory tab to restock (Stock In).",
             ]}
           />
@@ -48,11 +48,13 @@ export function SalonMoneyFlowGuide() {
         </div>
 
         <div className="rounded-lg border bg-background p-3 font-mono text-xs leading-relaxed text-muted-foreground">
-          Net profit = Sales revenue − Expenses − Staff paid − Product COGS (sold)
+          Net profit = Sales revenue − Expenses − Staff paid − Product COGS − In-house usage COGS
           <br />
-          Net cash flow = (Sales + Advances collected) − (Expenses + Staff + COGS)
+          Net cash flow = (Sales + Advances collected) − (Expenses + Staff + cash refunds)
           <br />
           Product gross profit = Product retail sold − Product COGS
+          <br />
+          Service gross profit = Service revenue − In-house usage COGS
         </div>
 
         <div className="flex flex-wrap gap-2">

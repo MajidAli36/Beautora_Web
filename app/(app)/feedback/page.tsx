@@ -31,6 +31,7 @@ function emptyDashboard(from: string, to: string) {
     needsImprovement: [],
     recent: [],
     lowScores: [],
+    allReviews: [],
   };
 }
 
@@ -52,7 +53,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Feedback"
-        description="Collect visit ratings from customers, then see where the salon needs improvement."
+        description="Reception can collect ratings for registered customers or walk-ins (even without a profile), optionally credit a stylist, and browse all reviews openly."
       />
 
       <FeedbackHub

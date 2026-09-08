@@ -17,13 +17,19 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
   const k = data.kpis;
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Service revenue" value={formatCurrency(k.serviceRevenue.current)} compare={k.serviceRevenue} />
         <KpiCard label="Services sold" value={String(k.servicesSold.current)} compare={k.servicesSold} />
         <KpiCard label="Avg service value" value={formatCurrency(k.avgServiceValue.current)} compare={k.avgServiceValue} />
         <KpiCard label="Unique services" value={String(k.uniqueServices.current)} compare={k.uniqueServices} />
+        <KpiCard label="In-house usage COGS" value={formatCurrency(k.usageCogs.current)} compare={k.usageCogs} />
+        <KpiCard
+          label="Service gross profit"
+          value={formatCurrency(k.serviceGrossProfit.current)}
+          compare={k.serviceGrossProfit}
+        />
       </div>
-      <ReportUnavailable reason={data.unavailable.profit} />
+      {data.unavailable.profit ? <ReportUnavailable reason={data.unavailable.profit} /> : null}
       <p className="text-xs text-muted-foreground">{k.serviceDiscountsNote}</p>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -55,12 +61,25 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
             onClick={() =>
               downloadCsv(
                 `services-${data.from}-${data.to}.csv`,
-                ["Service", "Category", "Qty", "Revenue", "Avg price", "% of service revenue"],
+                [
+                  "Service",
+                  "Category",
+                  "Qty",
+                  "Revenue",
+                  "Usage cost",
+                  "Gross profit",
+                  "Margin %",
+                  "Avg price",
+                  "% of service revenue",
+                ],
                 data.detail.map((r) => [
                   r.name,
                   r.category ?? "",
                   r.qty,
                   r.revenue,
+                  r.usageCost,
+                  r.grossProfit,
+                  r.marginPercent,
                   r.avgPrice,
                   r.pctOfServiceRevenue.toFixed(1),
                 ])
@@ -82,7 +101,9 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Avg</TableHead>
+                  <TableHead className="text-right">Usage cost</TableHead>
+                  <TableHead className="text-right">Profit</TableHead>
+                  <TableHead className="text-right">Margin</TableHead>
                   <TableHead className="text-right">%</TableHead>
                 </TableRow>
               </TableHeader>
@@ -93,7 +114,9 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
                     <TableCell>{r.category ?? "—"}</TableCell>
                     <TableCell className="text-right">{r.qty}</TableCell>
                     <TableCell className="text-right">{formatCurrency(r.revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.avgPrice)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(r.usageCost)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(r.grossProfit)}</TableCell>
+                    <TableCell className="text-right">{r.marginPercent}%</TableCell>
                     <TableCell className="text-right">{r.pctOfServiceRevenue.toFixed(1)}%</TableCell>
                   </TableRow>
                 ))}
@@ -122,6 +145,7 @@ function ServiceMini({
             <TableHead>Service</TableHead>
             <TableHead className="text-right">Qty</TableHead>
             <TableHead className="text-right">Revenue</TableHead>
+            <TableHead className="text-right">Profit</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -130,6 +154,7 @@ function ServiceMini({
               <TableCell className="font-medium">{r.name}</TableCell>
               <TableCell className="text-right">{r.qty}</TableCell>
               <TableCell className="text-right">{formatCurrency(r.revenue)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(r.grossProfit)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

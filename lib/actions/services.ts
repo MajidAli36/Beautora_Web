@@ -108,17 +108,30 @@ export async function createService(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("services").insert({
-    organization_id: org.organizationId,
-    category_id: parsed.data.category_id ?? null,
-    name: parsed.data.name,
-    description: parsed.data.description ?? null,
-    price: parsed.data.price,
-    duration_minutes: parsed.data.duration_minutes,
-    is_active: parsed.data.is_active,
-  });
+  const { data: created, error } = await supabase
+    .from("services")
+    .insert({
+      organization_id: org.organizationId,
+      category_id: parsed.data.category_id ?? null,
+      name: parsed.data.name,
+      description: parsed.data.description ?? null,
+      price: parsed.data.price,
+      duration_minutes: parsed.data.duration_minutes,
+      is_active: parsed.data.is_active,
+    })
+    .select("id")
+    .single();
 
-  if (error) return { error: error.message };
+  if (error || !created) return { error: error?.message ?? "Failed to create service" };
+
+  const usage = parseUsageRecipeFromForm(formData);
+  const usageResult = await replaceServiceUsageRecipe(
+    org.organizationId,
+    created.id,
+    usage
+  );
+  if (usageResult.error) return { error: usageResult.error };
+
   revalidatePath("/services");
   revalidatePath("/");
   revalidatePath("/book");
@@ -158,13 +171,155 @@ export async function updateService(
       is_active: parsed.data.is_active,
     })
     .eq("id", id)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null);
 
   if (error) return { error: error.message };
+
+  const usage = parseUsageRecipeFromForm(formData);
+  const usageResult = await replaceServiceUsageRecipe(org.organizationId, id, usage);
+  if (usageResult.error) return { error: usageResult.error };
+
   revalidatePath("/services");
   revalidatePath("/");
   revalidatePath("/book");
   return { success: true };
+}
+
+function parseUsageRecipeFromForm(formData: FormData): {
+  productId: string;
+  quantity: number;
+}[] {
+  const productIds = formData.getAll("usage_product_id").map(String);
+  const quantities = formData.getAll("usage_qty").map(String);
+  const rows: { productId: string; quantity: number }[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < productIds.length; i++) {
+    const productId = productIds[i]?.trim();
+    if (!productId || productId === "none") continue;
+    const quantity = Number(quantities[i] ?? 0);
+    if (!(quantity > 0)) continue;
+    if (seen.has(productId)) continue;
+    seen.add(productId);
+    rows.push({ productId, quantity });
+  }
+  return rows;
+}
+
+async function replaceServiceUsageRecipe(
+  organizationId: string,
+  serviceId: string,
+  rows: { productId: string; quantity: number }[]
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  if (rows.length) {
+    const ids = rows.map((r) => r.productId);
+    const { data: products, error } = await supabase
+      .from("products")
+      .select("id, product_kind, is_active, deleted_at")
+      .eq("organization_id", organizationId)
+      .in("id", ids);
+    if (error) return { error: error.message };
+    if ((products ?? []).length !== ids.length) {
+      return { error: "One or more in-house products were not found" };
+    }
+    for (const p of products ?? []) {
+      if (!p.is_active || p.deleted_at) {
+        return { error: "In-house products must be active" };
+      }
+      if (p.product_kind !== "IN_HOUSE" && p.product_kind !== "BOTH") {
+        return { error: "Only in-house (or both) products can be used in a service recipe" };
+      }
+    }
+  }
+
+  const { error: delErr } = await supabase
+    .from("service_product_usage")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("service_id", serviceId);
+  if (delErr) return { error: delErr.message };
+
+  if (!rows.length) return {};
+
+  const { error: insErr } = await supabase.from("service_product_usage").insert(
+    rows.map((r) => ({
+      organization_id: organizationId,
+      service_id: serviceId,
+      product_id: r.productId,
+      quantity_per_service: r.quantity,
+    }))
+  );
+  if (insErr) return { error: insErr.message };
+  return {};
+}
+
+export async function getServiceUsageRecipe(serviceId: string) {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("service_product_usage")
+    .select(
+      "id, product_id, quantity_per_service, product:products(id, name, cost_price, stock_quantity, product_kind, sku)"
+    )
+    .eq("organization_id", org.organizationId)
+    .eq("service_id", serviceId)
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as {
+    id: string;
+    product_id: string;
+    quantity_per_service: number;
+    product: {
+      id: string;
+      name: string;
+      cost_price: number;
+      stock_quantity: number;
+      product_kind: string;
+      sku: string | null;
+    } | null;
+  }[];
+}
+
+export async function getServicesWithUsage() {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+
+  const [{ data: services, error }, { data: usageRows, error: usageErr }] = await Promise.all([
+    supabase
+      .from("services")
+      .select("*, category:service_categories(id, name)")
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .order("name"),
+    supabase
+      .from("service_product_usage")
+      .select("id, service_id, product_id, quantity_per_service")
+      .eq("organization_id", org.organizationId),
+  ]);
+
+  if (error) throw new Error(error.message);
+  if (usageErr) throw new Error(usageErr.message);
+
+  const usageByService = new Map<
+    string,
+    { id: string; product_id: string; quantity_per_service: number }[]
+  >();
+  for (const row of usageRows ?? []) {
+    const list = usageByService.get(row.service_id) ?? [];
+    list.push({
+      id: row.id,
+      product_id: row.product_id,
+      quantity_per_service: Number(row.quantity_per_service),
+    });
+    usageByService.set(row.service_id, list);
+  }
+
+  return (services ?? []).map((s) => ({
+    ...s,
+    usage: usageByService.get(s.id) ?? [],
+  }));
 }
 
 export async function deleteService(id: string): Promise<ActionResult> {

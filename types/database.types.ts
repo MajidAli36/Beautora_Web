@@ -599,6 +599,7 @@ export type Database = {
           id: string; organization_id: string; category_id: string | null; sku: string | null;
           name: string; description: string | null; cost_price: number; retail_price: number;
           stock_quantity: number; low_stock_threshold: number; is_active: boolean;
+          product_kind: "RETAIL" | "IN_HOUSE" | "BOTH";
           deleted_at: string | null; deleted_by: string | null; deleted_by_role: MemberRole | null;
           created_by: string | null; updated_by: string | null;
           created_at: string; updated_at: string;
@@ -607,6 +608,7 @@ export type Database = {
           id?: string; organization_id: string; category_id?: string | null; sku?: string | null;
           name: string; description?: string | null; cost_price?: number; retail_price?: number;
           stock_quantity?: number; low_stock_threshold?: number; is_active?: boolean;
+          product_kind?: "RETAIL" | "IN_HOUSE" | "BOTH";
           deleted_at?: string | null; deleted_by?: string | null; deleted_by_role?: MemberRole | null;
           created_by?: string | null; updated_by?: string | null;
           created_at?: string; updated_at?: string;
@@ -615,9 +617,40 @@ export type Database = {
           id?: string; organization_id?: string; category_id?: string | null; sku?: string | null;
           name?: string; description?: string | null; cost_price?: number; retail_price?: number;
           stock_quantity?: number; low_stock_threshold?: number; is_active?: boolean;
+          product_kind?: "RETAIL" | "IN_HOUSE" | "BOTH";
           deleted_at?: string | null; deleted_by?: string | null; deleted_by_role?: MemberRole | null;
           created_by?: string | null; updated_by?: string | null;
           created_at?: string; updated_at?: string;
+        };
+        Relationships: [];
+      };
+      service_product_usage: {
+        Row: {
+          id: string;
+          organization_id: string;
+          service_id: string;
+          product_id: string;
+          quantity_per_service: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          service_id: string;
+          product_id: string;
+          quantity_per_service: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          service_id?: string;
+          product_id?: string;
+          quantity_per_service?: number;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1042,6 +1075,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      whatsapp_templates: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          body: string;
+          is_default: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          name: string;
+          body: string;
+          is_default?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          body?: string;
+          is_default?: boolean;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       customer_feedback: {
         Row: {
           id: string;
@@ -1296,6 +1359,7 @@ export type Database = {
     };
     Enums: {
       member_role: MemberRole;
+      product_kind: "RETAIL" | "IN_HOUSE" | "BOTH";
       inventory_transaction_type: "IN" | "OUT" | "ADJUSTMENT";
       sale_status: "DRAFT" | "COMPLETED" | "AMENDED" | "VOID" | "REFUNDED";
       sale_item_type: "SERVICE" | "PRODUCT" | "PACKAGE";
@@ -1318,6 +1382,9 @@ export type Package = Database["public"]["Tables"]["packages"]["Row"];
 export type PackageItem = Database["public"]["Tables"]["package_items"]["Row"];
 export type ProductCategory = Database["public"]["Tables"]["product_categories"]["Row"];
 export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type ProductKind = Database["public"]["Enums"]["product_kind"];
+export type ServiceProductUsage =
+  Database["public"]["Tables"]["service_product_usage"]["Row"];
 export type Sale = Database["public"]["Tables"]["sales"]["Row"];
 export type SaleItem = Database["public"]["Tables"]["sale_items"]["Row"];
 export type Invoice = Database["public"]["Tables"]["invoices"]["Row"];
