@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeCheckout } from "@/lib/actions/sales";
+import { previewCheckoutUsage } from "@/lib/actions/products";
 import {
   getCustomerDueInvoices,
   receiveCustomerAccountPayment,
@@ -18,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatCustomerName, formatDate, formatTime } from "@/lib/format";
 import { calculateInvoiceTotals, roundMoney } from "@/lib/sales/calculate";
+import { roundQty } from "@/lib/products/kinds";
 import type { CartItem, PaymentMethod } from "@/types/commerce";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
@@ -31,6 +33,16 @@ type CatalogCustomer = { id: string; first_name: string; last_name: string | nul
 type CatalogStaff = { id: string; full_name: string };
 
 type DueInvoiceRow = Awaited<ReturnType<typeof getCustomerDueInvoices>>[number];
+
+type UsageLine = {
+  productId: string;
+  productName: string;
+  recipeQty: number;
+  quantity: number;
+  unitLabel?: string | null;
+  unitCost: number;
+  dirty: boolean;
+};
 
 type PosTerminalProps = {
   services: CatalogService[];
@@ -70,6 +82,8 @@ export function PosTerminal({
   const [dueInvoices, setDueInvoices] = useState<DueInvoiceRow[]>([]);
   const [selectedDueIds, setSelectedDueIds] = useState<Set<string>>(new Set());
   const [duesLoading, setDuesLoading] = useState(false);
+  const [usageLines, setUsageLines] = useState<UsageLine[]>([]);
+  const [usageLoading, setUsageLoading] = useState(false);
 
   const selectedAppointment = useMemo(
     () => appointments.find((a) => a.id === appointmentId) ?? null,
@@ -113,6 +127,72 @@ export function PosTerminal({
       cancelled = true;
     };
   }, [customerId]);
+
+  // Auto-load in-house usage from service recipes when cart services/packages change
+  useEffect(() => {
+    let cancelled = false;
+    const serviceOrPackage = cart.filter(
+      (c) => c.itemType === "SERVICE" || c.itemType === "PACKAGE"
+    );
+    if (!serviceOrPackage.length) {
+      setUsageLines([]);
+      return;
+    }
+
+    setUsageLoading(true);
+    void (async () => {
+      try {
+        const result = await previewCheckoutUsage(
+          serviceOrPackage.map((c) => ({
+            itemType: c.itemType,
+            itemId: c.itemId,
+            quantity: c.quantity,
+          }))
+        );
+        if (cancelled) return;
+        if (result.error) {
+          notify.error(result.error);
+          setUsageLines([]);
+          return;
+        }
+        setUsageLines((prev) => {
+          const prevById = new Map(prev.map((l) => [l.productId, l]));
+          return result.requirements.map((r) => {
+            const existing = prevById.get(r.productId);
+            if (existing?.dirty) {
+              return {
+                ...existing,
+                recipeQty: r.quantity,
+                productName: r.productName,
+                unitLabel: r.unitLabel,
+                unitCost: r.unitCost,
+              };
+            }
+            return {
+              productId: r.productId,
+              productName: r.productName,
+              recipeQty: r.quantity,
+              quantity: r.quantity,
+              unitLabel: r.unitLabel,
+              unitCost: r.unitCost,
+              dirty: false,
+            };
+          });
+        });
+      } catch (e) {
+        if (!cancelled) {
+          setUsageLines([]);
+          notify.error(e instanceof Error ? e.message : "Could not load in-house usage");
+        }
+      } finally {
+        if (!cancelled) setUsageLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cart]);
 
   const invoiceTotals = useMemo(
     () =>
@@ -341,6 +421,19 @@ export function PosTerminal({
       expectedPaymentVersion: d.paymentVersion,
     }));
 
+    const usageOverrides = usageLines
+      .filter((l) => l.dirty || l.quantity !== l.recipeQty)
+      .map((l) => ({
+        productId: l.productId,
+        quantity: roundQty(l.quantity),
+      }));
+    // Also send removals: recipe products set to 0
+    for (const l of usageLines) {
+      if (l.quantity <= 0 && !usageOverrides.some((o) => o.productId === l.productId)) {
+        usageOverrides.push({ productId: l.productId, quantity: 0 });
+      }
+    }
+
     if (duesOnly) {
       if (!customerId) return { error: "Select a customer to pay past dues" };
       const result = await receiveCustomerAccountPayment({
@@ -387,6 +480,7 @@ export function PosTerminal({
       tenderedAmount: saleTendered,
       allowUnpaid: allowUnpaid && canManage,
       priorDuePayments: priorDuePayments.length ? priorDuePayments : undefined,
+      usageOverrides: usageOverrides.length ? usageOverrides : undefined,
     });
     if (result.error) {
       if (result.error.toLowerCase().includes("past")) {
@@ -680,6 +774,72 @@ export function PosTerminal({
               </li>
             ))}
           </ul>
+        )}
+
+        {(usageLoading || usageLines.length > 0) && (
+          <div className="space-y-2 rounded-lg border border-teal-200/80 bg-teal-50/50 p-3 dark:border-teal-900/40 dark:bg-teal-950/20">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">In-house used (this sale)</p>
+              {usageLoading ? (
+                <span className="text-xs text-muted-foreground">Updating…</span>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Internal stock only — not charged to customer
+                </span>
+              )}
+            </div>
+            {usageLines.length === 0 && !usageLoading ? (
+              <p className="text-xs text-muted-foreground">No in-house recipe linked to these services.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {usageLines.map((line) => (
+                  <li
+                    key={line.productId}
+                    className="flex flex-wrap items-center gap-2 rounded-md bg-background/80 px-2 py-1.5 text-sm"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium">{line.productName}</span>
+                    {line.unitLabel ? (
+                      <Badge variant="outline" className="text-xs">
+                        {line.unitLabel}
+                      </Badge>
+                    ) : null}
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.001"
+                      className="h-8 w-24"
+                      value={line.quantity}
+                      onChange={(e) => {
+                        const qty = roundQty(Math.max(0, Number(e.target.value) || 0));
+                        setUsageLines((prev) =>
+                          prev.map((row) =>
+                            row.productId === line.productId
+                              ? { ...row, quantity: qty, dirty: true }
+                              : row
+                          )
+                        );
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() =>
+                        setUsageLines((prev) =>
+                          prev.map((row) =>
+                            row.productId === line.productId
+                              ? { ...row, quantity: row.recipeQty, dirty: false }
+                              : row
+                          )
+                        )
+                      }
+                    >
+                      Reset
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         <Separator />

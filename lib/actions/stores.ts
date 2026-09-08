@@ -54,6 +54,7 @@ export async function listPublicStores(): Promise<PublicStore[]> {
     .from("organizations")
     .select("id, name, slug, city, address, tagline, whatsapp_phone, logo_path, cover_path")
     .is("admin_disabled_at", null)
+    .eq("public_listing_enabled", true)
     .order("name");
 
   if (error || !orgs?.length) return [];
@@ -128,12 +129,12 @@ export async function getPublicStoreBySlug(slug: string): Promise<PublicStoreDet
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at"
+      "id, name, slug, city, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at, public_listing_enabled"
     )
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!org || org.admin_disabled_at) return null;
+  if (!org || org.admin_disabled_at || !org.public_listing_enabled) return null;
 
   const [{ data: services }, { data: staff }, logoUrl, coverUrl] = await Promise.all([
     admin

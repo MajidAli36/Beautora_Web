@@ -13,7 +13,7 @@ export function SyncOpsCredit({ className = "", variant = "dark" }: SyncOpsCredi
 
   return (
     <p className={`text-xs ${colors} ${className}`}>
-      {SYNCOPS.label} ·{" "}
+      {SYNCOPS.label} · {SYNCOPS.builder.label} ·{" "}
       <a href={`tel:${SYNCOPS.phone.replace(/\s/g, "")}`} className="underline-offset-2 hover:underline">
         {SYNCOPS.phone}
       </a>
@@ -26,6 +26,16 @@ export function SyncOpsCredit({ className = "", variant = "dark" }: SyncOpsCredi
         className="underline-offset-2 hover:underline"
       >
         {SYNCOPS.domain}
+      </a>
+      {" · "}
+      <a
+        href={SYNCOPS.builder.url}
+        target="_blank"
+        rel="noopener noreferrer me author"
+        title={`${SYNCOPS.builder.name} — ${SYNCOPS.builder.domain}`}
+        className="underline-offset-2 hover:underline"
+      >
+        {SYNCOPS.builder.domain}
       </a>
     </p>
   );

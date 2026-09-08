@@ -17,7 +17,8 @@ export type CreateOrganizationInput = {
   whatsappPhone?: string;
   bookingSlotMinutes?: number;
   bookingDaysAhead?: number;
-  seedStarterServices?: boolean;
+  /** Partner username / referral code from ?ref= or cookie */
+  referralCode?: string | null;
 };
 
 export async function createSalonOrganization(
@@ -154,6 +155,24 @@ export async function createSalonOrganization(
   const trialEndsAt = new Date();
   trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + 30);
 
+  let referredByPartnerId: string | null = null;
+  let referralCodeUsed: string | null = null;
+  try {
+    const { resolveApprovedPartnerByUsername, getRememberedPartnerReferral } =
+      await import("@/lib/actions/partners");
+    const code =
+      input.referralCode?.trim() ||
+      (await getRememberedPartnerReferral()) ||
+      null;
+    const partner = await resolveApprovedPartnerByUsername(code);
+    if (partner) {
+      referredByPartnerId = partner.id;
+      referralCodeUsed = partner.username;
+    }
+  } catch {
+    // Referral is best-effort — never block store creation
+  }
+
   const { data: org, error: orgError } = await admin
     .from("organizations")
     .insert({
@@ -164,6 +183,8 @@ export async function createSalonOrganization(
       booking_days_ahead: safeDays,
       trial_ends_at: trialEndsAt.toISOString(),
       subscription_status: "trial",
+      referred_by_partner_id: referredByPartnerId,
+      referral_code_used: referralCodeUsed,
     })
     .select("id, slug")
     .single();
@@ -186,45 +207,7 @@ export async function createSalonOrganization(
     return { error: memberError.message };
   }
 
-  if (input.seedStarterServices) {
-    const { data: cats } = await admin
-      .from("service_categories")
-      .insert([
-        { organization_id: org.id, name: "Hair", sort_order: 1 },
-        { organization_id: org.id, name: "Nails", sort_order: 2 },
-      ])
-      .select("id, name");
-
-    const hairCat = cats?.find((c) => c.name === "Hair")?.id ?? null;
-    const nailCat = cats?.find((c) => c.name === "Nails")?.id ?? null;
-
-    await admin.from("services").insert([
-      {
-        organization_id: org.id,
-        category_id: hairCat,
-        name: "Haircut",
-        price: 1500,
-        duration_minutes: 45,
-        is_active: true,
-      },
-      {
-        organization_id: org.id,
-        category_id: hairCat,
-        name: "Hair Color",
-        price: 4500,
-        duration_minutes: 120,
-        is_active: true,
-      },
-      {
-        organization_id: org.id,
-        category_id: nailCat,
-        name: "Manicure",
-        price: 1200,
-        duration_minutes: 40,
-        is_active: true,
-      },
-    ]);
-  }
+  // Empty store on create — services, staff, customers, etc. are added by the salon.
 
   await admin.auth.admin.updateUserById(user.id, {
     user_metadata: {

@@ -15,11 +15,14 @@ import {
 import { isPostedSaleStatus } from "@/lib/sales/lifecycle";
 import { syncSalePaymentDenorm } from "@/lib/sales/sync-payment-denorm";
 import {
+  applyUsageOverrides,
   calculateUsageInventoryDelta,
   getPackageUnitUsageCosts,
+  getRecordedSaleUsage,
   getServiceUnitUsageCosts,
+  replaceSaleUsageLines,
   resolveServiceUsageRequirements,
-  reverseRecordedServiceUsage,
+  servicePackageLinesUnchanged,
 } from "@/lib/inventory/service-usage";
 import { roundQty } from "@/lib/products/kinds";
 
@@ -30,6 +33,7 @@ function revalidateSalePaths(saleId: string) {
   revalidatePath("/reports");
   revalidatePath("/finances");
   revalidatePath("/products");
+  revalidatePath("/in-house");
   revalidatePath("/services");
   revalidatePath("/dashboard");
   revalidatePath("/customers");
@@ -67,6 +71,15 @@ async function sumRefunds(saleId: string, organizationId: string) {
     .eq("sale_id", saleId)
     .eq("organization_id", organizationId);
   return (data ?? []).reduce((s, p) => s + Number(p.amount), 0);
+}
+
+/** Max cash/card still refundable on a posted sale (excludes deposit applications). */
+export async function getSaleRefundableCash(saleId: string): Promise<number> {
+  const { requireOrganization } = await import("@/lib/auth/organization");
+  const org = await requireOrganization();
+  const payments = await sumRefundablePayments(saleId, org.organizationId);
+  const refunds = await sumRefunds(saleId, org.organizationId);
+  return roundMoney(Math.max(0, payments - refunds));
 }
 
 async function ensureVersionOne(
@@ -172,28 +185,94 @@ async function applyInventoryDeltas(
   }
 }
 
+/**
+ * Restore retail product stock still outstanding for this sale.
+ * Nets prior OUT (sale / sale_amend) against IN restores so void/refund never double-restores.
+ * Returns the rows restored so callers can compensate if a later step fails.
+ */
 async function reverseAllProductStock(
   organizationId: string,
   saleId: string,
-  items: { item_type: string; item_id: string; quantity: number }[],
+  _items: { item_type: string; item_id: string; quantity: number }[],
   userId: string | null,
   referenceType: string
-) {
+): Promise<{ productId: string; quantity: number }[]> {
   const supabase = await createClient();
-  for (const item of items.filter((i) => i.item_type === "PRODUCT")) {
-    const qty = Number(item.quantity) || 0;
-    if (qty <= 0) continue;
+  const [{ data: outs }, { data: ins }] = await Promise.all([
+    supabase
+      .from("inventory_transactions")
+      .select("product_id, quantity")
+      .eq("organization_id", organizationId)
+      .eq("reference_id", saleId)
+      .eq("type", "OUT")
+      .in("reference_type", ["sale", "sale_amend", "sale_refund_compensate"]),
+    supabase
+      .from("inventory_transactions")
+      .select("product_id, quantity")
+      .eq("organization_id", organizationId)
+      .eq("reference_id", saleId)
+      .eq("type", "IN")
+      .in("reference_type", ["sale_void", "sale_amend_reverse", "sale_refund_full"]),
+  ]);
+
+  const net = new Map<string, number>();
+  for (const row of outs ?? []) {
+    net.set(
+      row.product_id,
+      Math.round(((net.get(row.product_id) ?? 0) + Number(row.quantity)) * 1000) / 1000
+    );
+  }
+  for (const row of ins ?? []) {
+    net.set(
+      row.product_id,
+      Math.round(((net.get(row.product_id) ?? 0) - Number(row.quantity)) * 1000) / 1000
+    );
+  }
+
+  const restored: { productId: string; quantity: number }[] = [];
+  for (const [productId, quantity] of net) {
+    if (quantity <= 0.0005) continue;
     const { error } = await supabase.from("inventory_transactions").insert({
       organization_id: organizationId,
-      product_id: item.item_id,
+      product_id: productId,
       type: "IN",
-      quantity: qty,
+      quantity,
       reference_type: referenceType,
       reference_id: saleId,
       notes: "Stock restored",
       created_by: userId,
     });
     if (error) throw new Error(`Inventory restore failed: ${error.message}`);
+    restored.push({ productId, quantity });
+  }
+  return restored;
+}
+
+/** Undo a retail restore if refund money commit fails after stock was returned. */
+async function compensateRetailRestore(
+  organizationId: string,
+  saleId: string,
+  restored: { productId: string; quantity: number }[],
+  userId: string | null
+) {
+  if (!restored.length) return;
+  const supabase = await createClient();
+  for (const row of restored) {
+    const { error } = await supabase.from("inventory_transactions").insert({
+      organization_id: organizationId,
+      product_id: row.productId,
+      type: "OUT",
+      quantity: row.quantity,
+      reference_type: "sale_refund_compensate",
+      reference_id: saleId,
+      notes: "Compensate — refund money commit failed after retail restore",
+      created_by: userId,
+    });
+    if (error) {
+      throw new Error(
+        `Refund aborted and retail compensate failed for ${row.productId}: ${error.message}. Check stock manually.`
+      );
+    }
   }
 }
 
@@ -330,6 +409,7 @@ export async function amendCompletedSale(
     totals.lines
   );
   let inventoryApplied = false;
+  let usageDeltasApplied: { productId: string; delta: number }[] = [];
 
   try {
     await ensureVersionOne(
@@ -355,24 +435,44 @@ export async function amendCompletedSale(
     await applyInventoryDeltas(org.organizationId, sale.id, deltas, userId);
     inventoryApplied = true;
 
-    const oldUsage = await resolveServiceUsageRequirements(
-      org.organizationId,
-      (oldItems ?? []).map((item) => ({
-        itemType: item.item_type,
-        itemId: item.item_id,
-        quantity: Number(item.quantity),
-      }))
-    );
+    const oldUsage = await getRecordedSaleUsage(org.organizationId, sale.id);
     if (oldUsage.error) throw new Error(oldUsage.error);
-    const newUsage = await resolveServiceUsageRequirements(
-      org.organizationId,
-      totals.lines.map((l) => ({
-        itemType: l.itemType,
-        itemId: l.itemId,
-        quantity: l.quantity,
-      }))
-    );
-    if (newUsage.error) throw new Error(newUsage.error);
+
+    const oldServiceFp = (oldItems ?? []).map((item) => ({
+      itemType: item.item_type,
+      itemId: item.item_id,
+      quantity: Number(item.quantity),
+    }));
+    const newServiceFp = totals.lines.map((l) => ({
+      itemType: l.itemType,
+      itemId: l.itemId,
+      quantity: l.quantity,
+    }));
+    const hasExplicitOverrides = (payload.usageOverrides?.length ?? 0) > 0;
+
+    // Keep POS / prior usage snapshot when service/package lines are unchanged
+    // and the owner did not send new overrides (avoids silent recipe rebase).
+    let newUsage: { requirements: typeof oldUsage.requirements; error?: string };
+    if (servicePackageLinesUnchanged(oldServiceFp, newServiceFp) && !hasExplicitOverrides) {
+      newUsage = { requirements: oldUsage.requirements };
+    } else {
+      const newUsageResolved = await resolveServiceUsageRequirements(
+        org.organizationId,
+        totals.lines.map((l) => ({
+          itemType: l.itemType,
+          itemId: l.itemId,
+          quantity: l.quantity,
+        }))
+      );
+      if (newUsageResolved.error) throw new Error(newUsageResolved.error);
+
+      newUsage = await applyUsageOverrides(
+        org.organizationId,
+        newUsageResolved.requirements,
+        payload.usageOverrides ?? null
+      );
+      if (newUsage.error) throw new Error(newUsage.error);
+    }
 
     const usageDeltas = calculateUsageInventoryDelta(
       oldUsage.requirements,
@@ -398,6 +498,14 @@ export async function amendCompletedSale(
       });
       if (usageInvErr) throw new Error(`In-house inventory update failed: ${usageInvErr.message}`);
     }
+    usageDeltasApplied = usageDeltas;
+
+    const snap = await replaceSaleUsageLines({
+      organizationId: org.organizationId,
+      saleId: sale.id,
+      requirements: newUsage.requirements,
+    });
+    if (snap.error) throw new Error(snap.error);
 
     // Replace line items
     const { error: delErr } = await supabase
@@ -690,6 +798,29 @@ export async function amendCompletedSale(
     return { success: true, saleId: sale.id, version: newVersion };
   } catch (e) {
     // Best-effort compensation when inventory already moved (no multi-statement DB txn via client)
+    if (usageDeltasApplied.length) {
+      try {
+        for (const { productId, delta } of usageDeltasApplied) {
+          if (Math.abs(delta) < 0.0005) continue;
+          // Negate the amend movement
+          const type = delta > 0 ? "IN" : "OUT";
+          const quantity = roundQty(Math.abs(delta));
+          await supabase.from("inventory_transactions").insert({
+            organization_id: org.organizationId,
+            product_id: productId,
+            type,
+            quantity,
+            reference_type:
+              type === "IN" ? "service_usage_amend_reverse" : "service_usage_amend",
+            reference_id: sale.id,
+            notes: "Amendment rollback — in-house usage",
+            created_by: userId,
+          });
+        }
+      } catch {
+        /* surfaced via original error */
+      }
+    }
     if (inventoryApplied && deltas.length) {
       try {
         await applyInventoryDeltas(
@@ -742,48 +873,69 @@ export async function refundSale(input: {
     return { error: `Refund exceeds refundable cash/card collected (max ${refundable})` };
   }
 
-  const { error: refundErr } = await supabase.from("sale_refunds").insert({
-    organization_id: org.organizationId,
-    sale_id: sale.id,
-    amount,
-    method: input.method,
-    reason,
-    created_by: user?.id ?? null,
-  });
-  if (refundErr) return { error: refundErr.message };
-
-  // Track cash-out on sale_refunds only. Full refunds remove the sale from revenue;
-  // partial refunds are subtracted in financial summary via sale_refunds on posted sales.
-  // An expenses row here would double-hit P&L.
-
   const newRefunds = refundsTotal + amount;
   const fullyRefunded = newRefunds >= paymentsTotal - 0.009;
 
+  // Full refund: restore retail stock BEFORE inserting the refund row so we never
+  // leave money refunded with stock still out (or refund committed with no restore).
+  let restoredRetail: { productId: string; quantity: number }[] = [];
   if (fullyRefunded) {
-    // Restore inventory on full refund
     const { data: items } = await supabase
       .from("sale_items")
       .select("item_type, item_id, quantity")
       .eq("sale_id", sale.id);
     try {
-      await reverseAllProductStock(
+      restoredRetail = await reverseAllProductStock(
         org.organizationId,
         sale.id,
         items ?? [],
         user?.id ?? null,
         "sale_refund_full"
       );
-      const usageRestore = await reverseRecordedServiceUsage({
-        organizationId: org.organizationId,
-        saleId: sale.id,
-        userId: user?.id ?? null,
-        referenceType: "service_usage_restore",
-      });
-      if (usageRestore.error) throw new Error(usageRestore.error);
     } catch (e) {
       return { error: e instanceof Error ? e.message : "Inventory restore failed" };
     }
+  }
 
+  const { data: refundRow, error: refundErr } = await supabase
+    .from("sale_refunds")
+    .insert({
+      organization_id: org.organizationId,
+      sale_id: sale.id,
+      amount,
+      method: input.method,
+      reason,
+      created_by: user?.id ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (refundErr || !refundRow) {
+    if (restoredRetail.length) {
+      try {
+        await compensateRetailRestore(
+          org.organizationId,
+          sale.id,
+          restoredRetail,
+          user?.id ?? null
+        );
+      } catch (compErr) {
+        return {
+          error:
+            (refundErr?.message ?? "Refund insert failed") +
+            " · " +
+            (compErr instanceof Error ? compErr.message : "Stock compensate failed"),
+        };
+      }
+    }
+    return { error: refundErr?.message ?? "Refund insert failed" };
+  }
+
+  // Track cash-out on sale_refunds only. Full refunds remove the sale from revenue;
+  // partial refunds are subtracted in financial summary via sale_refunds on posted sales.
+  // An expenses row here would double-hit P&L.
+
+  if (fullyRefunded) {
     // Unlink advances so they can be reused or refunded (same as void)
     await supabase
       .from("appointment_deposits")
@@ -791,17 +943,36 @@ export async function refundSale(input: {
       .eq("applied_to_sale_id", sale.id)
       .eq("organization_id", org.organizationId);
 
-    await supabase
+    const { error: statusErr } = await supabase
       .from("sales")
       .update({ status: "REFUNDED" })
       .eq("id", sale.id)
       .eq("organization_id", org.organizationId);
+
+    if (statusErr) {
+      // Money + stock already applied; surface error but do not compensate stock
+      // (refund row exists — owner can reconcile status). Prefer stock+money correct.
+      try {
+        await syncSalePaymentDenorm(org.organizationId, sale.id);
+      } catch {
+        /* ignore */
+      }
+      return {
+        error: `Refund saved and retail stock restored, but status update failed: ${statusErr.message}. Refresh and check invoice.`,
+      };
+    }
   }
 
   try {
     await syncSalePaymentDenorm(org.organizationId, sale.id);
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to sync payment status" };
+    return {
+      error:
+        (e instanceof Error ? e.message : "Failed to sync payment status") +
+        (fullyRefunded
+          ? " (refund and retail restore already applied — refresh invoice)"
+          : ""),
+    };
   }
 
   await writeAuditLog({
@@ -810,11 +981,24 @@ export async function refundSale(input: {
     action: "sale.refund",
     entityType: "sale",
     entityId: sale.id,
-    metadata: { amount, method: input.method, reason, fullyRefunded },
+    metadata: {
+      amount,
+      method: input.method,
+      reason,
+      fullyRefunded,
+      stockRestoredRetail: fullyRefunded,
+      inHouseKeptDeducted: true,
+      refundId: refundRow.id,
+    },
   });
 
   revalidateSalePaths(sale.id);
-  return { success: true };
+  return {
+    success: true,
+    message: fullyRefunded
+      ? "Full refund recorded. Retail stock restored. In-house usage kept deducted (already used)."
+      : "Partial refund recorded. Money only — retail and in-house stock unchanged.",
+  };
 }
 
 export async function getSaleVersions(saleId: string) {

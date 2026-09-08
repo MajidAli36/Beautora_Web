@@ -1,10 +1,12 @@
--- Wipe all business data. KEEP: organizations, organization_members (roles),
--- schema_migrations, enums, auth.users.
+-- Wipe ALL public business data. KEEP: auth.users (and auth identities).
+-- Removes organizations, partners, memberships, and all salon operational data.
+-- After this, existing logins can re-onboard into empty stores (no dummy seed).
 
 do $$
 declare
   t text;
   wipe text[] := array[
+    'sale_usage_lines',
     'sale_version_items',
     'sale_versions',
     'sale_refunds',
@@ -18,17 +20,13 @@ declare
     'appointment_deposits',
     'appointments',
     'queue_tokens',
+    'chairs',
     'staff_attendance',
     'staff_payments',
     'staff_notes',
     'staff_schedules',
     'staff',
-    'device_commands',
-    'devices',
-    'expenses',
-    'whatsapp_messages',
-    'audit_logs',
-    'customer_feedback',
+    'service_product_usage',
     'package_items',
     'packages',
     'products',
@@ -36,7 +34,19 @@ declare
     'services',
     'service_categories',
     'customers',
-    'chairs'
+    'device_commands',
+    'devices',
+    'expenses',
+    'whatsapp_messages',
+    'whatsapp_templates',
+    'customer_feedback',
+    'audit_logs',
+    'partner_commissions',
+    'subscription_payments',
+    'organization_payment_accounts',
+    'organization_members',
+    'organizations',
+    'partners'
   ];
 begin
   foreach t in array wipe loop
@@ -46,3 +56,22 @@ begin
     end if;
   end loop;
 end $$;
+
+-- Clear salon/partner onboarding flags so logins can create a fresh empty store.
+update auth.users
+set raw_user_meta_data = (
+  (
+    (
+      (
+        (
+          coalesce(raw_user_meta_data, '{}'::jsonb)
+          - 'onboarding_completed'
+        )
+        - 'account_type'
+      )
+      - 'partner_username'
+    )
+    - 'partner_status'
+  )
+  - 'salon_name'
+);

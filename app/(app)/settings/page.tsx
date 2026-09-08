@@ -5,6 +5,7 @@ import { getActiveOrganization } from "@/lib/auth/organization";
 import { canManageRecords } from "@/lib/auth/permissions";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
 import { SettingsTabs } from "@/components/features/settings/settings-tabs";
+import { StorePublicListingToggle } from "@/components/features/settings/store-public-listing-toggle";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,12 @@ export default async function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Store profile, hours, and payment accounts used on online booking — plus system tools."
+        actions={
+          <StorePublicListingToggle
+            enabled={profile.public_listing_enabled}
+            canManage={canManage}
+          />
+        }
       />
 
       <SettingsTabs

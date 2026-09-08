@@ -11,6 +11,7 @@
     "db:push": "node scripts/db-push.mjs",
     "db:link": "node scripts/db-link.mjs",
     "db:seed": "node scripts/seed-data.mjs",
+    "db:wipe": "node scripts/wipe-business-data.mjs",
     "db:reset-test": "node scripts/reset-for-retest.mjs",
     "db:setup": "node scripts/setup-db.mjs",
     "db:fix-auth": "node scripts/fix-auth.mjs",

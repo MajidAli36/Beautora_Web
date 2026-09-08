@@ -11,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: org ? `Book at ${org.name}` : "Book Appointment",
     description: org
-      ? `Schedule your visit at ${org.name}. Online booking powered by ${SYNCOPS.name}.`
-      : `Online salon booking powered by ${SYNCOPS.name}.`,
+      ? `Schedule your visit at ${org.name}. Online booking powered by ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`
+      : `Online salon booking powered by ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
   };
 }
 

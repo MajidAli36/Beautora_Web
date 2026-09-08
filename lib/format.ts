@@ -97,3 +97,24 @@ export function getInitials(name: string) {
     .map((p) => p[0]?.toUpperCase())
     .join("");
 }
+
+/** Relative label like "2 days ago" / "Just now" (client or server). */
+export function formatRelativeTime(date: Date | string | null | undefined) {
+  if (!date) return "—";
+  const d = typeof date === "string" ? new Date(date) : date;
+  const ms = Date.now() - d.getTime();
+  if (Number.isNaN(ms)) return "—";
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return "Just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const days = Math.floor(hr / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}

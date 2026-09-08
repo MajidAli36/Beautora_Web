@@ -13,6 +13,8 @@ const NAV = [
   { label: "Platform", href: "/#platform" },
   { label: "Pricing", href: "/#pricing" },
   { label: "Stores", href: "/stores" },
+  { label: "Apps", href: "/apps" },
+  { label: "Partner", href: "/partner" },
 ];
 
 export function SiteHeader() {
@@ -28,6 +30,10 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   const solid = !isHome || scrolled || open;
 
   return (
@@ -35,34 +41,61 @@ export function SiteHeader() {
       <SiteTopBar />
       <header
         className={cn(
-          "transition-[background-color,border-color,backdrop-filter] duration-300",
+          "transition-[background-color,border-color,height] duration-200 ease-out",
           solid
-            ? "border-b border-[var(--m-line)] bg-[var(--m-paper)]/92 backdrop-blur-md"
+            ? "border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 backdrop-blur-md"
             : "border-b border-transparent bg-transparent"
         )}
       >
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6 lg:h-16">
+        <div
+          className={cn(
+            "mx-auto flex max-w-6xl items-center justify-between px-6 transition-[height] duration-200",
+            scrolled ? "h-12 lg:h-14" : "h-14 lg:h-16"
+          )}
+        >
           <Link
             href="/"
             className={cn(
-              "font-display text-xl font-semibold tracking-tight transition-colors sm:text-2xl",
+              "flex flex-col leading-none transition-colors",
               solid ? "text-[var(--m-ink)]" : "text-white"
             )}
           >
-            {SYNCOPS.name}
+            <span className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
+              {SYNCOPS.name}
+            </span>
+            <span
+              className={cn(
+                "mt-0.5 text-[10px] font-medium uppercase tracking-[0.16em]",
+                solid ? "text-[var(--m-muted)]" : "text-white/55"
+              )}
+            >
+              {SYNCOPS.builder.short}
+            </span>
           </Link>
 
-          <nav className="hidden items-center gap-8 md:flex lg:gap-10">
+          <nav className="hidden items-center gap-7 lg:flex lg:gap-9" aria-label="Primary">
             {NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "text-sm font-medium tracking-wide transition-opacity hover:opacity-70",
+                  "inline-flex items-center gap-1.5 text-sm font-medium tracking-wide transition-opacity duration-150 hover:opacity-70",
                   solid ? "text-[var(--m-ink-soft)]" : "text-white/90"
                 )}
               >
                 {item.label}
+                {item.href === "/apps" ? (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                      solid
+                        ? "bg-[var(--m-accent)]/12 text-[var(--m-accent)]"
+                        : "bg-white/15 text-white/90"
+                    )}
+                  >
+                    Soon
+                  </span>
+                ) : null}
               </Link>
             ))}
           </nav>
@@ -71,7 +104,7 @@ export function SiteHeader() {
             <Link
               href="/login"
               className={cn(
-                "text-sm font-medium transition-opacity hover:opacity-70",
+                "text-sm font-medium transition-opacity duration-150 hover:opacity-70",
                 solid ? "text-[var(--m-muted)]" : "text-white/75"
               )}
             >
@@ -80,55 +113,65 @@ export function SiteHeader() {
             <Link
               href="/signup"
               className={cn(
-                "inline-flex h-10 items-center px-5 text-sm font-semibold tracking-wide transition-colors",
+                "inline-flex h-10 items-center px-5 text-sm font-semibold tracking-wide transition-all duration-150",
                 solid
                   ? "bg-[var(--m-ink)] text-[var(--m-paper)] hover:bg-[var(--m-ink-soft)]"
                   : "bg-white text-[var(--m-ink)] hover:bg-white/90"
               )}
             >
-              Open a store
+              Start free
             </Link>
           </div>
 
           <button
             type="button"
             className={cn(
-              "inline-flex size-11 items-center justify-center rounded-lg md:hidden",
+              "inline-flex size-11 items-center justify-center md:hidden",
               solid ? "text-[var(--m-ink)]" : "text-white"
             )}
             onClick={() => setOpen(!open)}
-            aria-label="Toggle menu"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? "Close menu" : "Open menu"}
           >
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
         </div>
 
         {open && (
-          <div className="border-t border-[var(--m-line)] bg-[var(--m-paper)] px-6 py-5 md:hidden">
-            <nav className="flex flex-col gap-1">
+          <div
+            id="mobile-nav"
+            className="border-t border-[var(--m-line)] bg-[var(--m-paper)] px-6 py-5 md:hidden"
+          >
+            <nav className="flex flex-col gap-1" aria-label="Mobile">
               {NAV.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className="rounded-lg px-2 py-3 text-base font-medium text-[var(--m-ink)]"
+                  className="flex min-h-11 items-center justify-between px-1 text-base font-medium text-[var(--m-ink)]"
                 >
                   {item.label}
+                  {item.href === "/apps" ? (
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--m-accent)]">
+                      Coming soon
+                    </span>
+                  ) : null}
                 </Link>
               ))}
               <Link
                 href="/login"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-2 py-3 text-base text-[var(--m-muted)]"
+                className="min-h-11 px-1 py-3 text-base text-[var(--m-muted)]"
               >
                 Login
               </Link>
               <Link
                 href="/signup"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-11 items-center justify-center bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
+                className="mt-2 inline-flex h-11 w-full items-center justify-center bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
               >
-                Open a store
+                Start free
               </Link>
             </nav>
           </div>

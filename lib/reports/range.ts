@@ -24,6 +24,7 @@ export type ReportTabId =
   | "appointments"
   | "staff"
   | "inventory"
+  | "in_house"
   | "products"
   | "finance"
   | "payments"
@@ -37,6 +38,7 @@ export const REPORT_TABS: { id: ReportTabId; label: string }[] = [
   { id: "appointments", label: "Appointments" },
   { id: "staff", label: "Staff" },
   { id: "inventory", label: "Inventory" },
+  { id: "in_house", label: "In-house" },
   { id: "products", label: "Products" },
   { id: "finance", label: "Finance" },
   { id: "payments", label: "Payments" },

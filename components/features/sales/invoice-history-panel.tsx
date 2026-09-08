@@ -2,8 +2,10 @@
 
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { SaleStockMovement } from "@/lib/inventory/service-usage";
+import Link from "next/link";
 
 type VersionRow = {
   id: string;
@@ -36,9 +38,11 @@ type RefundRow = {
 export function InvoiceHistoryPanel({
   versions,
   refunds,
+  stockMovements = [],
 }: {
   versions: VersionRow[];
   refunds: RefundRow[];
+  stockMovements?: SaleStockMovement[];
 }) {
   return (
     <div className="space-y-4">
@@ -97,6 +101,10 @@ export function InvoiceHistoryPanel({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Refund history</CardTitle>
+          <CardDescription>
+            Partial refunds are money only. Full refund restores retail stock; in-house stays
+            deducted.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {!refunds.length ? (
@@ -106,7 +114,9 @@ export function InvoiceHistoryPanel({
               {refunds.map((r) => (
                 <li key={r.id} className="flex justify-between gap-3 border-b border-border/60 py-2">
                   <div>
-                    <p className="font-medium">{formatCurrency(r.amount)} · {r.method}</p>
+                    <p className="font-medium">
+                      {formatCurrency(r.amount)} · {r.method}
+                    </p>
                     <p className="text-xs text-muted-foreground">{r.reason}</p>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -115,6 +125,60 @@ export function InvoiceHistoryPanel({
                 </li>
               ))}
             </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Stock movements</CardTitle>
+          <CardDescription>
+            Retail and in-house inventory tied to this invoice (deduct, amend, restore).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!stockMovements.length ? (
+            <p className="text-sm text-muted-foreground">No inventory movements for this invoice.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>When</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Event</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stockMovements.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {formatDateTime(m.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={
+                          m.kind === "in_house"
+                            ? `/in-house/${m.productId}`
+                            : `/products`
+                        }
+                        className="text-sm text-primary underline-offset-2 hover:underline"
+                      >
+                        {m.productName}
+                      </Link>
+                      <Badge variant="outline" className="ml-2 text-[10px]">
+                        {m.kind === "in_house" ? "In-house" : "Retail"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">{m.label}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {m.type === "IN" ? "+" : "−"}
+                      {m.quantity}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

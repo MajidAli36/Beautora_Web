@@ -7,10 +7,10 @@ export const SYNCOPS = {
   phone: "+92301 8678319",
   phoneDisplay: "+92 301 8678319",
   label: "Powered by Beautora",
-  line: "Powered by Beautora · +92301 8678319 · beautora.app",
+  line: "Powered by Beautora · Built by SyncOps · beautora.app · syncops.tech",
   seoDescription:
-    "Beautora builds salon POS, online booking, attendance, and operations software for modern beauty brands.",
-  html: `<span class="credit">Powered by <strong>Beautora</strong> · <a href="tel:+923018678319">+92301 8678319</a> · <a href="https://beautora.app" rel="noopener noreferrer me author">beautora.app</a></span>`,
+    "Beautora is the salon operating system from SyncOps — online booking, POS, staff, attendance, WhatsApp, and reports for modern beauty brands.",
+  html: `<span class="credit">Powered by <strong>Beautora</strong> · Built by <strong>SyncOps</strong> · <a href="https://beautora.app" rel="noopener noreferrer me author">beautora.app</a> · <a href="https://syncops.tech" rel="noopener noreferrer me author">syncops.tech</a></span>`,
   /** Parent studio / product house */
   builder: {
     name: "SyncOps",
@@ -18,6 +18,8 @@ export const SYNCOPS = {
     domain: "syncops.tech",
     label: "Built by SyncOps",
     short: "Beautora — a SyncOps product",
+    seoDescription:
+      "SyncOps builds software products for real businesses. Beautora is our salon operating system for bookings, POS, staff, and operations.",
   },
   /** Thermal receipt footer lines (POS, token, appointment) */
   receipt: {

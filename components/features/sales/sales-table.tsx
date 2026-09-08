@@ -30,6 +30,7 @@ type SaleRow = {
   payment_status?: string;
   amount_paid?: number;
   amount_due?: number;
+  amount_refunded?: number;
   payment_version?: number;
   completed_at: string | null;
   created_at: string;
@@ -166,6 +167,10 @@ export function SalesTable({
                         status={sale.status}
                         total={sale.total}
                         amountDue={due}
+                        refundableMax={Math.max(
+                          0,
+                          Number(sale.amount_paid ?? 0) - Number(sale.amount_refunded ?? 0)
+                        )}
                         paymentVersion={Number(sale.payment_version ?? 1)}
                         invoiceLabel={invoiceNum}
                         canManage={canManage}

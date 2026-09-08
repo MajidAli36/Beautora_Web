@@ -14,6 +14,8 @@ import {
   type BillingPaymentRow,
 } from "@/lib/actions/billing";
 import { CustomerInvoicePreview } from "@/components/billing/customer-invoice-preview";
+import { PlatformPartnersPanel } from "@/components/platform/platform-partners-panel";
+import type { PartnerRow } from "@/lib/actions/partners";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,15 +47,18 @@ function storeStatusLine(store: PlatformStoreRow): string {
 export function PlatformAdminPanel({
   stores,
   payments,
+  partners,
   summary,
   adminEmail,
 }: {
   stores: PlatformStoreRow[];
   payments: BillingPaymentRow[];
+  partners: PartnerRow[];
   summary: {
     storeCount: number;
     disabledCount: number;
     pendingInvoices: number;
+    pendingPartners: number;
     monthlyFee: number;
   };
   adminEmail: string;
@@ -133,10 +138,11 @@ export function PlatformAdminPanel({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Stores" value={String(summary.storeCount)} />
         <Stat label="Disabled / locked" value={String(summary.disabledCount)} />
         <Stat label="Pending invoices" value={String(summary.pendingInvoices)} />
+        <Stat label="Pending partners" value={String(summary.pendingPartners)} />
       </div>
 
       <section className="space-y-3">
@@ -350,6 +356,8 @@ export function PlatformAdminPanel({
           )}
         </ul>
       </section>
+
+      <PlatformPartnersPanel partners={partners} />
     </div>
   );
 }

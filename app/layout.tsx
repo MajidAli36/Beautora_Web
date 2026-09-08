@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
+import { SYNCOPS } from "@/lib/print/syncops";
 import { SiteJsonLd } from "@/components/seo/site-json-ld";
 import { AppToaster } from "@/components/ui/app-toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { buildRootMetadata } from "@/lib/seo/site";
 import "./globals.css";
 
-const geistSans = Geist({
+const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -26,14 +27,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <SiteJsonLd />
-        <link rel="author" href="https://syncops.tech" title="SyncOps" />
-        <link rel="author" href="https://beautora.app" title="Beautora" />
-        <link rel="me" href="https://syncops.tech" />
-        <link rel="me" href="https://beautora.app" />
+        <link rel="author" href={SYNCOPS.builder.url} title={SYNCOPS.builder.name} />
+        <link rel="author" href={SYNCOPS.url} title={SYNCOPS.name} />
+        <link rel="me" href={SYNCOPS.builder.url} />
+        <link rel="me" href={SYNCOPS.url} />
       </head>
       <body className="flex min-h-full flex-col">
         <TooltipProvider>

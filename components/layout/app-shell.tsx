@@ -48,7 +48,7 @@ export function AppShell({
           overrides={navOverrides}
           landingPath={landingPath}
         >
-          <div className="app-main flex-1 overflow-x-auto overscroll-x-contain p-3 sm:overflow-x-hidden sm:p-6 lg:p-8">
+          <div className="app-main flex-1 overflow-x-hidden overscroll-x-contain p-4 sm:p-6 lg:p-8">
             {children}
           </div>
           <QuickActionFab memberRole={memberRole} navOverrides={navOverrides} />

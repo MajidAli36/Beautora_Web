@@ -98,7 +98,7 @@ export function AppSidebar({
                       <SidebarMenuButton
                         isActive={isActive}
                         tooltip={item.title}
-                        className="h-10 rounded-lg px-2.5 transition-colors duration-150 data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-accent-foreground"
+                        className="h-10 rounded-lg px-2.5 transition-colors duration-150 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:[&_svg]:text-sidebar-accent-foreground"
                         render={<Link href={item.href} />}
                       >
                         <item.icon className="size-[18px] shrink-0" />

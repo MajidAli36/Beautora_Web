@@ -32,8 +32,9 @@ export function VoidSaleButton({ saleId }: { saleId: string }) {
             <DialogTitle>Delete this invoice?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Soft-deletes the invoice. It remains visible as Deleted / Disabled, restores product
-            stock, and is excluded from revenue, staff, and reports. A reason is required.
+            Soft-deletes the invoice (visible as Deleted / Disabled). Restores retail stock.
+            In-house cream/ml stays deducted (already used). Excluded from revenue. Owner can open
+            History for money and stock timeline.
           </p>
           <div className="space-y-2">
             <Label htmlFor="void-reason-btn">Reason</Label>
@@ -58,7 +59,9 @@ export function VoidSaleButton({ saleId }: { saleId: string }) {
                     notify.error(res.error);
                     return;
                   }
-                  notify.success("Invoice deleted (disabled)");
+                  notify.success(
+                    "Invoice deleted — retail restored; in-house kept deducted"
+                  );
                   setOpen(false);
                   router.refresh();
                 })

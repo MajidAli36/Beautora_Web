@@ -13,7 +13,7 @@ const statusStyles: Record<string, { label: string; className: string }> = {
   CONFIRMED: { label: "Confirmed", className: "bg-accent text-accent-foreground" },
   CHECKED_IN: { label: "Checked in", className: "bg-primary/10 text-primary" },
   IN_PROGRESS: { label: "In progress", className: "bg-primary/10 text-primary" },
-  COMPLETED: { label: "Completed", className: "bg-[#16a34a]/10 text-[#16a34a]" },
+  COMPLETED: { label: "Completed", className: "bg-success/10 text-success" },
   CANCELLED: { label: "Cancelled", className: "bg-destructive/10 text-destructive" },
   NO_SHOW: { label: "No show", className: "bg-destructive/10 text-destructive" },
 };
@@ -24,13 +24,13 @@ type AppointmentListProps = {
 
 export function AppointmentList({ appointments }: AppointmentListProps) {
   return (
-    <div className="dashboard-card flex flex-col">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <div>
+    <div className="dashboard-card flex w-full min-w-0 flex-col">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-4 sm:px-5">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Today&apos;s Appointments</h3>
           <p className="text-xs text-muted-foreground">{appointments.length} scheduled</p>
         </div>
-        <Button variant="ghost" size="sm" render={<Link href="/appointments" />}>
+        <Button variant="ghost" size="sm" className="h-9 shrink-0" render={<Link href="/appointments" />}>
           View all
           <ChevronRight className="size-4" />
         </Button>
@@ -45,7 +45,7 @@ export function AppointmentList({ appointments }: AppointmentListProps) {
           <p className="mt-1 max-w-xs text-xs text-muted-foreground">
             Your schedule is clear. Create an appointment to get started.
           </p>
-          <Button className="mt-4" size="sm" render={<Link href="/appointments/new" />}>
+          <Button className="mt-4 h-11 sm:h-8" size="sm" render={<Link href="/appointments/new" />}>
             New Appointment
           </Button>
         </div>
@@ -56,7 +56,7 @@ export function AppointmentList({ appointments }: AppointmentListProps) {
             return (
               <li
                 key={appt.id}
-                className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-muted/30"
+                className="flex min-h-14 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 sm:px-5"
               >
                 <Avatar size="sm">
                   <AvatarFallback className="bg-primary/10 text-[10px] font-medium text-primary">

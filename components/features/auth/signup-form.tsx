@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { notify } from "@/lib/toast";
 // import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
@@ -11,20 +11,36 @@ import {
   checkSalonNameAvailable,
   registerAccount,
 } from "@/lib/actions/auth";
+import { rememberPartnerReferral } from "@/lib/actions/partners";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [salonName, setSalonName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [nameHint, setNameHint] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState<string | null>(null);
   const [nameOk, setNameOk] = useState<boolean | null>(null);
   const [emailOk, setEmailOk] = useState<boolean | null>(null);
+  const [partnerRef, setPartnerRef] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ref = searchParams.get("ref")?.trim();
+    if (!ref) return;
+    void (async () => {
+      const result = await rememberPartnerReferral(ref);
+      if (!result.error) {
+        setPartnerRef(ref.toLowerCase());
+      }
+    })();
+  }, [searchParams]);
 
   useEffect(() => {
     if (salonName.trim().length < 2) {
@@ -64,6 +80,12 @@ export function SignupForm() {
 
     if (password.length < 8) {
       notify.error("Password must be at least 8 characters");
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      notify.error("Password and confirm password do not match");
       setLoading(false);
       return;
     }
@@ -122,6 +144,12 @@ export function SignupForm() {
             Sign in
           </Link>
         </p>
+        {partnerRef ? (
+          <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            Referred by partner <span className="font-semibold">@{partnerRef}</span> — they
+            earn your first month&apos;s subscription when you pay.
+          </p>
+        ) : null}
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -209,9 +237,52 @@ export function SignupForm() {
           <p className="text-xs text-[var(--m-muted)]">At least 8 characters</p>
         </div>
 
+        <div className="space-y-2">
+          <label
+            htmlFor="confirmPassword"
+            className="text-sm font-medium text-[var(--m-ink-soft)]"
+          >
+            Confirm password
+          </label>
+          <div className="relative">
+            <input
+              id="confirmPassword"
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              className={cn(fieldClassName, "pr-11")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((v) => !v)}
+              aria-label={
+                showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+              }
+              className="absolute top-1/2 right-2.5 flex size-8 -translate-y-1/2 items-center justify-center text-[var(--m-muted)] transition-colors hover:text-[var(--m-ink)]"
+            >
+              {showConfirmPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </button>
+          </div>
+          {confirmPassword.length > 0 && password !== confirmPassword ? (
+            <p className="text-xs text-red-700">Passwords do not match</p>
+          ) : null}
+        </div>
+
         <button
           type="submit"
-          disabled={loading || nameOk === false || emailOk === false}
+          disabled={
+            loading ||
+            nameOk === false ||
+            emailOk === false ||
+            (confirmPassword.length > 0 && password !== confirmPassword)
+          }
           className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[var(--m-ink)] text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)] disabled:opacity-60"
         >
           {loading ? "Creating account…" : "Continue to setup"}

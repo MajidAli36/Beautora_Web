@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: BookPageProps): Promise<Metad
   return {
     title: org ? `Book at ${org.name}` : "Book appointment",
     description: org
-      ? `Book online at ${org.name}. Powered by ${SYNCOPS.name} · ${SYNCOPS.domain}`
-      : `Online salon booking by ${SYNCOPS.name}`,
+      ? `Book online at ${org.name}. Powered by ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`
+      : `Online salon booking by ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
   };
 }
 

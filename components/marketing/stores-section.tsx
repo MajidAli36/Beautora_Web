@@ -1,10 +1,16 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import type { PublicStore } from "@/lib/actions/stores";
 import { StoreCardMedia } from "@/components/marketing/store-card-media";
 import { cn } from "@/lib/utils";
 
+const INITIAL_VISIBLE = 9;
+
 type StoresSectionProps = {
   stores: PublicStore[];
+  /** Initial cards shown before “Load all” (default 9). */
   limit?: number;
   showViewAll?: boolean;
   hideIntro?: boolean;
@@ -23,33 +29,35 @@ function storeBlurb(store: PublicStore): string {
 
 export function StoresSection({
   stores,
-  limit,
+  limit = INITIAL_VISIBLE,
   showViewAll = true,
   hideIntro = false,
 }: StoresSectionProps) {
-  const items = typeof limit === "number" ? stores.slice(0, limit) : stores;
+  const [expanded, setExpanded] = useState(false);
   const count = stores.length;
+  const hasMore = count > limit;
+  const items = expanded || !hasMore ? stores : stores.slice(0, limit);
 
   return (
     <section
       id="stores"
       className={cn(
-        "scroll-mt-24 bg-[var(--m-paper)]",
-        hideIntro ? "pt-12 pb-24 sm:pt-14 sm:pb-28" : "py-24 sm:py-28"
+        "scroll-mt-28 bg-[var(--m-paper)]",
+        hideIntro ? "pb-28 pt-12 sm:pb-32 sm:pt-14" : "py-28 sm:py-32"
       )}
     >
       <div className="mx-auto max-w-6xl px-6">
         {!hideIntro && (
           <div className="max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
-              Live stores
+              Real salons on Beautora
             </p>
             <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
-              Real salons on Beautora
+              Real salons. Running on Beautora.
             </h2>
             <p className="mt-4 text-lg leading-relaxed text-[var(--m-muted)]">
               {count > 0
-                ? `${count} salon${count === 1 ? "" : "s"} from our database — open a store to see live services and book.`
+                ? "See how salons are using Beautora to manage their daily operations."
                 : "Salons appear here as soon as they join Beautora. No demo listings."}
             </p>
           </div>
@@ -79,11 +87,11 @@ export function StoresSection({
               <li key={store.id}>
                 <Link href={`/stores/${store.slug}`} className="group block">
                   <StoreCardMedia store={store} />
-                  <div className="mt-5">
+                  <div className="mt-5 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transform-none">
                     <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--m-muted)]">
                       {store.city?.trim() || `/${store.slug}`}
                     </p>
-                    <h3 className="mt-1.5 font-display text-2xl font-medium text-[var(--m-ink)] transition-colors group-hover:text-[var(--m-accent)]">
+                    <h3 className="mt-1.5 font-display text-2xl font-medium text-[var(--m-ink)] transition-colors duration-150 group-hover:text-[var(--m-accent)]">
                       {store.name}
                     </h3>
                     <p className="mt-2 text-sm leading-relaxed text-[var(--m-muted)]">
@@ -95,8 +103,9 @@ export function StoresSection({
                         ? ` · ${store.staffCount} stylist${store.staffCount === 1 ? "" : "s"}`
                         : ""}
                     </p>
-                    <span className="mt-4 inline-flex text-sm font-semibold tracking-wide text-[var(--m-ink)] underline-offset-4 group-hover:underline">
-                      View store →
+                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold tracking-wide text-[var(--m-ink)] underline-offset-4 transition-transform duration-150 group-hover:translate-x-1 group-hover:underline motion-reduce:transform-none">
+                      View store
+                      <span aria-hidden>→</span>
                     </span>
                   </div>
                 </Link>
@@ -105,16 +114,28 @@ export function StoresSection({
           </ul>
         )}
 
-        {showViewAll && count > (limit ?? count) && (
-          <div className="mt-12">
+        {showViewAll && hasMore && !expanded ? (
+          <div className="mt-12 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="inline-flex h-12 min-w-[10rem] items-center justify-center border border-[var(--m-ink)] px-8 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
+            >
+              Load all
+            </button>
+          </div>
+        ) : null}
+
+        {showViewAll && expanded && count > limit ? (
+          <div className="mt-12 flex justify-center">
             <Link
               href="/stores"
-              className="inline-flex h-11 items-center border border-[var(--m-ink)] px-6 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-colors hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
+              className="inline-flex h-11 items-center border border-[var(--m-ink)] px-6 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
             >
-              View all stores
+              Browse store directory
             </Link>
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );

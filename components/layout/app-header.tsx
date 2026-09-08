@@ -32,8 +32,8 @@ export function AppHeader({ userEmail, userRole, organizationName }: AppHeaderPr
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card/80 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md supports-[backdrop-filter]:bg-card/60 sm:gap-3 sm:px-4">
-      <SidebarTrigger className="touch-target -ml-0.5 size-10 sm:size-8" />
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/90 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md supports-[backdrop-filter]:bg-card/70 sm:gap-3 sm:px-6">
+      <SidebarTrigger className="touch-target -ml-0.5 size-11 sm:size-9" />
       <Separator orientation="vertical" className="hidden h-4 sm:block" />
 
       <div className="min-w-0 flex-1">
@@ -54,9 +54,6 @@ export function AppHeader({ userEmail, userRole, organizationName }: AppHeaderPr
             placeholder="Search customers, appointments…"
             className="h-9 rounded-lg border-border bg-muted/50 pl-9 text-sm transition-colors focus:bg-background"
           />
-          <kbd className="pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground lg:inline">
-            ⌘K
-          </kbd>
         </div>
       </form>
 
@@ -64,7 +61,7 @@ export function AppHeader({ userEmail, userRole, organizationName }: AppHeaderPr
         <Button
           variant="ghost"
           size="icon"
-          className="touch-target size-10 md:hidden"
+          className="touch-target size-11 md:hidden"
           aria-label="Search"
           onClick={() => router.push("/customers")}
         >

@@ -3,9 +3,9 @@ import { SYNCOPS } from "@/lib/print/syncops";
 /** Content for /ceo — Majid Ali founder page. */
 export const CEO_PAGE = {
   path: "/ceo",
-  company: SYNCOPS.name,
-  domain: SYNCOPS.domain,
-  url: SYNCOPS.url,
+  company: SYNCOPS.builder.name,
+  domain: SYNCOPS.builder.domain,
+  url: SYNCOPS.builder.url,
   email: SYNCOPS.email,
   phone: SYNCOPS.phone,
   phoneDisplay: SYNCOPS.phoneDisplay,

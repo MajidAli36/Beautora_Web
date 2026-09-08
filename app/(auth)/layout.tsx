@@ -1,4 +1,5 @@
 import { Cormorant_Garamond, Outfit } from "next/font/google";
+import { ScrollToTopButton } from "@/components/marketing/scroll-to-top-button";
 
 const display = Cormorant_Garamond({
   subsets: ["latin"],
@@ -24,6 +25,7 @@ export default function AuthLayout({
       className={`${display.variable} ${sans.variable} marketing-site auth-root flex min-h-full flex-1 flex-col`}
     >
       {children}
+      <ScrollToTopButton threshold={120} />
     </div>
   );
 }

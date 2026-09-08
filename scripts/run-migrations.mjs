@@ -142,6 +142,14 @@ async function bootstrapAppliedMigrations(client) {
       file: "20250902100030_chairs.sql",
       ok: () => tableExists(client, "chairs"),
     },
+    {
+      file: "20250909010000_org_public_listing.sql",
+      ok: () => columnExists(client, "organizations", "public_listing_enabled"),
+    },
+    {
+      file: "20250909020000_partners.sql",
+      ok: () => tableExists(client, "partners"),
+    },
   ];
 
   let bootstrapped = 0;

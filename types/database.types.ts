@@ -62,6 +62,9 @@ export type Database = {
           subscription_locked_at: string | null;
           subscription_status: string;
           admin_disabled_at: string | null;
+          public_listing_enabled: boolean;
+          referred_by_partner_id: string | null;
+          referral_code_used: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -90,6 +93,9 @@ export type Database = {
           subscription_locked_at?: string | null;
           subscription_status?: string;
           admin_disabled_at?: string | null;
+          public_listing_enabled?: boolean;
+          referred_by_partner_id?: string | null;
+          referral_code_used?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -118,6 +124,93 @@ export type Database = {
           subscription_locked_at?: string | null;
           subscription_status?: string;
           admin_disabled_at?: string | null;
+          public_listing_enabled?: boolean;
+          referred_by_partner_id?: string | null;
+          referral_code_used?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      partners: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          username: string;
+          email: string;
+          full_name: string | null;
+          phone: string | null;
+          status: string;
+          review_notes: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          username: string;
+          email: string;
+          full_name?: string | null;
+          phone?: string | null;
+          status?: string;
+          review_notes?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          username?: string;
+          email?: string;
+          full_name?: string | null;
+          phone?: string | null;
+          status?: string;
+          review_notes?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      partner_commissions: {
+        Row: {
+          id: string;
+          partner_id: string;
+          organization_id: string;
+          subscription_payment_id: string;
+          amount_pkr: number;
+          currency: string;
+          status: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          partner_id: string;
+          organization_id: string;
+          subscription_payment_id: string;
+          amount_pkr: number;
+          currency?: string;
+          status?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          partner_id?: string;
+          organization_id?: string;
+          subscription_payment_id?: string;
+          amount_pkr?: number;
+          currency?: string;
+          status?: string;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -600,6 +693,9 @@ export type Database = {
           name: string; description: string | null; cost_price: number; retail_price: number;
           stock_quantity: number; low_stock_threshold: number; is_active: boolean;
           product_kind: "RETAIL" | "IN_HOUSE" | "BOTH";
+          unit_label: string | null;
+          pack_size: number | null;
+          default_usage_qty: number | null;
           deleted_at: string | null; deleted_by: string | null; deleted_by_role: MemberRole | null;
           created_by: string | null; updated_by: string | null;
           created_at: string; updated_at: string;
@@ -609,6 +705,9 @@ export type Database = {
           name: string; description?: string | null; cost_price?: number; retail_price?: number;
           stock_quantity?: number; low_stock_threshold?: number; is_active?: boolean;
           product_kind?: "RETAIL" | "IN_HOUSE" | "BOTH";
+          unit_label?: string | null;
+          pack_size?: number | null;
+          default_usage_qty?: number | null;
           deleted_at?: string | null; deleted_by?: string | null; deleted_by_role?: MemberRole | null;
           created_by?: string | null; updated_by?: string | null;
           created_at?: string; updated_at?: string;
@@ -618,6 +717,9 @@ export type Database = {
           name?: string; description?: string | null; cost_price?: number; retail_price?: number;
           stock_quantity?: number; low_stock_threshold?: number; is_active?: boolean;
           product_kind?: "RETAIL" | "IN_HOUSE" | "BOTH";
+          unit_label?: string | null;
+          pack_size?: number | null;
+          default_usage_qty?: number | null;
           deleted_at?: string | null; deleted_by?: string | null; deleted_by_role?: MemberRole | null;
           created_by?: string | null; updated_by?: string | null;
           created_at?: string; updated_at?: string;
@@ -651,6 +753,45 @@ export type Database = {
           quantity_per_service?: number;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      sale_usage_lines: {
+        Row: {
+          id: string;
+          organization_id: string;
+          sale_id: string;
+          product_id: string;
+          product_name: string;
+          quantity: number;
+          unit_cost: number;
+          unit_label: string | null;
+          source: "RECIPE" | "OVERRIDE" | "MANUAL";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          sale_id: string;
+          product_id: string;
+          product_name: string;
+          quantity: number;
+          unit_cost?: number;
+          unit_label?: string | null;
+          source?: "RECIPE" | "OVERRIDE" | "MANUAL";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          sale_id?: string;
+          product_id?: string;
+          product_name?: string;
+          quantity?: number;
+          unit_cost?: number;
+          unit_label?: string | null;
+          source?: "RECIPE" | "OVERRIDE" | "MANUAL";
+          created_at?: string;
         };
         Relationships: [];
       };

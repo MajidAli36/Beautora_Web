@@ -18,10 +18,10 @@ export const SITE_SEO = {
   product: SYNCOPS.name,
   builder: SYNCOPS.builder.name,
   tagline: "The operating system for modern salons",
-  titleDefault: `${SYNCOPS.name} — Salon POS & booking by ${SYNCOPS.builder.name}`,
+  titleDefault: `${SYNCOPS.name} by ${SYNCOPS.builder.name} — Salon Management Software`,
   titleTemplate: `%s · ${SYNCOPS.name} by ${SYNCOPS.builder.name}`,
-  description: `${SYNCOPS.name} by ${SYNCOPS.builder.name}: salon POS, online booking, staff, queue, WhatsApp, and reports. 1 month free, then Rs ${PRICE}/month. Built in Pakistan for beauty businesses worldwide.`,
-  shortDescription: `${SYNCOPS.name} salon software — bookings, POS, staff & reports. A ${SYNCOPS.builder.name} product.`,
+  description: `${SYNCOPS.name} is an all-in-one salon management platform by ${SYNCOPS.builder.name} for bookings, POS, staff, customers, attendance, WhatsApp, and reports. ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month per store.`,
+  shortDescription: `${SYNCOPS.name} by ${SYNCOPS.builder.name} — bookings, POS, staff & reports for modern salons.`,
   keywords: [
     SYNCOPS.name,
     SYNCOPS.builder.name,
@@ -29,6 +29,7 @@ export const SITE_SEO = {
     SYNCOPS.builder.domain,
     "Beautora by SyncOps",
     "SyncOps Beautora",
+    "SyncOps product",
     "salon software",
     "salon POS Pakistan",
     "salon management system",
@@ -39,6 +40,7 @@ export const SITE_SEO = {
     "multi store salon software",
     "JazzCash salon subscription",
     "Majid Ali SyncOps",
+    "SyncOps tech",
   ],
   locale: "en_PK",
 } as const;
@@ -109,7 +111,6 @@ export function buildRootMetadata(): Metadata {
     applicationName: `${SITE_SEO.product} by ${SITE_SEO.builder}`,
     authors: [
       { name: SYNCOPS.builder.name, url: SYNCOPS.builder.url },
-      { name: SYNCOPS.name, url: SYNCOPS.url },
       { name: SYNCOPS.ceo.name, url: absoluteUrl("/ceo") },
     ],
     creator: SYNCOPS.builder.name,
@@ -155,7 +156,7 @@ export function buildRootMetadata(): Metadata {
       "theme-color": "#0f172a",
       copyright: `${SITE_SEO.product}. Built by ${SITE_SEO.builder} (${SYNCOPS.builder.domain})`,
       "product:brand": SITE_SEO.product,
-      "product:retailer": SITE_SEO.builder,
+      "product:publisher": SITE_SEO.builder,
     },
   };
 }
@@ -176,16 +177,16 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         "@id": websiteId,
         url: siteUrl,
         name: SITE_SEO.product,
-        alternateName: [`${SITE_SEO.product} by ${SITE_SEO.builder}`, SITE_SEO.builder],
+        alternateName: [
+          `${SITE_SEO.product} by ${SITE_SEO.builder}`,
+          SITE_SEO.builder,
+          SYNCOPS.builder.short,
+        ],
         description: SITE_SEO.description,
-        publisher: { "@id": beautoraOrgId },
+        publisher: { "@id": syncOpsOrgId },
         creator: { "@id": syncOpsOrgId },
+        about: { "@id": beautoraOrgId },
         inLanguage: "en-PK",
-        potentialAction: {
-          "@type": "SearchAction",
-          target: `${siteUrl}/stores?q={search_term_string}`,
-          "query-input": "required name=search_term_string",
-        },
       },
       {
         "@type": "Organization",
@@ -193,9 +194,9 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         name: SYNCOPS.builder.name,
         legalName: SYNCOPS.builder.name,
         url: SYNCOPS.builder.url,
-        email: SYNCOPS.email,
+        email: SYNCOPS.ceo.links.email,
         telephone: SYNCOPS.phone,
-        logo: absoluteUrl("/brand/ceo-majid-ali.png"),
+        logo: absoluteUrl(SYNCOPS.ceo.photo),
         sameAs: [
           SYNCOPS.builder.url,
           absoluteUrl("/syncops"),
@@ -205,7 +206,7 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
           SYNCOPS.ceo.links.github,
           SYNCOPS.ceo.links.website,
         ],
-        description: `${SYNCOPS.builder.name} builds software products for real businesses. ${SITE_SEO.product} is our salon operating system.`,
+        description: SYNCOPS.builder.seoDescription,
         founder: { "@id": ceoId },
         brand: { "@id": beautoraOrgId },
         makesOffer: {
@@ -239,17 +240,21 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         "@type": "SoftwareApplication",
         "@id": softwareId,
         name: SYNCOPS.name,
-        alternateName: `${SYNCOPS.name} Salon Platform`,
+        alternateName: [
+          `${SYNCOPS.name} by ${SYNCOPS.builder.name}`,
+          `${SYNCOPS.name} Salon Platform`,
+        ],
         applicationCategory: "BusinessApplication",
         applicationSubCategory: "Salon management · POS · Online booking",
         operatingSystem: "Web",
         url: siteUrl,
-        image: absoluteUrl("/brand/ceo-majid-ali.png"),
+        image: absoluteUrl(SYNCOPS.ceo.photo),
         description: SITE_SEO.description,
         author: { "@id": syncOpsOrgId },
         provider: { "@id": syncOpsOrgId },
-        publisher: { "@id": beautoraOrgId },
+        publisher: { "@id": syncOpsOrgId },
         creator: { "@id": syncOpsOrgId },
+        brand: { "@id": beautoraOrgId },
         offers: {
           "@type": "Offer",
           url: absoluteUrl("/#pricing"),
@@ -257,6 +262,7 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
           price: String(SUBSCRIPTION.monthlyAmountPkr),
           availability: "https://schema.org/InStock",
           description: `1 month free trial, then Rs ${PRICE}/month via JazzCash`,
+          seller: { "@id": syncOpsOrgId },
         },
         featureList: [
           "Online booking",
@@ -288,30 +294,6 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         description: `${SYNCOPS.ceo.name}, ${SYNCOPS.ceo.role} of ${SYNCOPS.builder.name} — makers of ${SYNCOPS.name}.`,
       },
       {
-        "@type": "BreadcrumbList",
-        "@id": `${siteUrl}/#breadcrumb`,
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: "Home",
-            item: siteUrl,
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: "SyncOps",
-            item: absoluteUrl("/syncops"),
-          },
-          {
-            "@type": "ListItem",
-            position: 3,
-            name: "CEO",
-            item: absoluteUrl("/ceo"),
-          },
-        ],
-      },
-      {
         "@type": "FAQPage",
         "@id": `${siteUrl}/#faq`,
         mainEntity: [
@@ -320,7 +302,7 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
             name: "What is Beautora?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — built by SyncOps.",
+              text: `Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — a product of SyncOps (${SYNCOPS.builder.domain}).`,
             },
           },
           {
@@ -328,7 +310,15 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
             name: "Who builds Beautora?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: `Beautora is a product by SyncOps (${SYNCOPS.builder.domain}), founded by ${SYNCOPS.ceo.name}.`,
+              text: `Beautora is built by SyncOps (${SYNCOPS.builder.domain}), founded by ${SYNCOPS.ceo.name}. Official studio: ${SYNCOPS.builder.url}.`,
+            },
+          },
+          {
+            "@type": "Question",
+            name: "What is SyncOps?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: SYNCOPS.builder.seoDescription,
             },
           },
           {

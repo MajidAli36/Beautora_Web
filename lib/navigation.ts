@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Monitor,
   Package,
+  Droplets,
   Receipt,
   Scissors,
   Settings,
@@ -54,6 +55,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: "Services", href: "/services", icon: Scissors, key: "services" },
       { title: "Products", href: "/products", icon: Package, key: "products" },
+      { title: "In-house", href: "/in-house", icon: Droplets, key: "products" },
       { title: "Chairs", href: "/chairs", icon: Armchair, key: "chairs" },
     ],
   },
@@ -102,6 +104,7 @@ export const pageTitles: Record<string, string> = {
   "/sales": "Sales",
   "/services": "Services",
   "/products": "Products",
+  "/in-house": "In-house stock",
   "/chairs": "Chairs",
   "/staff": "Staff",
   "/attendance": "Attendance",
@@ -115,6 +118,7 @@ export const pageTitles: Record<string, string> = {
 
 export function getPageTitle(pathname: string) {
   if (pageTitles[pathname]) return pageTitles[pathname];
+  if (pathname.startsWith("/in-house/")) return "In-house product";
   const base = pathname.split("/").slice(0, 2).join("/");
   if (pageTitles[base]) return pageTitles[base];
   return "Hair & Care Salon";

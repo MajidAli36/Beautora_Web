@@ -19,11 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ActionResult } from "@/lib/actions/customers";
 import type { ServiceCategory } from "@/types";
-import {
-  ServiceUsageRecipeFields,
-  type ConsumableProductOption,
-  type UsageRecipeRow,
-} from "@/components/features/services/service-usage-recipe-fields";
+import type { UsageRecipeRow } from "@/components/features/services/service-usage-recipe-fields";
 
 export type EditableService = {
   id: string;
@@ -41,11 +37,9 @@ export type EditableService = {
 export function EditServiceButton({
   service,
   categories,
-  consumables,
 }: {
   service: EditableService;
   categories: ServiceCategory[];
-  consumables: ConsumableProductOption[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -66,7 +60,8 @@ export function EditServiceButton({
           <DialogHeader>
             <DialogTitle>Edit service</DialogTitle>
             <DialogDescription>
-              Update pricing, duration, and in-house products used during this service.
+              Update name, price, and duration. Link cream/wax usage with{" "}
+              <strong>Use in-house stock</strong> on the list.
             </DialogDescription>
           </DialogHeader>
           {open ? (
@@ -74,7 +69,6 @@ export function EditServiceButton({
               key={`${service.id}-open`}
               service={service}
               categories={categories}
-              consumables={consumables}
               onDone={() => setOpen(false)}
             />
           ) : null}
@@ -87,12 +81,10 @@ export function EditServiceButton({
 function EditServiceForm({
   service,
   categories,
-  consumables,
   onDone,
 }: {
   service: EditableService;
   categories: ServiceCategory[];
-  consumables: ConsumableProductOption[];
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -180,11 +172,6 @@ function EditServiceForm({
         />
         <Label htmlFor={`edit_svc_active_${service.id}`}>Active</Label>
       </div>
-      <ServiceUsageRecipeFields
-        consumables={consumables}
-        initialRows={service.usageRows ?? []}
-        idPrefix={`edit_svc_${service.id}`}
-      />
       <DialogFooter className="sm:col-span-2">
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel

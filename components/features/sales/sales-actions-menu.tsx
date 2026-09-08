@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   Eye,
   Pencil,
@@ -17,6 +17,7 @@ import { printSaleReceipt } from "@/components/features/sales/print-receipt-butt
 import { voidSale } from "@/lib/actions/sales";
 import { refundSale } from "@/lib/actions/sales-lifecycle";
 import { notify } from "@/lib/toast";
+import { formatCurrency } from "@/lib/format";
 import { isDeletedSaleStatus, isPostedSaleStatus } from "@/lib/sales/lifecycle";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,7 @@ type SalesActionsMenuProps = {
   status: string;
   total: number;
   amountDue?: number;
+  refundableMax?: number;
   paymentVersion?: number;
   invoiceLabel?: string;
   canManage: boolean;
@@ -54,6 +56,7 @@ export function SalesActionsMenu({
   status,
   total,
   amountDue = 0,
+  refundableMax,
   canManage,
   canReceivePayment = false,
   onReceivePayment,
@@ -63,11 +66,19 @@ export function SalesActionsMenu({
   const [voidOpen, setVoidOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const [refundAmount, setRefundAmount] = useState(String(total));
+  const maxRefund = Math.max(0, Number(refundableMax ?? total) || 0);
+  const [refundAmount, setRefundAmount] = useState(String(maxRefund));
 
   const deleted = isDeletedSaleStatus(status);
   const posted = isPostedSaleStatus(status);
   const showReceive = canReceivePayment && amountDue > 0 && posted && !deleted;
+  const canRefund = canManage && posted && !deleted && maxRefund > 0;
+
+  const amount = Number(refundAmount) || 0;
+  const isFull = useMemo(
+    () => maxRefund > 0 && amount >= maxRefund - 0.009,
+    [amount, maxRefund]
+  );
 
   return (
     <>
@@ -127,27 +138,33 @@ export function SalesActionsMenu({
                 Invoice history
               </DropdownMenuItem>
             ) : null}
-            {canManage && posted && !deleted ? (
+            {canRefund || (canManage && posted && !deleted) ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    setRefundOpen(true);
-                  }}
-                >
-                  <Undo2 className="size-3.5" />
-                  Refund
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => {
-                    setReason("");
-                    setVoidOpen(true);
-                  }}
-                >
-                  <Ban className="size-3.5" />
-                  Delete invoice
-                </DropdownMenuItem>
+                {canRefund ? (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setReason("");
+                      setRefundAmount(String(maxRefund));
+                      setRefundOpen(true);
+                    }}
+                  >
+                    <Undo2 className="size-3.5" />
+                    Refund
+                  </DropdownMenuItem>
+                ) : null}
+                {canManage && posted && !deleted ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => {
+                      setReason("");
+                      setVoidOpen(true);
+                    }}
+                  >
+                    <Ban className="size-3.5" />
+                    Delete invoice
+                  </DropdownMenuItem>
+                ) : null}
               </>
             ) : null}
           </DropdownMenuContent>
@@ -160,9 +177,9 @@ export function SalesActionsMenu({
             <DialogTitle>Delete invoice?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Soft-deletes this invoice. It stays on the sales list as Deleted / Disabled, restores
-            product stock, and is removed from revenue, staff, and report calculations. Payment
-            history is kept.
+            Soft-deletes this invoice (stays visible as Deleted / Disabled). Restores{" "}
+            <strong className="text-foreground">retail</strong> product stock. In-house cream/ml
+            stays deducted (already used). Removed from revenue; payment history kept.
           </p>
           <div className="space-y-2">
             <Label htmlFor="void-reason">Reason</Label>
@@ -187,7 +204,7 @@ export function SalesActionsMenu({
                     notify.error(res.error);
                     return;
                   }
-                  notify.success("Invoice deleted (disabled)");
+                  notify.success("Invoice deleted — retail stock restored; in-house kept deducted");
                   setVoidOpen(false);
                   router.refresh();
                 })
@@ -204,16 +221,37 @@ export function SalesActionsMenu({
           <DialogHeader>
             <DialogTitle>Refund</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Partial or full refund. Full refund restores inventory and marks the sale REFUNDED.
-          </p>
-          <div className="space-y-3">
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Max refundable:{" "}
+              <strong className="text-foreground">{formatCurrency(maxRefund)}</strong>
+            </p>
+            <div
+              className={
+                isFull
+                  ? "rounded-lg border border-teal-200 bg-teal-50/80 px-3 py-2 text-teal-900 dark:border-teal-900/50 dark:bg-teal-950/30 dark:text-teal-100"
+                  : "rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100"
+              }
+            >
+              {isFull ? (
+                <p>
+                  <strong>Full refund</strong> — restores retail stock only. In-house usage stays
+                  deducted (already used). Marks invoice REFUNDED.
+                </p>
+              ) : (
+                <p>
+                  <strong>Partial refund</strong> — money only; retail and in-house stock stay
+                  deducted.
+                </p>
+              )}
+            </div>
             <div className="space-y-2">
               <Label htmlFor="refund-amount">Amount</Label>
               <Input
                 id="refund-amount"
                 type="number"
                 min={0}
+                max={maxRefund}
                 step="1"
                 value={refundAmount}
                 onChange={(e) => setRefundAmount(e.target.value)}
@@ -239,7 +277,7 @@ export function SalesActionsMenu({
                 startTransition(async () => {
                   const res = await refundSale({
                     saleId,
-                    amount: Number(refundAmount),
+                    amount,
                     method: "CASH",
                     reason,
                   });
@@ -247,13 +285,13 @@ export function SalesActionsMenu({
                     notify.error(res.error);
                     return;
                   }
-                  notify.success("Refund recorded.");
+                  notify.success(res.message ?? "Refund recorded.");
                   setRefundOpen(false);
                   router.refresh();
                 })
               }
             >
-              {pending ? "Refunding…" : "Confirm refund"}
+              {pending ? "Refunding…" : isFull ? "Confirm full refund" : "Confirm partial refund"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -23,7 +23,7 @@ export async function generateMetadata({
   const ogImage = store.coverUrl ?? store.visual.coverImage;
   return {
     title: store.name,
-    description: `${blurb}. Book on ${SYNCOPS.name}.`,
+    description: `${blurb}. Book on ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
     openGraph: {
       title: store.name,
       description: blurb,

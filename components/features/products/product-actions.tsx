@@ -82,7 +82,20 @@ export function InventoryAdjustForm({ products }: { products: { id: string; name
       </div>
       <div className="space-y-2">
         <Label htmlFor="qty">Quantity</Label>
-        <Input id="qty" name="quantity" type="number" min={1} required defaultValue={1} className="w-24" />
+        <Input
+          id="qty"
+          name="quantity"
+          type="number"
+          min={0.001}
+          step="0.001"
+          required
+          defaultValue={1}
+          className="w-28"
+        />
+      </div>
+      <div className="space-y-2 min-w-[160px] flex-1">
+        <Label htmlFor="inv_notes">Notes</Label>
+        <Input id="inv_notes" name="notes" placeholder="Optional" />
       </div>
       <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Record"}</Button>
     </form>

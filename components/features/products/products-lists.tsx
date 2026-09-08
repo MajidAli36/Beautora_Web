@@ -61,11 +61,15 @@ export function ProductsTable({
   products,
   categories,
   canManage,
+  catalog = "retail",
 }: {
   products: ProductRow[];
   categories: ProductCategory[];
   canManage: boolean;
+  /** Hide Kind on retail catalog — In-house is a separate module. */
+  catalog?: "retail" | "inhouse";
 }) {
+  const showKind = catalog === "inhouse";
   return (
     <PaginatedList
       items={products}
@@ -77,7 +81,7 @@ export function ProductsTable({
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Kind</TableHead>
+                {showKind ? <TableHead>Kind</TableHead> : null}
                 <TableHead>SKU</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead className="text-right">Retail</TableHead>
@@ -94,9 +98,11 @@ export function ProductsTable({
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{productKindLabel(p.product_kind)}</Badge>
-                    </TableCell>
+                    {showKind ? (
+                      <TableCell>
+                        <Badge variant="outline">{productKindLabel(p.product_kind)}</Badge>
+                      </TableCell>
+                    ) : null}
                     <TableCell>{p.sku ?? "—"}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {formatCurrency(v.costPrice)}
@@ -121,6 +127,9 @@ export function ProductsTable({
                         }
                       >
                         {v.stock}
+                        {(p as { unit_label?: string | null }).unit_label
+                          ? ` ${(p as { unit_label?: string | null }).unit_label}`
+                          : ""}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -134,7 +143,11 @@ export function ProductsTable({
                     {canManage && (
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-2">
-                          <EditProductButton product={p} categories={categories} />
+                          <EditProductButton
+                            product={p}
+                            categories={categories}
+                            catalog={catalog}
+                          />
                           <DeleteProductButton id={p.id} name={p.name} />
                         </div>
                       </TableCell>

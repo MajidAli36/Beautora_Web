@@ -21,25 +21,25 @@ export function StatCard({
   iconClassName,
 }: StatCardProps) {
   return (
-    <div className="dashboard-card p-5">
+    <div className="dashboard-card w-full p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="min-w-0 flex-1 space-y-2.5 sm:space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {label}
           </p>
           <div>
-            <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
+            <p className="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               {value}
             </p>
             {(change || subtext) && (
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                 {change ? (
                   <span
                     className={cn(
-                      "font-medium",
-                      changeType === "positive" && "text-[#16a34a]",
-                      changeType === "negative" && "text-destructive",
-                      changeType === "neutral" && "text-muted-foreground"
+                      "delta-pill",
+                      changeType === "positive" && "delta-pill-positive",
+                      changeType === "negative" && "delta-pill-negative",
+                      changeType === "neutral" && "delta-pill-neutral"
                     )}
                   >
                     {change}
@@ -54,11 +54,11 @@ export function StatCard({
         </div>
         <div
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted/80",
+            "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted sm:size-11",
             iconClassName
           )}
         >
-          <Icon className="size-[18px] text-muted-foreground" />
+          <Icon className="size-4 text-muted-foreground sm:size-[18px]" />
         </div>
       </div>
     </div>

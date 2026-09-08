@@ -9,6 +9,7 @@ import {
   EditServiceButton,
   type EditableService,
 } from "@/components/features/services/edit-service-dialog";
+import { UseInHouseStockButton } from "@/components/features/services/use-in-house-stock-dialog";
 import { Badge } from "@/components/ui/badge";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import {
@@ -69,7 +70,7 @@ export function ServicesTable({
                 <TableHead>Duration</TableHead>
                 <TableHead>In-house</TableHead>
                 <TableHead>Status</TableHead>
-                {canManage && <TableHead className="min-w-[160px]" />}
+                {canManage && <TableHead className="min-w-[280px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -94,11 +95,8 @@ export function ServicesTable({
                   {canManage && (
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-2">
-                        <EditServiceButton
-                          service={service}
-                          categories={categories}
-                          consumables={consumables}
-                        />
+                        <UseInHouseStockButton service={service} consumables={consumables} />
+                        <EditServiceButton service={service} categories={categories} />
                         <DeleteServiceButton id={service.id} name={service.name} />
                       </div>
                     </TableCell>

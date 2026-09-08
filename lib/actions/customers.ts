@@ -62,6 +62,132 @@ export async function createCustomer(
   redirect(`/customers/${data.id}`);
 }
 
+/** Create customer without redirect — for slide-over / modal forms. */
+export async function createCustomerInline(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult & { customerId?: string }> {
+  const org = await requireMinimumRole("RECEPTIONIST");
+  const parsed = customerSchema.safeParse({
+    first_name: formData.get("first_name"),
+    last_name: formData.get("last_name") || undefined,
+    phone: formData.get("phone") || undefined,
+    email: formData.get("email") || undefined,
+    notes: formData.get("notes") || undefined,
+    tags: formData.get("tags") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const tags = parsed.data.tags
+    ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
+    : [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customers")
+    .insert({
+      organization_id: org.organizationId,
+      first_name: parsed.data.first_name,
+      last_name: parsed.data.last_name ?? null,
+      phone: parsed.data.phone ?? null,
+      email: parsed.data.email || null,
+      notes: parsed.data.notes ?? null,
+      tags,
+    })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/customers");
+  return { success: true, customerId: data.id };
+}
+
+export type CustomerDirectoryRow = {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  tags: string[];
+  created_at: string;
+  totalSpent: number;
+  visitCount: number;
+  lastVisitAt: string | null;
+};
+
+/** Customers list with spend / last visit for the directory UI. */
+export async function getCustomersDirectory(search?: string): Promise<{
+  customers: CustomerDirectoryRow[];
+  newThisMonth: number;
+}> {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const customers = await getCustomers(search);
+
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("customer_id, total, completed_at, status")
+    .eq("organization_id", org.organizationId)
+    .in("status", ["COMPLETED", "AMENDED"])
+    .is("deleted_at", null)
+    .not("customer_id", "is", null);
+
+  const byCustomer = new Map<
+    string,
+    { totalSpent: number; visitCount: number; lastVisitAt: string | null }
+  >();
+
+  for (const sale of sales ?? []) {
+    const cid = sale.customer_id as string;
+    if (!cid) continue;
+    const prev = byCustomer.get(cid) ?? {
+      totalSpent: 0,
+      visitCount: 0,
+      lastVisitAt: null as string | null,
+    };
+    prev.totalSpent += Number(sale.total) || 0;
+    prev.visitCount += 1;
+    const completed = sale.completed_at as string | null;
+    if (
+      completed &&
+      (!prev.lastVisitAt || new Date(completed) > new Date(prev.lastVisitAt))
+    ) {
+      prev.lastVisitAt = completed;
+    }
+    byCustomer.set(cid, prev);
+  }
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const rows: CustomerDirectoryRow[] = (customers ?? []).map((c) => {
+    const stats = byCustomer.get(c.id);
+    return {
+      id: c.id,
+      first_name: c.first_name,
+      last_name: c.last_name,
+      phone: c.phone,
+      email: c.email,
+      notes: c.notes,
+      tags: c.tags ?? [],
+      created_at: c.created_at,
+      totalSpent: stats?.totalSpent ?? 0,
+      visitCount: stats?.visitCount ?? 0,
+      lastVisitAt: stats?.lastVisitAt ?? null,
+    };
+  });
+
+  const newThisMonth = rows.filter((c) => new Date(c.created_at) >= monthStart).length;
+
+  return { customers: rows, newThisMonth };
+}
+
 export async function updateCustomer(
   id: string,
   _prev: ActionResult,
@@ -137,6 +263,41 @@ export async function deleteCustomer(id: string): Promise<ActionResult> {
 
   revalidatePath("/customers");
   redirect("/customers");
+}
+
+/** Soft-delete without redirect — for list UIs that refresh in place. */
+export async function deleteCustomerInline(id: string): Promise<ActionResult> {
+  const org = await requireMinimumRole("MANAGER");
+  const supabase = await createClient();
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("id, first_name, last_name, phone, email")
+    .eq("id", id)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!customer) return { error: "Customer not found" };
+
+  const { resolveSoftDeleteActor, softDeleteEntity } = await import("@/lib/db/soft-delete");
+  const actor = await resolveSoftDeleteActor();
+  const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ");
+  const result = await softDeleteEntity({
+    table: "customers",
+    id,
+    organizationId: org.organizationId,
+    actor,
+    action: "customer.delete",
+    entityType: "customer",
+    summary: `Deleted customer ${name}`,
+    before: customer as unknown as Record<string, unknown>,
+  });
+
+  if (result.error) return { error: result.error };
+
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${id}`);
+  return { success: true };
 }
 
 export async function getCustomers(search?: string) {

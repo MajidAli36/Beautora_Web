@@ -34,7 +34,7 @@ export function StoreCardMedia({
         <img
           src={cover.src}
           alt={cover.alt}
-          className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+          className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-[1.02] motion-reduce:transform-none"
         />
       ) : (
         <Image
@@ -43,7 +43,7 @@ export function StoreCardMedia({
           fill
           priority={priority}
           sizes={sizes}
-          className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.02] motion-reduce:transform-none"
         />
       )}
       <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(12,31,28,0.55)_0%,transparent_55%)]" />

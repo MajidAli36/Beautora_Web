@@ -1,5 +1,7 @@
 /**
- * Wipe all business data. KEEP: auth.users, organizations, organization_members (roles).
+ * Wipe ALL public business data. KEEP: auth.users only.
+ * Removes orgs, partners, memberships, and all salon data.
+ * Clears onboarding/partner flags on users so they can create a fresh empty store.
  */
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -37,7 +39,7 @@ const client = new pg.Client({
 });
 
 await client.connect();
-console.log("Connected — wiping business data (keeping org + login roles)…");
+console.log("Connected — wiping ALL business data (keeping auth.users only)…");
 await client.query(readFileSync(sqlFile, "utf8"));
 
 const { rows } = await client.query(`
@@ -45,11 +47,13 @@ const { rows } = await client.query(`
     (select count(*)::int from auth.users) as users,
     (select count(*)::int from public.organizations) as orgs,
     (select count(*)::int from public.organization_members) as members,
+    (select count(*)::int from public.partners) as partners,
     (select count(*)::int from public.customers) as customers,
+    (select count(*)::int from public.services) as services,
     (select count(*)::int from public.sales) as sales,
     (select count(*)::int from public.appointments) as appointments,
     (select count(*)::int from public.staff) as staff
 `);
 console.log("After wipe:", rows[0]);
 await client.end();
-console.log("✓ Done. Logins and roles kept.");
+console.log("✓ Done. Logins kept. Create a salon — it starts empty (no dummy data).");

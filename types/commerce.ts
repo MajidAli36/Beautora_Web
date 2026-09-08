@@ -2,6 +2,7 @@ export type ActionResult = {
   error?: string;
   success?: boolean;
   recordDate?: string;
+  message?: string;
 };
 
 export type SaleItemType = "SERVICE" | "PRODUCT" | "PACKAGE";
@@ -33,6 +34,11 @@ export type PriorDuePaymentLine = {
   expectedPaymentVersion: number;
 };
 
+export type CheckoutUsageOverride = {
+  productId: string;
+  quantity: number;
+};
+
 export type CheckoutPayload = {
   items: CartItem[];
   customerId?: string | null;
@@ -61,4 +67,9 @@ export type CheckoutPayload = {
    * Validated before the new sale is created; applied after it succeeds.
    */
   priorDuePayments?: PriorDuePaymentLine[];
+  /**
+   * In-house usage at checkout. When set, replaces auto recipe totals for listed products.
+   * Products omitted keep recipe qty. Quantity 0 removes that product from usage.
+   */
+  usageOverrides?: CheckoutUsageOverride[];
 };

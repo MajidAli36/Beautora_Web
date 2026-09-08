@@ -377,6 +377,18 @@ export async function reviewSubscriptionPayment(input: {
 
   if (orgUpd) return { error: orgUpd.message };
 
+  // First approved subscription for a referred store → full amount to partner
+  try {
+    const { creditPartnerFirstSubscription } = await import("@/lib/actions/partners");
+    await creditPartnerFirstSubscription({
+      organizationId: org.id,
+      paymentId: payment.id,
+      amountPkr: Number(payment.amount),
+    });
+  } catch (err) {
+    console.error("partner commission failed", err);
+  }
+
   revalidatePath("/platform/subscriptions");
   revalidatePath("/billing");
   revalidatePath("/dashboard");

@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useEffectEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { notify } from "@/lib/toast";
 import {
   checkSalonNameAvailable,
   createSalonOrganization,
 } from "@/lib/actions/onboarding";
+import { getRememberedPartnerReferral } from "@/lib/actions/partners";
 import { cn } from "@/lib/utils";
 
 type OrganizationOnboardingProps = {
@@ -23,8 +24,14 @@ export function OrganizationOnboarding({
   const [salonName, setSalonName] = useState(initialSalonName);
   const [nameOk, setNameOk] = useState<boolean | null>(null);
   const [nameHint, setNameHint] = useState<string | null>(null);
-  const [seedStarterServices, setSeedStarterServices] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [partnerRef, setPartnerRef] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getRememberedPartnerReferral().then((code) => {
+      if (code) setPartnerRef(code);
+    });
+  }, []);
 
   const checkName = useEffectEvent(async (name: string) => {
     if (name.trim().length < 2) {
@@ -58,10 +65,10 @@ export function OrganizationOnboarding({
     setLoading(true);
     const result = await createSalonOrganization({
       salonName: name,
-      seedStarterServices,
       // Quiet defaults — online booking can be configured later
       bookingSlotMinutes: 30,
       bookingDaysAhead: 14,
+      referralCode: partnerRef,
     });
     if (result.error) {
       notify.error(result.error);
@@ -92,6 +99,13 @@ export function OrganizationOnboarding({
         </p>
       )}
 
+      {partnerRef ? (
+        <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          Partner referral <span className="font-semibold">@{partnerRef}</span> will be linked to
+          this store.
+        </p>
+      ) : null}
+
       <div className="mt-6 space-y-4">
         <div className="space-y-2">
           <label htmlFor="salonName" className="text-sm font-medium text-[var(--m-ink-soft)]">
@@ -115,24 +129,6 @@ export function OrganizationOnboarding({
             </p>
           )}
         </div>
-
-        <label className="flex cursor-pointer items-start gap-3 border border-[var(--m-line)] bg-[var(--m-mist)]/70 p-3.5">
-          <input
-            type="checkbox"
-            checked={seedStarterServices}
-            onChange={(e) => setSeedStarterServices(e.target.checked)}
-            className="mt-0.5 size-4 accent-[var(--m-ink)]"
-          />
-          <span>
-            <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--m-ink)]">
-              <Sparkles className="size-3.5 text-[var(--m-accent)]" />
-              Add a few starter services
-            </span>
-            <span className="mt-0.5 block text-xs text-[var(--m-muted)]">
-              Helps POS &amp; sales right away. Edit anytime.
-            </span>
-          </span>
-        </label>
 
         <button
           type="button"

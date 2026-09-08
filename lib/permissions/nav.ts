@@ -60,6 +60,7 @@ export const HREF_TO_NAV_KEY: Record<string, NavKey> = {
   "/sales": "sales",
   "/services": "services",
   "/products": "products",
+  "/in-house": "products",
   "/chairs": "chairs",
   "/staff": "staff",
   "/attendance": "attendance",

@@ -3,7 +3,7 @@ import {
   getInventorySummaryStats,
   getInventoryTransactions,
   getProductCategories,
-  getProducts,
+  getRetailProducts,
 } from "@/lib/actions/products";
 import { canManageRecords } from "@/lib/auth/permissions";
 import { InventoryAdjustForm } from "@/components/features/products/product-actions";
@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default async function ProductsPage() {
   const [categories, products, transactions, inventorySummary, canManage] = await Promise.all([
     getProductCategories(),
-    getProducts(),
+    getRetailProducts(),
     getInventoryTransactions(),
     getInventorySummaryStats(),
     canManageRecords(),
@@ -31,7 +31,7 @@ export default async function ProductsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Products"
-        description="Retail and in-house catalog, stock levels, and inventory value (cost vs retail)."
+        description="Items you sell to customers at POS. Back-bar cream, wax, and sprays live under In-house."
       />
 
       <Tabs defaultValue="products">
@@ -47,8 +47,8 @@ export default async function ProductsPage() {
               <CardHeader>
                 <CardTitle>Add product</CardTitle>
                 <CardDescription>
-                  Set cost (your purchase price) and retail (POS price). Stock value is calculated
-                  from both.
+                  For sale to customers. Cost = what you pay; retail = POS price. Use In-house for
+                  service-only stock.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -58,7 +58,7 @@ export default async function ProductsPage() {
           )}
           <Card>
             <CardHeader>
-              <CardTitle>All products</CardTitle>
+              <CardTitle>Sellable products</CardTitle>
               <CardDescription>
                 &quot;Stock value&quot; = current stock × cost price. POS uses retail price.
               </CardDescription>
@@ -68,6 +68,7 @@ export default async function ProductsPage() {
                 products={products}
                 categories={categories}
                 canManage={canManage}
+                catalog="retail"
               />
             </CardContent>
           </Card>

@@ -24,10 +24,11 @@ import {
 } from "@/lib/actions/payments";
 import {
   applyServiceUsageInventory,
+  applyUsageOverrides,
   getPackageUnitUsageCosts,
   getServiceUnitUsageCosts,
+  replaceSaleUsageLines,
   resolveServiceUsageRequirements,
-  reverseRecordedServiceUsage,
 } from "@/lib/inventory/service-usage";
 import { isSellableProductKind } from "@/lib/products/kinds";
 
@@ -127,7 +128,13 @@ export async function completeCheckout(
     }))
   );
   if (usageResolved.error) return { error: usageResolved.error };
-  const usageRequirements = usageResolved.requirements;
+  const usageWithOverrides = await applyUsageOverrides(
+    org.organizationId,
+    usageResolved.requirements,
+    payload.usageOverrides
+  );
+  if (usageWithOverrides.error) return { error: usageWithOverrides.error };
+  const usageRequirements = usageWithOverrides.requirements;
   if (usageRequirements.length) {
     const usageIds = usageRequirements.map((r) => r.productId);
     const { data: usageStock } = await supabase
@@ -463,6 +470,18 @@ export async function completeCheckout(
   }
 
   if (usageRequirements.length) {
+    const snap = await replaceSaleUsageLines({
+      organizationId: org.organizationId,
+      saleId: sale.id,
+      requirements: usageRequirements,
+    });
+    if (snap.error) {
+      return {
+        error: `Sale saved but usage snapshot failed: ${snap.error}. Void this invoice or adjust inventory.`,
+        saleId: sale.id,
+      };
+    }
+
     const usageInv = await applyServiceUsageInventory({
       organizationId: org.organizationId,
       saleId: sale.id,
@@ -485,9 +504,9 @@ export async function completeCheckout(
   revalidatePath("/finances");
   revalidatePath("/appointments");
   revalidatePath("/products");
+  revalidatePath("/in-house");
   revalidatePath("/services");
   revalidatePath("/dashboard");
-  revalidatePath("/products");
   if (payload.customerId) revalidatePath(`/customers/${payload.customerId}`);
 
   try {
@@ -582,38 +601,56 @@ export async function voidSale(
     .eq("organization_id", org.organizationId)
     .maybeSingle();
 
-  const { data: items } = await supabase
-    .from("sale_items")
-    .select("item_type, item_id, quantity")
-    .eq("sale_id", id)
-    .eq("organization_id", org.organizationId);
-
-  // Reverse product stock (IN). Managers can insert IN transactions.
-  for (const item of (items ?? []).filter((i) => i.item_type === "PRODUCT")) {
-    const qty = Number(item.quantity) || 0;
-    if (qty <= 0) continue;
-    const { error: invErr } = await supabase.from("inventory_transactions").insert({
-      organization_id: org.organizationId,
-      product_id: item.item_id,
-      type: "IN",
-      quantity: qty,
-      reference_type: "sale_void",
-      reference_id: id,
-      notes: `Void restore — ${voidReason}`,
-      created_by: user?.id ?? null,
-    });
-    if (invErr) return { error: `Inventory restore failed: ${invErr.message}` };
+  // Restore retail product stock still outstanding (nets prior amend restores)
+  {
+    const [{ data: outs }, { data: ins }] = await Promise.all([
+      supabase
+        .from("inventory_transactions")
+        .select("product_id, quantity")
+        .eq("organization_id", org.organizationId)
+        .eq("reference_id", id)
+        .eq("type", "OUT")
+        .in("reference_type", ["sale", "sale_amend", "sale_refund_compensate"]),
+      supabase
+        .from("inventory_transactions")
+        .select("product_id, quantity")
+        .eq("organization_id", org.organizationId)
+        .eq("reference_id", id)
+        .eq("type", "IN")
+        .in("reference_type", ["sale_void", "sale_amend_reverse", "sale_refund_full"]),
+    ]);
+    const net = new Map<string, number>();
+    for (const row of outs ?? []) {
+      net.set(
+        row.product_id,
+        Math.round(((net.get(row.product_id) ?? 0) + Number(row.quantity)) * 1000) / 1000
+      );
+    }
+    for (const row of ins ?? []) {
+      net.set(
+        row.product_id,
+        Math.round(((net.get(row.product_id) ?? 0) - Number(row.quantity)) * 1000) / 1000
+      );
+    }
+    for (const [productId, quantity] of net) {
+      if (quantity <= 0.0005) continue;
+      const { error: invErr } = await supabase.from("inventory_transactions").insert({
+        organization_id: org.organizationId,
+        product_id: productId,
+        type: "IN",
+        quantity,
+        reference_type: "sale_void",
+        reference_id: id,
+        notes: `Void restore — ${voidReason}`,
+        created_by: user?.id ?? null,
+      });
+      if (invErr) return { error: `Inventory restore failed: ${invErr.message}` };
+    }
   }
 
-  const usageRestore = await reverseRecordedServiceUsage({
-    organizationId: org.organizationId,
-    saleId: id,
-    userId: user?.id ?? null,
-    referenceType: "service_usage_void",
-  });
-  if (usageRestore.error) {
-    return { error: `In-house stock restore failed: ${usageRestore.error}` };
-  }
+  // In-house (cream/ml) is NOT restored on delete — product was already used on the client.
+  // Owner can restock manually under In-house if the service never happened.
+  // Retail PRODUCT lines are restored above.
 
   // Unlink applied deposits so they can be reused or refunded separately
   await supabase
@@ -713,6 +750,7 @@ export async function voidSale(
   revalidatePath("/reports");
   revalidatePath("/finances");
   revalidatePath("/products");
+  revalidatePath("/in-house");
   revalidatePath("/dashboard");
   revalidatePath("/staff");
   if (sale.customer_id) {

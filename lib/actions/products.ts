@@ -12,6 +12,16 @@ import {
   type InventorySummary,
 } from "@/lib/inventory/valuation";
 import { isProductKind, isSellableProductKind } from "@/lib/products/kinds";
+import {
+  unitCostFromPackCost,
+  unitCostFromTotalPaid,
+} from "@/lib/products/in-house-math";
+
+const optionalPositive = z.preprocess((v) => {
+  if (v === "" || v === null || v === undefined) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}, z.number().positive().optional());
 
 const productSchema = z.object({
   name: z.string().min(1),
@@ -22,9 +32,33 @@ const productSchema = z.object({
   cost_price: z.coerce.number().min(0),
   retail_price: z.coerce.number().min(0),
   stock_quantity: z.coerce.number().min(0).default(0),
-  low_stock_threshold: z.coerce.number().int().min(0).default(5),
+  low_stock_threshold: z.coerce.number().min(0).default(5),
   is_active: z.coerce.boolean().default(true),
+  unit_label: z.string().max(24).optional(),
+  pack_size: optionalPositive,
+  default_usage_qty: optionalPositive,
 });
+
+/**
+ * In-house forms send cost_mode:
+ * - pack: cost_price = cost of 1 pack → store cost per unit
+ * - total: cost_price = paid for whole stock → store cost per unit
+ * - unit / missing: cost_price already per stock unit (retail default)
+ */
+function resolveStoredCostPrice(
+  formData: FormData,
+  data: { cost_price: number; pack_size?: number; stock_quantity?: number; product_kind: string }
+): number {
+  const mode = String(formData.get("cost_mode") ?? "unit");
+  if (mode === "pack" && data.pack_size && data.pack_size > 0) {
+    return unitCostFromPackCost(data.cost_price, data.pack_size);
+  }
+  if (mode === "total") {
+    const qty = Number(formData.get("stock_quantity") ?? data.stock_quantity) || 0;
+    return unitCostFromTotalPaid(data.cost_price, qty);
+  }
+  return data.cost_price;
+}
 
 export async function createProductCategory(
   _prev: ActionResult,
@@ -92,6 +126,9 @@ export async function createProduct(
     stock_quantity: formData.get("stock_quantity") ?? 0,
     low_stock_threshold: formData.get("low_stock_threshold") ?? 5,
     is_active: formData.get("is_active") === "on",
+    unit_label: (formData.get("unit_label") as string) || undefined,
+    pack_size: formData.get("pack_size") || undefined,
+    default_usage_qty: formData.get("default_usage_qty") || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
@@ -103,6 +140,8 @@ export async function createProduct(
     return { error: "Retail price is required for sellable products" };
   }
 
+  const costPrice = resolveStoredCostPrice(formData, parsed.data);
+
   const supabase = await createClient();
   const { error } = await supabase.from("products").insert({
     organization_id: org.organizationId,
@@ -111,14 +150,18 @@ export async function createProduct(
     name: parsed.data.name,
     description: parsed.data.description ?? null,
     product_kind: parsed.data.product_kind,
-    cost_price: parsed.data.cost_price,
-    retail_price: parsed.data.product_kind === "IN_HOUSE" ? parsed.data.retail_price : parsed.data.retail_price,
+    cost_price: costPrice,
+    retail_price: parsed.data.retail_price,
     stock_quantity: parsed.data.stock_quantity,
     low_stock_threshold: parsed.data.low_stock_threshold,
     is_active: parsed.data.is_active,
+    unit_label: parsed.data.unit_label?.trim() || null,
+    pack_size: parsed.data.pack_size ?? null,
+    default_usage_qty: parsed.data.default_usage_qty ?? null,
   });
   if (error) return { error: error.message };
   revalidatePath("/products");
+  revalidatePath("/in-house");
   revalidatePath("/services");
   return { success: true };
 }
@@ -143,8 +186,13 @@ export async function updateProduct(
     retail_price: formData.get("retail_price"),
     low_stock_threshold: formData.get("low_stock_threshold") ?? 5,
     is_active: formData.get("is_active") === "on",
+    unit_label: (formData.get("unit_label") as string) || undefined,
+    pack_size: formData.get("pack_size") || undefined,
+    default_usage_qty: formData.get("default_usage_qty") || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const costPrice = resolveStoredCostPrice(formData, parsed.data);
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -155,10 +203,13 @@ export async function updateProduct(
       name: parsed.data.name,
       description: parsed.data.description ?? null,
       product_kind: parsed.data.product_kind,
-      cost_price: parsed.data.cost_price,
+      cost_price: costPrice,
       retail_price: parsed.data.retail_price,
       low_stock_threshold: parsed.data.low_stock_threshold,
       is_active: parsed.data.is_active,
+      unit_label: parsed.data.unit_label?.trim() || null,
+      pack_size: parsed.data.pack_size ?? null,
+      default_usage_qty: parsed.data.default_usage_qty ?? null,
     })
     .eq("id", id)
     .eq("organization_id", org.organizationId)
@@ -166,6 +217,7 @@ export async function updateProduct(
 
   if (error) return { error: error.message };
   revalidatePath("/products");
+  revalidatePath("/in-house");
   revalidatePath("/services");
   return { success: true };
 }
@@ -230,6 +282,7 @@ export async function adjustInventory(
   });
   if (error) return { error: error.message };
   revalidatePath("/products");
+  revalidatePath("/in-house");
   return { success: true };
 }
 
@@ -255,6 +308,21 @@ export async function getProducts() {
     .select("*, category:product_categories(id, name)")
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return data as unknown as (Product & { category: { id: string; name: string } | null })[];
+}
+
+/** Customer catalog (POS sellables). Pure in-house stock is managed under /in-house. */
+export async function getRetailProducts() {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("*, category:product_categories(id, name)")
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .in("product_kind", ["RETAIL", "BOTH"])
     .order("name");
   if (error) throw new Error(error.message);
   return data as unknown as (Product & { category: { id: string; name: string } | null })[];
@@ -287,7 +355,7 @@ export async function getInventoryTransactions(limit = 20) {
 }
 
 export async function getInventorySummaryStats(): Promise<InventorySummary> {
-  const products = await getProducts();
+  const products = await getRetailProducts();
   return getInventorySummary(products);
 }
 
@@ -377,7 +445,7 @@ export async function getConsumableProducts() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, cost_price, stock_quantity, product_kind, sku")
+    .select("id, name, cost_price, stock_quantity, product_kind, sku, unit_label, pack_size, default_usage_qty")
     .eq("organization_id", org.organizationId)
     .eq("is_active", true)
     .is("deleted_at", null)
@@ -385,4 +453,150 @@ export async function getConsumableProducts() {
     .order("name");
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+/** In-house + BOTH catalog for the owner In-house module. */
+export async function getInHouseProducts() {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select(
+      "*, category:product_categories(id, name)"
+    )
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .in("product_kind", ["IN_HOUSE", "BOTH"])
+    .order("name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export type InHouseProductTxn = {
+  id: string;
+  type: string;
+  quantity: number;
+  reference_type: string | null;
+  reference_id: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+/** Single in-house product with usage totals + movement history. */
+export async function getInHouseProductDetail(productId: string) {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("*, category:product_categories(id, name)")
+    .eq("id", productId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .in("product_kind", ["IN_HOUSE", "BOTH"])
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!product) return null;
+
+  const [{ data: txns }, { data: links }] = await Promise.all([
+    supabase
+      .from("inventory_transactions")
+      .select("id, type, quantity, reference_type, reference_id, notes, created_at")
+      .eq("organization_id", org.organizationId)
+      .eq("product_id", productId)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("service_product_usage")
+      .select("quantity_per_service, service:services(id, name, deleted_at, is_active)")
+      .eq("organization_id", org.organizationId)
+      .eq("product_id", productId),
+  ]);
+
+  let lifetimeUsed = 0;
+  let lifetimeRestored = 0;
+  let lifetimeStockIn = 0;
+  let lifetimeManualOut = 0;
+
+  for (const t of txns ?? []) {
+    const qty = Number(t.quantity) || 0;
+    const ref = String(t.reference_type ?? "");
+    if (t.type === "OUT" && (ref.startsWith("service_usage") || ref === "sale")) {
+      if (ref.startsWith("service_usage")) lifetimeUsed += qty;
+      else lifetimeManualOut += qty;
+    } else if (t.type === "IN" && ref.startsWith("service_usage")) {
+      lifetimeRestored += qty;
+    } else if (t.type === "IN" && (ref === "manual" || !ref)) {
+      lifetimeStockIn += qty;
+    } else if (t.type === "OUT" && ref === "manual") {
+      lifetimeManualOut += qty;
+    }
+  }
+
+  const netUsed = Math.max(0, lifetimeUsed - lifetimeRestored);
+  const stock = Number(product.stock_quantity) || 0;
+  const useQty = Number(product.default_usage_qty) || 0;
+  const unitCost = Number(product.cost_price) || 0;
+  const pack = Number(product.pack_size) || 0;
+
+  const linkedServices = (links ?? [])
+    .map((row) => {
+      const service = row.service as {
+        id: string;
+        name: string;
+        deleted_at: string | null;
+        is_active: boolean;
+      } | null;
+      if (!service || service.deleted_at) return null;
+      return {
+        serviceId: service.id,
+        serviceName: service.name,
+        quantity: Number(row.quantity_per_service) || 0,
+        isActive: service.is_active,
+      };
+    })
+    .filter(Boolean) as {
+    serviceId: string;
+    serviceName: string;
+    quantity: number;
+    isActive: boolean;
+  }[];
+
+  return {
+    product,
+    linkedServices,
+    transactions: (txns ?? []) as InHouseProductTxn[],
+    stats: {
+      stockRemaining: stock,
+      unitLabel: (product.unit_label as string | null)?.trim() || "unit",
+      packSize: pack > 0 ? pack : null,
+      usePerClient: useQty > 0 ? useQty : null,
+      clientsLeft: useQty > 0 ? Math.floor(stock / useQty + 1e-9) : null,
+      netUsed,
+      lifetimeUsed,
+      lifetimeRestored,
+      lifetimeStockIn,
+      usageCost: netUsed * unitCost,
+      stockValue: stock * unitCost,
+      unitCost,
+      autoDeduct: linkedServices.length > 0 && useQty > 0,
+    },
+  };
+}
+
+/** Preview recipe usage for a POS cart (before checkout). */
+export async function previewCheckoutUsage(
+  items: { itemType: string; itemId: string; quantity: number }[]
+) {
+  const org = await requireMinimumRole("CASHIER");
+  const { resolveServiceUsageRequirements } = await import("@/lib/inventory/service-usage");
+  return resolveServiceUsageRequirements(
+    org.organizationId,
+    items.map((i) => ({
+      itemType: i.itemType,
+      itemId: i.itemId,
+      quantity: i.quantity,
+    }))
+  );
 }

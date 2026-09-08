@@ -167,4 +167,6 @@ export type AmendPayload = {
   refundPayment?: { amount: number; method: PaymentMethod } | null;
   /** When true (default false), require collecting additionalDue now; otherwise leave as customer due */
   settleAdditionalNow?: boolean;
+  /** Optional in-house usage overrides for the amended line set (same semantics as POS). */
+  usageOverrides?: { productId: string; quantity: number }[] | null;
 };

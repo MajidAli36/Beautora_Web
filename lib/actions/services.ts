@@ -124,14 +124,6 @@ export async function createService(
 
   if (error || !created) return { error: error?.message ?? "Failed to create service" };
 
-  const usage = parseUsageRecipeFromForm(formData);
-  const usageResult = await replaceServiceUsageRecipe(
-    org.organizationId,
-    created.id,
-    usage
-  );
-  if (usageResult.error) return { error: usageResult.error };
-
   revalidatePath("/services");
   revalidatePath("/");
   revalidatePath("/book");
@@ -176,14 +168,148 @@ export async function updateService(
 
   if (error) return { error: error.message };
 
-  const usage = parseUsageRecipeFromForm(formData);
-  const usageResult = await replaceServiceUsageRecipe(org.organizationId, id, usage);
-  if (usageResult.error) return { error: usageResult.error };
-
   revalidatePath("/services");
   revalidatePath("/");
   revalidatePath("/book");
   return { success: true };
+}
+
+/** Link / update in-house products used when this service is sold at POS. */
+export async function updateServiceUsageRecipe(
+  serviceId: string,
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const org = await requireMinimumRole("MANAGER");
+  const supabase = await createClient();
+  const { data: svc } = await supabase
+    .from("services")
+    .select("id")
+    .eq("id", serviceId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!svc) return { error: "Service not found" };
+
+  const usage = parseUsageRecipeFromForm(formData);
+  const usageResult = await replaceServiceUsageRecipe(org.organizationId, serviceId, usage);
+  if (usageResult.error) return { error: usageResult.error };
+
+  revalidatePath("/services");
+  revalidatePath("/in-house");
+  revalidatePath("/");
+  return { success: true };
+}
+
+/** From In-house listing: attach this product to a service recipe (upsert). */
+export async function linkInHouseProductToService(
+  productId: string,
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const org = await requireMinimumRole("MANAGER");
+  const serviceId = String(formData.get("service_id") ?? "").trim();
+  if (!serviceId) return { error: "Choose a service" };
+
+  const supabase = await createClient();
+  const [{ data: product }, { data: service }] = await Promise.all([
+    supabase
+      .from("products")
+      .select("id, product_kind, is_active, deleted_at, default_usage_qty")
+      .eq("id", productId)
+      .eq("organization_id", org.organizationId)
+      .maybeSingle(),
+    supabase
+      .from("services")
+      .select("id")
+      .eq("id", serviceId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
+
+  if (!product || product.deleted_at || !product.is_active) {
+    return { error: "In-house product not found or inactive" };
+  }
+  if (product.product_kind !== "IN_HOUSE" && product.product_kind !== "BOTH") {
+    return { error: "Only in-house products can be linked to services" };
+  }
+  if (!service) return { error: "Service not found" };
+
+  const quantity = Number(product.default_usage_qty);
+  if (!(quantity > 0)) {
+    return { error: "Set use per client on the product (Edit) before linking" };
+  }
+
+  const { data: existing } = await supabase
+    .from("service_product_usage")
+    .select("id")
+    .eq("organization_id", org.organizationId)
+    .eq("service_id", serviceId)
+    .eq("product_id", productId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("service_product_usage")
+      .update({ quantity_per_service: quantity })
+      .eq("id", existing.id)
+      .eq("organization_id", org.organizationId);
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase.from("service_product_usage").insert({
+      organization_id: org.organizationId,
+      service_id: serviceId,
+      product_id: productId,
+      quantity_per_service: quantity,
+    });
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/services");
+  revalidatePath("/in-house");
+  return { success: true };
+}
+
+export async function getActiveServicesForLinking() {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("services")
+    .select("id, name, is_active")
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/** Map product_id → list of linked service names (for in-house table). */
+export async function getServiceLinksByProduct() {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("service_product_usage")
+    .select("product_id, quantity_per_service, service:services(id, name, deleted_at)")
+    .eq("organization_id", org.organizationId);
+  if (error) throw new Error(error.message);
+
+  const map = new Map<
+    string,
+    { serviceId: string; serviceName: string; quantity: number }[]
+  >();
+  for (const row of data ?? []) {
+    const service = row.service as { id: string; name: string; deleted_at: string | null } | null;
+    if (!service || service.deleted_at) continue;
+    const list = map.get(row.product_id) ?? [];
+    list.push({
+      serviceId: service.id,
+      serviceName: service.name,
+      quantity: Number(row.quantity_per_service),
+    });
+    map.set(row.product_id, list);
+  }
+  return map;
 }
 
 function parseUsageRecipeFromForm(formData: FormData): {

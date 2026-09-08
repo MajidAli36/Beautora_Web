@@ -66,7 +66,7 @@ export function QuickActionFab({ memberRole, navOverrides }: QuickActionFabProps
             >
               <action.icon className="size-4 shrink-0 text-primary" />
               <span className="flex-1">{action.label}</span>
-              <kbd className="ml-auto hidden rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
+              <kbd className="ml-auto hidden rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground md:inline">
                 Alt+{action.shortcut}
               </kbd>
             </Link>

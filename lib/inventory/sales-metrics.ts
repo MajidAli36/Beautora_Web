@@ -204,7 +204,8 @@ export async function getRevenueSplit(
   return split;
 }
 
-/** COGS from in-house products consumed via SERVICE/PACKAGE lines (snapshotted unit_cost). */
+/** COGS from in-house products consumed via services (actual sale_usage_lines snapshot).
+ * Includes VOID/REFUNDED: cream was used and is no longer restored to stock (write-off). */
 export async function getServiceUsageCogs(
   organizationId: string,
   from?: string,
@@ -217,27 +218,55 @@ export async function getServiceUsageCogs(
     .from("sales")
     .select("id")
     .eq("organization_id", organizationId)
-    .in("status", ["COMPLETED", "AMENDED"])
-    .is("deleted_at", null)
+    .in("status", ["COMPLETED", "AMENDED", "VOID", "REFUNDED"])
     .gte("completed_at", start.toISOString())
     .lte("completed_at", end.toISOString());
 
   const saleIds = (sales ?? []).map((s) => s.id);
   if (!saleIds.length) return 0;
 
-  const { data: lines } = await supabase
-    .from("sale_items")
-    .select("item_type, quantity, unit_cost")
+  const { data: usageLines } = await supabase
+    .from("sale_usage_lines")
+    .select("sale_id, quantity, unit_cost")
     .eq("organization_id", organizationId)
-    .in("item_type", ["SERVICE", "PACKAGE"])
     .in("sale_id", saleIds);
 
+  const salesWithUsage = new Set<string>();
   let cogs = 0;
-  for (const line of lines ?? []) {
+  for (const line of usageLines ?? []) {
+    salesWithUsage.add(line.sale_id);
     const qty = Number(line.quantity) || 0;
     const unitCost = Number(line.unit_cost) || 0;
     cogs += qty * unitCost;
   }
+
+  // Legacy sales before sale_usage_lines: fall back to SERVICE/PACKAGE unit_cost snapshot
+  // Only for still-posted tickets (VOID/REFUNDED without snapshot stay at 0 write-off).
+  const legacySaleIds = saleIds.filter((id) => !salesWithUsage.has(id));
+  if (legacySaleIds.length) {
+    const { data: postedLegacy } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("id", legacySaleIds)
+      .in("status", ["COMPLETED", "AMENDED"]);
+    const legacyPostedIds = (postedLegacy ?? []).map((s) => s.id);
+    if (legacyPostedIds.length) {
+      const { data: lines } = await supabase
+        .from("sale_items")
+        .select("quantity, unit_cost")
+        .eq("organization_id", organizationId)
+        .in("item_type", ["SERVICE", "PACKAGE"])
+        .in("sale_id", legacyPostedIds);
+
+      for (const line of lines ?? []) {
+        const qty = Number(line.quantity) || 0;
+        const unitCost = Number(line.unit_cost) || 0;
+        cogs += qty * unitCost;
+      }
+    }
+  }
+
   return Math.round(cogs * 100) / 100;
 }
 

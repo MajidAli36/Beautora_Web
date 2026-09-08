@@ -31,26 +31,26 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
 
   const rows = [
     { label: "Today's bookings", value: stats.total, color: "bg-primary" },
-    { label: "Completed", value: stats.completed, color: "bg-[#16a34a]" },
-    { label: "Pending", value: stats.upcoming, color: "bg-[#d97706]" },
+    { label: "Completed", value: stats.completed, color: "bg-success" },
+    { label: "Pending", value: stats.upcoming, color: "bg-warning" },
     { label: "Cancelled", value: stats.cancelled, color: "bg-destructive" },
   ];
 
   return (
-    <div className="dashboard-card flex flex-col">
-      <div className="border-b border-border px-5 py-4">
+    <div className="dashboard-card flex w-full min-w-0 flex-col">
+      <div className="border-b border-border px-4 py-4 sm:px-5">
         <h3 className="text-sm font-semibold text-foreground">Today&apos;s Summary</h3>
         <p className="text-xs text-muted-foreground">Operational overview</p>
       </div>
 
-      <div className="space-y-5 p-5">
+      <div className="space-y-5 p-4 sm:p-5">
         {todayFinances ? (
           <div className="space-y-3">
-            <div className="rounded-xl bg-muted/50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="rounded-xl bg-muted/60 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Today&apos;s sales
               </p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">
+              <p className="mt-1 text-2xl font-bold text-foreground">
                 {formatCurrency(todayFinances.salesRevenue)}
               </p>
               {todayFinances.productRetailRevenue > 0 && (
@@ -62,7 +62,7 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
             </div>
 
             {(todayFinances.productUnitsSold > 0 || todayFinances.inventoryValueAtCost > 0) && (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+              <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-3 text-sm">
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Stock sold</span>
                   <span className="font-semibold">
@@ -78,9 +78,9 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
                   </span>
                 </div>
                 {todayFinances.productGrossProfit > 0 && (
-                  <div className="mt-1.5 flex justify-between gap-2 text-green-700">
-                    <span>Stock profit today</span>
-                    <span className="font-semibold">
+                  <div className="mt-2 flex justify-between gap-2">
+                    <span className="text-muted-foreground">Stock profit today</span>
+                    <span className="delta-pill delta-pill-positive">
                       {formatCurrency(todayFinances.productGrossProfit)}
                     </span>
                   </div>
@@ -89,39 +89,53 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
             )}
 
             {todayFinances.advancesCollected > 0 && (
-              <div className="rounded-lg border bg-background p-2.5 text-sm">
-                <p className="text-[10px] uppercase text-muted-foreground">Advances collected</p>
-                <p className="font-semibold text-green-700">
-                  {formatCurrency(todayFinances.advancesCollected)}
+              <div className="rounded-xl border border-border bg-card p-2.5 text-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Advances collected
+                </p>
+                <p className="mt-0.5">
+                  <span className="delta-pill delta-pill-positive">
+                    {formatCurrency(todayFinances.advancesCollected)}
+                  </span>
                 </p>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-lg border bg-background p-2.5">
-                <p className="text-[10px] uppercase text-muted-foreground">Expenses</p>
-                <p className="font-semibold text-orange-700">
+              <div className="rounded-xl border border-border bg-card p-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Expenses
+                </p>
+                <p className="font-semibold text-foreground">
                   {formatCurrency(todayFinances.totalExpenses)}
                 </p>
               </div>
-              <div className="rounded-lg border bg-background p-2.5">
-                <p className="text-[10px] uppercase text-muted-foreground">Staff paid</p>
-                <p className="font-semibold text-orange-700">
+              <div className="rounded-xl border border-border bg-card p-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Staff paid
+                </p>
+                <p className="font-semibold text-foreground">
                   {formatCurrency(todayFinances.staffPayments)}
                 </p>
               </div>
               {todayFinances.productCogs > 0 && (
-                <div className="rounded-lg border bg-background p-2.5">
-                  <p className="text-[10px] uppercase text-muted-foreground">Stock COGS</p>
-                  <p className="font-semibold text-orange-700">
+                <div className="rounded-xl border border-border bg-card p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Stock COGS
+                  </p>
+                  <p className="font-semibold text-foreground">
                     {formatCurrency(todayFinances.productCogs)}
                   </p>
                 </div>
               )}
-              <div className="col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5">
-                <p className="text-[10px] uppercase text-muted-foreground">Net profit today</p>
+              <div className="col-span-2 rounded-xl border border-primary/20 bg-primary/[0.04] p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Net profit today
+                </p>
                 <p
-                  className={`text-lg font-bold ${todayFinances.netProfit >= 0 ? "text-primary" : "text-destructive"}`}
+                  className={`mt-1 text-lg font-bold ${
+                    todayFinances.netProfit >= 0 ? "text-primary" : "text-destructive"
+                  }`}
                 >
                   {formatCurrency(todayFinances.netProfit)}
                 </p>
@@ -132,11 +146,11 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
             </div>
           </div>
         ) : (
-          <div className="rounded-xl bg-muted/50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-xl bg-muted/60 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Today&apos;s sales
             </p>
-            <p className="mt-1 text-2xl font-semibold text-foreground">{formatCurrency(0)}</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{formatCurrency(0)}</p>
           </div>
         )}
 
@@ -160,7 +174,7 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
           })}
         </div>
 
-        <div className="rounded-lg border border-border bg-background p-3">
+        <div className="rounded-xl border border-border bg-card p-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Completion rate</span>
             <span className="font-semibold text-foreground">{completionRate}%</span>
@@ -168,16 +182,16 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" render={<Link href="/appointments" />}>
+          <Button variant="outline" size="sm" className="h-10" render={<Link href="/appointments" />}>
             Appointments
           </Button>
-          <Button variant="outline" size="sm" render={<Link href="/finances" />}>
+          <Button variant="outline" size="sm" className="h-10" render={<Link href="/finances" />}>
             Finances
           </Button>
-          <Button variant="outline" size="sm" render={<Link href="/products" />}>
+          <Button variant="outline" size="sm" className="h-10" render={<Link href="/products" />}>
             Inventory
           </Button>
-          <Button size="sm" render={<Link href="/pos" />}>
+          <Button size="sm" className="h-10" render={<Link href="/pos" />}>
             New Sale
           </Button>
         </div>

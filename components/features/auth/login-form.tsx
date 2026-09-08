@@ -81,10 +81,9 @@ export function LoginForm() {
 
     notify.success("Signed in successfully");
 
-    // Navigate directly — avoid post-login server actions on /login (middleware
-    // used to redirect those POSTs and break the action protocol).
-    // Store owners without an org are sent to /onboarding by middleware.
-    window.location.assign(isPlatformAdmin ? "/platform" : "/dashboard");
+    const { resolvePostLoginDestination } = await import("@/lib/actions/partners");
+    const dest = await resolvePostLoginDestination();
+    window.location.assign(dest);
   }
 
   async function handleForgotPassword() {
@@ -122,6 +121,16 @@ export function LoginForm() {
           >
             Sign up
           </Link>
+          {" · "}
+          <Link
+            href="/partner"
+            className="font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline"
+          >
+            Partner program
+          </Link>
+        </p>
+        <p className="mt-2 text-xs text-[var(--m-muted)]">
+          Partners land on the partner dashboard only — not the salon app.
         </p>
       </div>
 

@@ -30,10 +30,10 @@ export default async function DashboardPage() {
     data && data.todayRevenue >= data.yesterdayRevenue ? "positive" : "negative";
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-5 sm:space-y-6 lg:space-y-8">
       <DashboardHeader organizationName={org?.organizationName} userEmail={user.email} />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Today's Sales"
           value={formatCurrency(data?.todayRevenue ?? 0)}
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
           value={String(data?.appointmentStats.total ?? 0)}
           subtext={`${data?.appointmentStats.completed ?? 0} completed · ${data?.appointmentStats.upcoming ?? 0} upcoming`}
           icon={Calendar}
-          iconClassName="bg-accent"
+          iconClassName="bg-accent [&_svg]:text-primary"
         />
         <StatCard
           label="Customers"
@@ -83,19 +83,19 @@ export default async function DashboardPage() {
             data?.stockToday.unitsSold
               ? "bg-primary/10 [&_svg]:text-primary"
               : data?.lowStockCount
-                ? "bg-[#d97706]/10 [&_svg]:text-[#d97706]"
-                : "bg-[#16a34a]/10 [&_svg]:text-[#16a34a]"
+                ? "bg-warning/10 [&_svg]:text-warning"
+                : "bg-success/10 [&_svg]:text-success"
           }
         />
       </div>
 
       {data && <DashboardStockPanel stock={data.stockToday} />}
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6">
+        <div className="min-w-0 lg:col-span-3">
           <AppointmentList appointments={data?.appointmentsToday ?? []} />
         </div>
-        <div className="lg:col-span-2">
+        <div className="min-w-0 lg:col-span-2">
           <QuickActions
             stats={
               data?.appointmentStats ?? {
@@ -125,7 +125,7 @@ export default async function DashboardPage() {
         retentionRate={data?.retentionRate ?? null}
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         <ServicePerformance services={data?.topServices ?? []} />
         <InventoryAlerts products={data?.lowStockProducts ?? []} />
       </div>

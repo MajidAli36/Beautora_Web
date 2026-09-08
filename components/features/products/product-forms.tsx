@@ -24,11 +24,13 @@ export function ProductCategoryForm() {
   );
 }
 
+/** Customer-facing catalog only. Back-bar / cream stock lives under In-house. */
 export function ProductForm({ categories }: { categories: ProductCategory[] }) {
   const [state, formAction, pending] = useActionState(createProduct, {} as ActionResult);
   useActionToast(state, { successMessage: "Product added." });
   return (
     <form action={formAction} className="grid gap-4 sm:grid-cols-2">
+      <input type="hidden" name="product_kind" value="RETAIL" />
       <div className="space-y-2 sm:col-span-2">
         <Label htmlFor="p_name">Product name *</Label>
         <Input id="p_name" name="name" required />
@@ -53,22 +55,6 @@ export function ProductForm({ categories }: { categories: ProductCategory[] }) {
         </select>
       </div>
       <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="product_kind">Product kind *</Label>
-        <select
-          id="product_kind"
-          name="product_kind"
-          defaultValue="RETAIL"
-          className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-        >
-          <option value="RETAIL">Retail — sold to customers at POS</option>
-          <option value="IN_HOUSE">In-house — used during services only</option>
-          <option value="BOTH">Both — sold at POS and used in services</option>
-        </select>
-        <p className="text-xs text-muted-foreground">
-          In-house products are hidden from POS and linked from Services as usage recipes.
-        </p>
-      </div>
-      <div className="space-y-2 sm:col-span-2">
         <Label htmlFor="p_desc">Description</Label>
         <Textarea id="p_desc" name="description" rows={2} />
       </div>
@@ -80,11 +66,9 @@ export function ProductForm({ categories }: { categories: ProductCategory[] }) {
         </p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="retail">Retail price (POS selling price)</Label>
-        <Input id="retail" name="retail_price" type="number" min={0} step="1" defaultValue={0} />
-        <p className="text-xs text-muted-foreground">
-          Required for retail / both. Can be 0 for pure in-house items.
-        </p>
+        <Label htmlFor="retail">Retail price (POS selling price) *</Label>
+        <Input id="retail" name="retail_price" type="number" min={0} step="1" defaultValue={0} required />
+        <p className="text-xs text-muted-foreground">Price shown at POS when selling to customers.</p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="stock">Initial stock</Label>

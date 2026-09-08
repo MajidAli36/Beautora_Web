@@ -29,13 +29,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: absoluteUrl("/syncops"),
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.9,
+      priority: 0.95,
     },
     {
       url: absoluteUrl("/ceo"),
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.88,
+      priority: 0.9,
+    },
+    {
+      url: absoluteUrl("/partner"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.75,
+    },
+    {
+      url: absoluteUrl("/apps"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.65,
     },
     {
       url: absoluteUrl("/signup"),

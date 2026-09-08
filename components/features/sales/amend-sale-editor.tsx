@@ -386,8 +386,9 @@ export function AmendSaleEditor({
                   onChange={(e) => setConfirmed(e.target.checked)}
                 />
                 <span>
-                  This invoice has already been completed. Changes may affect revenue,
-                  inventory, payments, customer history, staff performance and profit.
+                  This invoice has already been completed. Changes may affect revenue, retail
+                  stock, payments, and reports. In-house usage is kept if services/packages are
+                  unchanged; adding/removing services recalculates cream/ml stock.
                 </span>
               </label>
               <div className="flex gap-2">

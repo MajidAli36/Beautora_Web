@@ -55,7 +55,7 @@ export function buildSyncOpsPageJsonLd() {
         url: SYNCOPS.builder.url,
         email: SYNCOPS.email,
         telephone: SYNCOPS.phone,
-        description: `${SYNCOPS.builder.name} is the product studio behind ${SYNCOPS.name} — salon POS, online booking, and operations software.`,
+        description: SYNCOPS.builder.seoDescription,
         logo: absoluteUrl(SYNCOPS.ceo.photo),
         sameAs: syncOpsSameAs(),
         founder: { "@id": ceoId },

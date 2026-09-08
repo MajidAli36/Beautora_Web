@@ -2,14 +2,15 @@ import { AuthBrandPanel } from "@/components/features/auth/auth-brand-panel";
 
 type AuthShellProps = {
   children: React.ReactNode;
-  slide?: 0 | 1 | 2;
+  /** Kept for call-site compatibility; panel always starts on CEO once. */
+  slide?: number;
 };
 
-export function AuthShell({ children, slide = 0 }: AuthShellProps) {
+export function AuthShell({ children }: AuthShellProps) {
   return (
     <div className="auth-screen flex min-h-full flex-1 flex-col lg:flex-row">
       <div className="order-2 lg:order-1 lg:contents">
-        <AuthBrandPanel slide={slide} />
+        <AuthBrandPanel />
       </div>
       <section className="relative order-1 flex flex-1 items-start justify-center bg-[var(--m-paper)] px-4 py-8 sm:items-center sm:px-8 sm:py-10 lg:order-2 lg:px-12">
         <div

@@ -15,6 +15,19 @@ async function userHasOrganization(
   return (count ?? 0) > 0;
 }
 
+async function userIsPartner(
+  supabase: ReturnType<typeof createServerClient<Database>>,
+  user: { id: string; user_metadata?: Record<string, unknown> }
+) {
+  if (user.user_metadata?.account_type === "partner") return true;
+  const { data } = await supabase
+    .from("partners")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return Boolean(data);
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -48,11 +61,13 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");
   const isOnboardingRoute = pathname.startsWith("/onboarding");
+  const isPartnerDashboard = pathname.startsWith("/partner/dashboard");
   const isProtectedRoute =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/customers") ||
     pathname.startsWith("/services") ||
     pathname.startsWith("/products") ||
+    pathname.startsWith("/in-house") ||
     pathname.startsWith("/chairs") ||
     pathname.startsWith("/pos") ||
     pathname.startsWith("/sales") ||
@@ -68,12 +83,11 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/feedback") ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/billing") ||
-    pathname.startsWith("/platform");
+    pathname.startsWith("/platform") ||
+    isPartnerDashboard;
 
   supabaseResponse.headers.set("x-pathname", pathname);
 
-  // Never redirect Server Actions — middleware HTML redirects break the action
-  // protocol ("An unexpected response was received from the server").
   if (isServerAction) {
     return supabaseResponse;
   }
@@ -86,9 +100,23 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
-    const hasOrg = await userHasOrganization(supabase, user.id);
     const isPlatformAdmin = isPlatformAdminEmail(user.email);
+    const isPartner = await userIsPartner(supabase, user);
     const isPlatformRoute = pathname.startsWith("/platform");
+
+    // Partners only ever use the partner dashboard (never salon app / onboarding)
+    if (isPartner && !isPlatformAdmin) {
+      if (isAuthRoute || isOnboardingRoute || (isProtectedRoute && !isPartnerDashboard)) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/partner/dashboard";
+        return NextResponse.redirect(url);
+      }
+      if (isPartnerDashboard) {
+        return supabaseResponse;
+      }
+    }
+
+    const hasOrg = await userHasOrganization(supabase, user.id);
 
     if (isAuthRoute) {
       const url = request.nextUrl.clone();
@@ -106,7 +134,6 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Platform admins can use /platform without a salon org
     if (isProtectedRoute && !hasOrg) {
       if (isPlatformRoute && isPlatformAdmin) {
         return supabaseResponse;

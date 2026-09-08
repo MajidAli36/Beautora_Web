@@ -1,6 +1,7 @@
 /**
- * Wipe all business data (keep org + member roles), then re-seed.
- * Login: owner@salon.com / Salon123!
+ * Wipe all business data then re-seed demo logins + sample catalog.
+ * Prefer `npm run db:wipe` for a clean production-like empty DB (users only).
+ * Login after this script: owner@salon.com / Salon123!
  */
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";

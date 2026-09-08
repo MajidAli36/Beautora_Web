@@ -51,27 +51,27 @@
 }
 
 :root {
-  --background: #f7f8fa;
+  --background: #fafafa;
   --foreground: #111827;
   --card: #ffffff;
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
-  --primary: #0f766e;
+  --primary: #0f9d8c;
   --primary-foreground: #ffffff;
   --secondary: #f3f4f6;
   --secondary-foreground: #111827;
-  --muted: #f3f4f6;
+  --muted: #f7f8f9;
   --muted-foreground: #6b7280;
-  --accent: #ecfdf5;
-  --accent-foreground: #0f766e;
+  --accent: #e6f7f5;
+  --accent-foreground: #0f9d8c;
   --destructive: #dc2626;
   --success: #16a34a;
   --warning: #d97706;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #0f766e;
-  --chart-1: #0f766e;
+  --border: #eaeaea;
+  --input: #eaeaea;
+  --ring: #0f9d8c;
+  --chart-1: #0f9d8c;
   --chart-2: #14b8a6;
   --chart-3: #6b7280;
   --chart-4: #d97706;
@@ -79,12 +79,12 @@
   --radius: 0.75rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #374151;
-  --sidebar-primary: #0f766e;
+  --sidebar-primary: #0f9d8c;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ecfdf5;
-  --sidebar-accent-foreground: #0f766e;
-  --sidebar-border: #e5e7eb;
-  --sidebar-ring: #0f766e;
+  --sidebar-accent: #e6f7f5;
+  --sidebar-accent-foreground: #0f9d8c;
+  --sidebar-border: #eaeaea;
+  --sidebar-ring: #0f9d8c;
 }
 
 .dark {
@@ -137,7 +137,31 @@
 
 @layer utilities {
   .dashboard-card {
-    @apply rounded-xl border border-border bg-card shadow-sm transition-shadow duration-200 hover:shadow-md;
+    @apply w-full min-w-0 rounded-xl border border-border bg-card shadow-none transition-all duration-150;
+  }
+
+  .dashboard-card-interactive {
+    @apply hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0;
+  }
+
+  .delta-pill {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium;
+  }
+
+  .delta-pill-positive {
+    @apply bg-[#16a34a]/10 text-[#16a34a];
+  }
+
+  .delta-pill-negative {
+    @apply bg-destructive/10 text-destructive;
+  }
+
+  .delta-pill-neutral {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  .delta-pill-info {
+    @apply bg-primary/10 text-primary;
   }
 
   .marketing-site .font-serif {
@@ -145,15 +169,15 @@
   }
 
   .marketing-site {
-    --m-ink: #0c1f1c;
-    --m-ink-soft: #1a332e;
+    --m-ink: #06211d;
+    --m-ink-soft: #0f2f29;
     --m-mist: #eef1ef;
-    --m-paper: #f6f7f5;
-    --m-line: rgba(12, 31, 28, 0.12);
+    --m-paper: #f5f6f3;
+    --m-line: rgba(6, 33, 29, 0.12);
     --m-muted: #5c6b66;
     --m-accent: #3d6b5f;
     --m-accent-soft: #c5d4ce;
-    --m-topbar: 2.25rem;
+    --m-topbar: 2rem;
     --m-header: 3.5rem;
     --m-chrome: calc(var(--m-topbar) + var(--m-header));
     background: var(--m-paper);

@@ -11,13 +11,13 @@ export function ServicePerformance({ services }: ServicePerformanceProps) {
   const maxRevenue = services[0]?.revenue ?? 1;
 
   return (
-    <div className="dashboard-card flex flex-col">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <div>
+    <div className="dashboard-card flex w-full min-w-0 flex-col">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-4 sm:px-5">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Top Performing Services</h3>
           <p className="text-xs text-muted-foreground">Last 30 days</p>
         </div>
-        <Button variant="ghost" size="sm" render={<Link href="/reports" />}>
+        <Button variant="ghost" size="sm" className="h-9 shrink-0" render={<Link href="/reports" />}>
           View reports
         </Button>
       </div>
@@ -34,7 +34,7 @@ export function ServicePerformance({ services }: ServicePerformanceProps) {
           {services.map((service, i) => {
             const pct = maxRevenue > 0 ? (service.revenue / maxRevenue) * 100 : 0;
             return (
-              <li key={service.name} className="space-y-2 px-5 py-3.5">
+              <li key={service.name} className="space-y-2 px-4 py-3.5 sm:px-5">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-medium text-muted-foreground">

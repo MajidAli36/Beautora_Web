@@ -12,6 +12,7 @@ import {
   getAppointmentsReport,
   getStaffReport,
   getInventoryReport,
+  getInHouseUsageReport,
   getProductsReport,
   getFinanceReport,
   getPaymentsReport,
@@ -23,6 +24,7 @@ import {
   type AppointmentsReport,
   type StaffReport,
   type InventoryReport,
+  type InHouseUsageReport,
   type ProductsReport,
   type FinanceReport,
   type PaymentsReport,
@@ -49,6 +51,7 @@ import { CustomersTab } from "@/components/features/reports/tabs/customers-tab";
 import { AppointmentsTab } from "@/components/features/reports/tabs/appointments-tab";
 import { StaffTab } from "@/components/features/reports/tabs/staff-tab";
 import { InventoryTab } from "@/components/features/reports/tabs/inventory-tab";
+import { InHouseUsageTab } from "@/components/features/reports/tabs/in-house-usage-tab";
 import { ProductsTab } from "@/components/features/reports/tabs/products-tab";
 import { FinanceTab } from "@/components/features/reports/tabs/finance-tab";
 import { PaymentsTab } from "@/components/features/reports/tabs/payments-tab";
@@ -72,6 +75,7 @@ type TabDataMap = {
   appointments: AppointmentsReport;
   staff: StaffReport;
   inventory: InventoryReport;
+  in_house: InHouseUsageReport;
   products: ProductsReport;
   finance: FinanceReport;
   payments: PaymentsReport;
@@ -126,6 +130,7 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
           appointments: () => getAppointmentsReport(rangeFrom, rangeTo),
           staff: () => getStaffReport(rangeFrom, rangeTo),
           inventory: () => getInventoryReport(rangeFrom, rangeTo),
+          in_house: () => getInHouseUsageReport(rangeFrom, rangeTo),
           products: () => getProductsReport(rangeFrom, rangeTo),
           finance: () => getFinanceReport(rangeFrom, rangeTo),
           payments: () => getPaymentsReport(rangeFrom, rangeTo),
@@ -287,6 +292,7 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
           ) : null}
           {tab === "staff" && cache.staff ? <StaffTab data={cache.staff} /> : null}
           {tab === "inventory" && cache.inventory ? <InventoryTab data={cache.inventory} /> : null}
+          {tab === "in_house" && cache.in_house ? <InHouseUsageTab data={cache.in_house} /> : null}
           {tab === "products" && cache.products ? <ProductsTab data={cache.products} /> : null}
           {tab === "finance" && cache.finance ? <FinanceTab data={cache.finance} /> : null}
           {tab === "payments" && cache.payments ? <PaymentsTab data={cache.payments} /> : null}

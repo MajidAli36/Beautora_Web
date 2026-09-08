@@ -55,7 +55,7 @@ export default async function ServicesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Services"
-        description="Manage service categories, individual services, packages, and in-house products used during each service."
+        description="Create customer-facing services, then link in-house stock. Customers pay the service price only — cream/ml usage is tracked internally."
       />
 
       <Tabs defaultValue="services">
@@ -71,12 +71,12 @@ export default async function ServicesPage() {
               <CardHeader>
                 <CardTitle>Add service</CardTitle>
                 <CardDescription>
-                  Create a salon service and optionally link in-house products used each time it
-                  is performed.
+                  Name, price, and duration only. After saving, use{" "}
+                  <strong>Use in-house stock</strong> on that row to link cream/ml usage.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ServiceForm categories={categories} consumables={consumables} />
+                <ServiceForm categories={categories} />
               </CardContent>
             </Card>
           )}
@@ -84,6 +84,10 @@ export default async function ServicesPage() {
           <Card>
             <CardHeader>
               <CardTitle>All services</CardTitle>
+                <CardDescription>
+                  Use in-house stock sets how much back-bar product is deducted at POS. It is not
+                  added to the customer bill — only stock and cost are tracked.
+                </CardDescription>
             </CardHeader>
             <CardContent>
               <ServicesTable

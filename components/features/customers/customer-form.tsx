@@ -14,17 +14,23 @@ type CustomerFormProps = {
     prev: ActionResult,
     formData: FormData
   ) => Promise<ActionResult>;
-  customer?: Customer;
+  customer?: Customer | null;
   submitLabel?: string;
+  successMessage?: string;
+  onSuccess?: () => void;
+  footer?: React.ReactNode;
 };
 
 export function CustomerForm({
   action,
   customer,
   submitLabel = "Save customer",
+  successMessage = "Saved successfully.",
+  onSuccess,
+  footer,
 }: CustomerFormProps) {
-  const [state, formAction, pending] = useActionState(action, {});
-  useActionToast(state, { successMessage: "Saved successfully." });
+  const [state, formAction, pending] = useActionState(action, {} as ActionResult);
+  useActionToast(state, { successMessage, onSuccess });
 
   return (
     <form action={formAction} className="space-y-4">
@@ -34,8 +40,9 @@ export function CustomerForm({
           <Input
             id="first_name"
             name="first_name"
-            defaultValue={customer?.first_name}
+            defaultValue={customer?.first_name ?? ""}
             required
+            className="h-11"
           />
         </div>
         <div className="space-y-2">
@@ -44,6 +51,7 @@ export function CustomerForm({
             id="last_name"
             name="last_name"
             defaultValue={customer?.last_name ?? ""}
+            className="h-11"
           />
         </div>
       </div>
@@ -56,6 +64,7 @@ export function CustomerForm({
             name="phone"
             type="tel"
             defaultValue={customer?.phone ?? ""}
+            className="h-11"
           />
         </div>
         <div className="space-y-2">
@@ -65,6 +74,7 @@ export function CustomerForm({
             name="email"
             type="email"
             defaultValue={customer?.email ?? ""}
+            className="h-11"
           />
         </div>
       </div>
@@ -74,8 +84,9 @@ export function CustomerForm({
         <Input
           id="tags"
           name="tags"
-          placeholder="VIP, Regular, Bridal"
+          placeholder="VIP, New, Bridal"
           defaultValue={customer?.tags?.join(", ") ?? ""}
+          className="h-11"
         />
       </div>
 
@@ -89,9 +100,12 @@ export function CustomerForm({
         />
       </div>
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : submitLabel}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button type="submit" disabled={pending} className="h-11 w-full sm:w-auto">
+          {pending ? "Saving…" : submitLabel}
+        </Button>
+        {footer}
+      </div>
     </form>
   );
 }

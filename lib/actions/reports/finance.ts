@@ -45,8 +45,10 @@ export async function getFinanceReport(from?: string, to?: string): Promise<Fina
   const grossSubtotal = roundMoney(curSales.reduce((a, s) => a + s.subtotal, 0));
   const prevGrossSubtotal = roundMoney(prevSales.reduce((a, s) => a + s.subtotal, 0));
 
-  const grossProfit = roundMoney(cur.salesRevenue - cur.productCogs);
-  const prevGrossProfit = roundMoney(prev.salesRevenue - prev.productCogs);
+  const totalCogs = roundMoney(cur.productCogs + cur.serviceUsageCogs);
+  const prevTotalCogs = roundMoney(prev.productCogs + prev.serviceUsageCogs);
+  const grossProfit = roundMoney(cur.salesRevenue - totalCogs);
+  const prevGrossProfit = roundMoney(prev.salesRevenue - prevTotalCogs);
   const grossMargin = cur.salesRevenue > 0 ? (grossProfit / cur.salesRevenue) * 100 : 0;
   const prevGrossMargin = prev.salesRevenue > 0 ? (prevGrossProfit / prev.salesRevenue) * 100 : 0;
   const netMargin = cur.salesRevenue > 0 ? (cur.netProfit / cur.salesRevenue) * 100 : 0;
@@ -60,7 +62,7 @@ export async function getFinanceReport(from?: string, to?: string): Promise<Fina
       grossRevenue: cmp(grossSubtotal, prevGrossSubtotal),
       discounts: cmp(discounts, prevDiscounts),
       netRevenue: cmp(cur.salesRevenue, prev.salesRevenue),
-      cogs: cmp(cur.productCogs, prev.productCogs),
+      cogs: cmp(totalCogs, prevTotalCogs),
       grossProfit: cmp(grossProfit, prevGrossProfit),
       grossMargin: cmp(grossMargin, prevGrossMargin),
       expenses: cmp(cur.totalExpenses, prev.totalExpenses),
@@ -74,6 +76,7 @@ export async function getFinanceReport(from?: string, to?: string): Promise<Fina
       { label: "Tax", value: tax },
       { label: "Net ticket revenue", value: cur.salesRevenue },
       { label: "Product COGS", value: -cur.productCogs },
+      { label: "In-house usage COGS", value: -cur.serviceUsageCogs },
       { label: "Gross profit", value: grossProfit },
       { label: "Operating expenses", value: -cur.totalExpenses },
       { label: "Staff payments", value: -cur.staffPayments },
@@ -85,10 +88,9 @@ export async function getFinanceReport(from?: string, to?: string): Promise<Fina
     })),
     notes: [
       "Net ticket = subtotal − discounts + tax (matches completed/amended sale totals).",
-      "Net profit = ticket revenue − partial sale refunds − operating expenses − staff payments − product COGS.",
-      "Full void/refund removes the ticket from revenue (not also booked as an operating expense).",
+      "Net profit = ticket revenue − partial sale refunds − operating expenses − staff payments − product COGS − in-house usage COGS.",
+      "Full void/refund removes the ticket from revenue. Retail stock is restored; in-house cream/ml stays deducted (already used) and remains in usage COGS as write-off.",
       "Appointment advances are tracked separately and are not added on top of ticket revenue in net profit.",
-      "Service/package COGS is unavailable — only product cost is deducted.",
       "Manage expense entry on the Finances page.",
     ],
   };

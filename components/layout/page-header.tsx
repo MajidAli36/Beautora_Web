@@ -7,7 +7,10 @@ type PageHeaderProps = {
   className?: string;
 };
 
-/** App page title — hidden on small screens when sticky header already shows it. */
+/**
+ * @deprecated Prefer `AppPage` for new screens. Kept for gradual migration.
+ * App page title row — SyncOps: bold title + muted subtitle + actions.
+ */
 export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
   return (
     <div
@@ -17,9 +20,11 @@ export function PageHeader({ title, description, actions, className }: PageHeade
       )}
     >
       <div className="min-w-0 space-y-1">
-        <h1 className="hidden text-2xl font-bold tracking-tight sm:block">{title}</h1>
+        <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          {title}
+        </h1>
         {description ? (
-          <p className="text-sm text-muted-foreground sm:text-base">{description}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
         ) : null}
       </div>
       {actions ? (

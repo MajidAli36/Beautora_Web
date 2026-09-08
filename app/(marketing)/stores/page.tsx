@@ -1,17 +1,17 @@
 import { listPublicStores } from "@/lib/actions/stores";
 import { StoresDirectory } from "@/components/marketing/stores-directory";
+import { buildPageMetadata } from "@/lib/seo/site";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Stores",
-  description: `Browse live salons on Beautora by SyncOps — search by name or city, view services, and book online.`,
-  openGraph: {
-    title: "Stores · Beautora by SyncOps",
-    description: `Browse live salons on Beautora by SyncOps — search by name or city, view services, and book online.`,
-  },
-};
+  description:
+    "Browse live salons on Beautora by SyncOps — search by name or city, view services, and book online.",
+  path: "/stores",
+  keywords: ["Beautora stores", "SyncOps salon directory"],
+});
 
 export default async function StoresPage() {
   const stores = await listPublicStores();
