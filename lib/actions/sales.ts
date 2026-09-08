@@ -19,6 +19,10 @@ import {
 import { syncSalePaymentDenorm } from "@/lib/sales/sync-payment-denorm";
 import { formatCurrency } from "@/lib/format";
 import {
+  applyPriorDuePayments,
+  validatePriorDuePayments,
+} from "@/lib/actions/payments";
+import {
   applyServiceUsageInventory,
   getPackageUnitUsageCosts,
   getServiceUnitUsageCosts,
@@ -43,6 +47,17 @@ export async function completeCheckout(
 
   if (!payload.items.length) {
     return { error: "Cart is empty" };
+  }
+
+  const priorDueLines = (payload.priorDuePayments ?? []).filter(
+    (l) => roundMoney(l.amount) > 0
+  );
+  if (priorDueLines.length) {
+    if (!payload.customerId) {
+      return { error: "Select a customer to pay past dues" };
+    }
+    const priorCheck = await validatePriorDuePayments(payload.customerId, priorDueLines);
+    if (priorCheck.error) return { error: priorCheck.error };
   }
 
   const totals = calculateInvoiceTotals(
@@ -508,8 +523,26 @@ export async function completeCheckout(
       remainingDue: paymentState.amountDue,
       changeGiven,
       paymentStatus: paymentState.paymentStatus,
+      priorDueCount: priorDueLines.length,
+      priorDueTotal: roundMoney(priorDueLines.reduce((s, l) => s + roundMoney(l.amount), 0)),
     },
   });
+
+  if (priorDueLines.length && payload.customerId) {
+    const priorResult = await applyPriorDuePayments({
+      customerId: payload.customerId,
+      method: payload.paymentMethod,
+      lines: priorDueLines,
+    });
+    if (priorResult.error) {
+      return {
+        error: priorResult.error,
+        saleId: sale.id,
+        changeGiven,
+        amountDue: paymentState.amountDue,
+      };
+    }
+  }
 
   return { saleId: sale.id, changeGiven, amountDue: paymentState.amountDue };
 }

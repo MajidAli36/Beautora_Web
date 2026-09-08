@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeCheckout } from "@/lib/actions/sales";
+import {
+  getCustomerDueInvoices,
+  receiveCustomerAccountPayment,
+} from "@/lib/actions/payments";
 import { notify } from "@/lib/toast";
 import { getCustomerAdvanceAppointments, type PosAppointment } from "@/lib/actions/appointments";
 import { printSaleReceipt } from "@/components/features/sales/print-receipt-button";
@@ -25,6 +29,8 @@ type CatalogProduct = { id: string; name: string; retail_price: number; stock_qu
 type CatalogPackage = { id: string; name: string; price: number };
 type CatalogCustomer = { id: string; first_name: string; last_name: string | null; phone: string | null };
 type CatalogStaff = { id: string; full_name: string };
+
+type DueInvoiceRow = Awaited<ReturnType<typeof getCustomerDueInvoices>>[number];
 
 type PosTerminalProps = {
   services: CatalogService[];
@@ -70,6 +76,9 @@ export function PosTerminal({
   const [allowUnpaid, setAllowUnpaid] = useState(false);
   const [search, setSearch] = useState("");
   const [customerLookupPending, startCustomerLookup] = useTransition();
+  const [dueInvoices, setDueInvoices] = useState<DueInvoiceRow[]>([]);
+  const [selectedDueIds, setSelectedDueIds] = useState<Set<string>>(new Set());
+  const [duesLoading, setDuesLoading] = useState(false);
 
   const selectedAppointment = useMemo(
     () => appointments.find((a) => a.id === appointmentId) ?? null,
@@ -80,6 +89,39 @@ export function PosTerminal({
     () => appointments.filter((a) => a.depositBalance > 0),
     [appointments]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    setSelectedDueIds(new Set());
+    setAmountReceived("");
+    setTenderedAmount("");
+    setConfirmPartial(false);
+
+    if (!customerId) {
+      setDueInvoices([]);
+      setDuesLoading(false);
+      return;
+    }
+
+    setDuesLoading(true);
+    void (async () => {
+      try {
+        const dues = await getCustomerDueInvoices(customerId);
+        if (!cancelled) setDueInvoices(dues);
+      } catch (e) {
+        if (!cancelled) {
+          setDueInvoices([]);
+          notify.error(e instanceof Error ? e.message : "Could not load past dues");
+        }
+      } finally {
+        if (!cancelled) setDuesLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId]);
 
   const invoiceTotals = useMemo(
     () =>
@@ -101,20 +143,33 @@ export function PosTerminal({
   const taxAmount = invoiceTotals.tax;
   const total = invoiceTotals.total;
   const appliedDeposit = roundMoney(Math.min(depositCredit, total));
-  const amountDue = roundMoney(Math.max(0, total - appliedDeposit));
+  /** Amount to collect for the new sale only (after advance). */
+  const saleCollect = roundMoney(Math.max(0, total - appliedDeposit));
+  const selectedDueInvoices = useMemo(
+    () => dueInvoices.filter((d) => selectedDueIds.has(d.saleId)),
+    [dueInvoices, selectedDueIds]
+  );
+  const selectedDuesTotal = roundMoney(
+    selectedDueInvoices.reduce((s, d) => s + Number(d.amountDue), 0)
+  );
+  const collectTarget = roundMoney(saleCollect + selectedDuesTotal);
+  const hasCart = cart.length > 0;
+  const duesOnly = !hasCart && selectedDuesTotal > 0.009;
   const receivedNow =
     amountReceived === ""
-      ? amountDue
+      ? collectTarget
       : roundMoney(Math.max(0, Number(amountReceived) || 0));
-  const remainingDue = roundMoney(Math.max(0, amountDue - receivedNow));
+  /** Cash/card applied to the new sale after covering selected past dues. */
+  const saleReceived = roundMoney(Math.max(0, receivedNow - selectedDuesTotal));
+  const remainingDue = roundMoney(Math.max(0, saleCollect - saleReceived));
   const tendered =
     tenderedAmount === ""
       ? receivedNow
       : roundMoney(Math.max(0, Number(tenderedAmount) || 0));
   const changeGiven = roundMoney(Math.max(0, tendered - receivedNow));
   const isWalkIn = !customerId;
-  const isPartial = remainingDue > 0.009;
-  const isUnpaid = receivedNow <= 0 && amountDue > 0;
+  const isPartial = hasCart && remainingDue > 0.009;
+  const isUnpaid = hasCart && saleReceived <= 0 && saleCollect > 0;
 
   function applyAppointment(appt: PosAppointment, loadServices = true) {
     setAppointmentId(appt.id);
@@ -243,9 +298,41 @@ export function PosTerminal({
     );
   }
 
+  function toggleDueInvoice(saleId: string) {
+    setSelectedDueIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(saleId)) next.delete(saleId);
+      else next.add(saleId);
+      return next;
+    });
+    setAmountReceived("");
+    setTenderedAmount("");
+    setConfirmPartial(false);
+    setAllowUnpaid(false);
+  }
+
+  async function reloadDues() {
+    if (!customerId) return;
+    try {
+      const dues = await getCustomerDueInvoices(customerId);
+      setDueInvoices(dues);
+      setSelectedDueIds((prev) => {
+        const valid = new Set(dues.map((d) => d.saleId));
+        return new Set([...prev].filter((id) => valid.has(id)));
+      });
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Could not reload past dues");
+    }
+  }
+
   async function runCheckout() {
-    if (depositCredit > 0 && !appointmentId) {
+    if (depositCredit > 0 && !appointmentId && hasCart) {
       return { error: "Select the appointment linked to this advance before completing sale." };
+    }
+    if (selectedDuesTotal > 0.009 && receivedNow + 0.009 < selectedDuesTotal) {
+      return {
+        error: `Pay selected past dues in full (${formatCurrency(selectedDuesTotal)}) or uncheck them.`,
+      };
     }
     if (isWalkIn && isPartial) {
       return { error: "Walk-in customers must pay the full amount." };
@@ -256,6 +343,46 @@ export function PosTerminal({
     if (isUnpaid && (!allowUnpaid || !canManage)) {
       return { error: "Creating an unpaid invoice requires a manager." };
     }
+
+    const priorDuePayments = selectedDueInvoices.map((d) => ({
+      saleId: d.saleId,
+      amount: roundMoney(Number(d.amountDue)),
+      expectedPaymentVersion: d.paymentVersion,
+    }));
+
+    if (duesOnly) {
+      if (!customerId) return { error: "Select a customer to pay past dues" };
+      const result = await receiveCustomerAccountPayment({
+        customerId,
+        amount: selectedDuesTotal,
+        method: paymentMethod,
+        notes: "Past dues paid at POS",
+        allocations: priorDuePayments.map((l) => ({
+          saleId: l.saleId,
+          amount: l.amount,
+          expectedPaymentVersion: l.expectedPaymentVersion,
+        })),
+      });
+      if (result.error) {
+        await reloadDues();
+        return result;
+      }
+      notify.success("Past dues paid.");
+      setSelectedDueIds(new Set());
+      await reloadDues();
+      router.refresh();
+      return { success: true };
+    }
+
+    if (!hasCart) {
+      return { error: "Add items to the cart, or select past dues to collect." };
+    }
+
+    const saleTendered =
+      paymentMethod === "CASH"
+        ? roundMoney(Math.max(0, tendered - selectedDuesTotal))
+        : saleReceived;
+
     const result = await completeCheckout({
       items: cart,
       customerId: customerId || null,
@@ -265,14 +392,20 @@ export function PosTerminal({
       discount: discountAmount,
       tax: taxAmount > 0 ? taxAmount : undefined,
       paymentMethod,
-      amountReceived: receivedNow,
-      tenderedAmount: tendered,
+      amountReceived: saleReceived,
+      tenderedAmount: saleTendered,
       allowUnpaid: allowUnpaid && canManage,
+      priorDuePayments: priorDuePayments.length ? priorDuePayments : undefined,
     });
     if (result.error) {
+      if (result.error.toLowerCase().includes("past")) {
+        await reloadDues();
+      }
       return result;
     }
-    notify.success("Sale completed.");
+    notify.success(
+      priorDuePayments.length ? "Sale completed · past dues paid." : "Sale completed."
+    );
     if (result.saleId) {
       await printSaleReceipt(result.saleId);
       router.push(`/sales/${result.saleId}`);
@@ -281,18 +414,23 @@ export function PosTerminal({
     return result;
   }
 
-  const checkoutLabel =
-    appliedDeposit > 0
+  const checkoutLabel = duesOnly
+    ? `Collect past dues · ${formatCurrency(selectedDuesTotal)}`
+    : appliedDeposit > 0
       ? `Complete sale · collect ${formatCurrency(receivedNow)}`
       : isPartial
         ? `Complete · due ${formatCurrency(remainingDue)}`
-        : "Complete sale";
+        : selectedDuesTotal > 0
+          ? `Complete · collect ${formatCurrency(collectTarget)}`
+          : "Complete sale";
 
-  const checkoutDescription = isPartial
-    ? `Invoice ${formatCurrency(total)}. Collecting ${formatCurrency(receivedNow)} now. Customer will have ${formatCurrency(remainingDue)} outstanding.`
-    : amountDue > 0
-      ? `Confirm this sale for ${formatCurrency(amountDue)} via ${paymentMethod}? A receipt will print after completion.`
-      : `Confirm this sale? Advance covers the full amount. A receipt will print after completion.`;
+  const checkoutDescription = duesOnly
+    ? `Collect ${formatCurrency(selectedDuesTotal)} against ${selectedDueInvoices.length} past invoice${selectedDueInvoices.length === 1 ? "" : "s"} via ${paymentMethod}? Unchecked dues stay for next time.`
+    : isPartial
+      ? `Sale ${formatCurrency(total)}${selectedDuesTotal > 0 ? ` + past dues ${formatCurrency(selectedDuesTotal)}` : ""}. Collecting ${formatCurrency(receivedNow)} now. New-sale balance due: ${formatCurrency(remainingDue)}.`
+      : collectTarget > 0
+        ? `Confirm collection of ${formatCurrency(collectTarget)} via ${paymentMethod}?${selectedDuesTotal > 0 ? ` Includes ${formatCurrency(selectedDuesTotal)} past dues.` : ""} A receipt will print after completion.`
+        : `Confirm this sale? Advance covers the full amount. A receipt will print after completion.`;
 
   const q = search.toLowerCase();
   const filteredServices = services.filter((s) => s.name.toLowerCase().includes(q));
@@ -503,7 +641,12 @@ export function PosTerminal({
         </div>
 
         {cart.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Add items to begin checkout.</p>
+          <p className="text-sm text-muted-foreground">
+            Add items to begin checkout
+            {customerId && dueInvoices.length > 0
+              ? ", or check past dues below to collect them alone."
+              : "."}
+          </p>
         ) : (
           <ul className="space-y-2">
             {cart.map((item) => (
@@ -570,6 +713,65 @@ export function PosTerminal({
             </p>
           )}
         </div>
+
+        {customerId ? (
+          <div className="space-y-2 rounded-lg border border-amber-200/80 bg-amber-50/60 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">Outstanding dues</p>
+              {duesLoading ? (
+                <span className="text-xs text-muted-foreground">Loading…</span>
+              ) : dueInvoices.length > 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  Check to collect now · leave unchecked for next visit
+                </span>
+              ) : null}
+            </div>
+            {!duesLoading && dueInvoices.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No unpaid invoices for this customer.</p>
+            ) : null}
+            {dueInvoices.length > 0 ? (
+              <ul className="max-h-40 space-y-1.5 overflow-y-auto">
+                {dueInvoices.map((d) => {
+                  const checked = selectedDueIds.has(d.saleId);
+                  const label = d.invoiceNumber ?? d.saleId.slice(0, 8);
+                  return (
+                    <label
+                      key={d.saleId}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm",
+                        checked
+                          ? "border-amber-400/70 bg-background"
+                          : "border-transparent bg-background/60 hover:bg-background"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleDueInvoice(d.saleId)}
+                        className="size-4 rounded border-input accent-primary"
+                      />
+                      <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+                      {d.completedAt ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {formatDate(d.completedAt)}
+                        </span>
+                      ) : null}
+                      <span className="shrink-0 tabular-nums font-semibold">
+                        {formatCurrency(d.amountDue)}
+                      </span>
+                    </label>
+                  );
+                })}
+              </ul>
+            ) : null}
+            {selectedDuesTotal > 0.009 ? (
+              <div className="flex justify-between border-t border-amber-200/60 pt-2 text-sm font-medium">
+                <span>Past dues selected</span>
+                <span>{formatCurrency(selectedDuesTotal)}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
@@ -660,50 +862,65 @@ export function PosTerminal({
               <span>-{formatCurrency(appliedDeposit)}</span>
             </div>
           )}
+          {hasCart ? (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">This sale</span>
+              <span>{formatCurrency(saleCollect)}</span>
+            </div>
+          ) : null}
+          {selectedDuesTotal > 0.009 ? (
+            <div className="flex justify-between text-amber-800 dark:text-amber-300">
+              <span>Past dues selected</span>
+              <span>+{formatCurrency(selectedDuesTotal)}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between border-t border-border pt-2 font-semibold text-base">
-            <span>{appliedDeposit > 0 ? "Collect now" : "Total"}</span>
-            <span>{formatCurrency(amountDue)}</span>
+            <span>Collect now</span>
+            <span>{formatCurrency(collectTarget)}</span>
           </div>
-          {appliedDeposit > 0 && amountDue === 0 && (
+          {appliedDeposit > 0 && saleCollect === 0 && selectedDuesTotal <= 0 && (
             <p className="text-xs text-green-600">Fully covered by advance — no payment needed today.</p>
           )}
         </div>
 
-        {amountDue > 0 ? (
+        {collectTarget > 0 ? (
           <div className="space-y-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-3">
             <p className="text-sm font-semibold">Payment now</p>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 size="sm"
-                variant={!isPartial ? "default" : "outline"}
+                variant={
+                  Math.abs(receivedNow - collectTarget) < 0.01 && !isPartial ? "default" : "outline"
+                }
                 onClick={() => {
-                  setAmountReceived(String(amountDue));
-                  setTenderedAmount(String(amountDue));
+                  setAmountReceived(String(collectTarget));
+                  setTenderedAmount(String(collectTarget));
                   setConfirmPartial(false);
                   setAllowUnpaid(false);
                 }}
               >
-                Pay full ({formatCurrency(amountDue)})
+                Pay full ({formatCurrency(collectTarget)})
               </Button>
-              {!isWalkIn ? (
+              {hasCart && !isWalkIn ? (
                 <Button
                   type="button"
                   size="sm"
                   variant={isPartial ? "default" : "outline"}
                   onClick={() => {
-                    const half = Math.round((amountDue / 2) * 100) / 100;
-                    setAmountReceived(String(half));
-                    setTenderedAmount(String(half));
+                    const halfSale = Math.round((saleCollect / 2) * 100) / 100;
+                    const partialTotal = roundMoney(halfSale + selectedDuesTotal);
+                    setAmountReceived(String(partialTotal));
+                    setTenderedAmount(String(partialTotal));
                   }}
                 >
-                  Partial payment
+                  Partial on sale
                 </Button>
-              ) : (
+              ) : hasCart && isWalkIn ? (
                 <p className="text-xs text-muted-foreground self-center">
                   Walk-in must pay full amount
                 </p>
-              )}
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="amount-received">Amount customer is paying now (Rs)</Label>
@@ -712,12 +929,18 @@ export function PosTerminal({
                 type="number"
                 min={0}
                 step={1}
-                value={amountReceived === "" ? amountDue : amountReceived}
+                value={amountReceived === "" ? collectTarget : amountReceived}
                 onChange={(e) => {
                   setAmountReceived(e.target.value);
                   setTenderedAmount(e.target.value);
                 }}
               />
+              {selectedDuesTotal > 0.009 ? (
+                <p className="text-xs text-muted-foreground">
+                  Includes {formatCurrency(selectedDuesTotal)} past dues (must be paid in full).
+                  Toward this sale: {formatCurrency(saleReceived)}.
+                </p>
+              ) : null}
             </div>
             {paymentMethod === "CASH" ? (
               <div className="space-y-1">
@@ -737,12 +960,20 @@ export function PosTerminal({
                 ) : null}
               </div>
             ) : null}
-            <div className="flex justify-between rounded-md bg-background px-2 py-1.5 text-sm">
-              <span className="text-muted-foreground">Remaining due (customer owes)</span>
-              <span className={remainingDue > 0 ? "font-semibold text-amber-700 dark:text-amber-400" : "font-semibold"}>
-                {formatCurrency(remainingDue)}
-              </span>
-            </div>
+            {hasCart ? (
+              <div className="flex justify-between rounded-md bg-background px-2 py-1.5 text-sm">
+                <span className="text-muted-foreground">Remaining due (this sale)</span>
+                <span
+                  className={
+                    remainingDue > 0
+                      ? "font-semibold text-amber-700 dark:text-amber-400"
+                      : "font-semibold"
+                  }
+                >
+                  {formatCurrency(remainingDue)}
+                </span>
+              </div>
+            ) : null}
             {isPartial && !isWalkIn ? (
               <label className="flex items-start gap-2 text-sm">
                 <input
@@ -776,21 +1007,25 @@ export function PosTerminal({
             ) : null}
             {isWalkIn && isPartial ? (
               <p className="text-xs text-destructive">
-                Walk-in must pay in full. Keep Majid Ali (or another customer) selected to leave a due.
+                Walk-in must pay in full. Select a customer to leave a due balance.
               </p>
             ) : null}
           </div>
         ) : null}
 
         <ConfirmAction
-          title="Complete this sale?"
+          title={duesOnly ? "Collect past dues?" : "Complete this sale?"}
           description={checkoutDescription}
           confirmLabel={checkoutLabel}
           pendingLabel="Processing…"
           variant="default"
           size="default"
           className="w-full"
-          disabled={cart.length === 0 || (isPartial && !isWalkIn && !confirmPartial)}
+          disabled={
+            (!hasCart && !duesOnly) ||
+            (isPartial && !isWalkIn && !confirmPartial) ||
+            (isUnpaid && (!allowUnpaid || !canManage))
+          }
           onConfirm={runCheckout}
           successMessage=""
         >

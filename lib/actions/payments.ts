@@ -259,6 +259,93 @@ export async function getCustomerDueInvoices(customerId: string) {
   });
 }
 
+export type PriorDuePaymentInput = {
+  saleId: string;
+  amount: number;
+  expectedPaymentVersion: number;
+};
+
+/** Validate past-due lines before creating a new POS sale (no writes). */
+export async function validatePriorDuePayments(
+  customerId: string,
+  lines: PriorDuePaymentInput[]
+): Promise<ActionResult> {
+  if (!lines.length) return { success: true };
+  if (!customerId) return { error: "Select a customer to pay past dues" };
+
+  const org = await requireMinimumRole("CASHIER");
+  const supabase = await createClient();
+  const saleIds = [...new Set(lines.map((l) => l.saleId))];
+
+  const { data: sales, error } = await supabase
+    .from("sales")
+    .select("id, customer_id, amount_due, payment_version, status, deleted_at")
+    .eq("organization_id", org.organizationId)
+    .in("id", saleIds);
+
+  if (error) return { error: error.message };
+
+  const byId = new Map((sales ?? []).map((s) => [s.id, s]));
+
+  for (const line of lines) {
+    const amount = roundMoney(line.amount);
+    if (!(amount > 0)) return { error: "Past due payment amount must be greater than zero" };
+
+    const sale = byId.get(line.saleId);
+    if (!sale || sale.deleted_at) return { error: "A selected past invoice was not found" };
+    if (sale.customer_id !== customerId) {
+      return { error: "A selected past invoice does not belong to this customer" };
+    }
+    if (sale.status !== "COMPLETED" && sale.status !== "AMENDED") {
+      return { error: "A selected past invoice cannot accept payment" };
+    }
+
+    const due = roundMoney(Number(sale.amount_due));
+    if (Math.abs(amount - due) > 0.009) {
+      return {
+        error: `Past due for an invoice changed (expected ${due}). Uncheck and reload, then try again.`,
+      };
+    }
+    if (Number(sale.payment_version ?? 1) !== line.expectedPaymentVersion) {
+      return {
+        error: "A past invoice was updated elsewhere. Reload dues and try again.",
+      };
+    }
+  }
+
+  return { success: true };
+}
+
+/** Apply full settlements for POS-selected past invoices. */
+export async function applyPriorDuePayments(input: {
+  customerId: string;
+  method: PaymentMethod;
+  lines: PriorDuePaymentInput[];
+}): Promise<ActionResult> {
+  if (!input.lines.length) return { success: true };
+
+  const check = await validatePriorDuePayments(input.customerId, input.lines);
+  if (check.error) return check;
+
+  for (const line of input.lines) {
+    const result = await receiveSalePayment({
+      saleId: line.saleId,
+      amount: roundMoney(line.amount),
+      method: input.method,
+      expectedPaymentVersion: line.expectedPaymentVersion,
+      notes: "Past due paid at POS",
+      reference: "POS_PRIOR_DUE",
+    });
+    if (result.error) {
+      return {
+        error: `New sale saved, but past due payment failed: ${result.error}. Collect remaining dues from Sales or customer account.`,
+      };
+    }
+  }
+
+  return { success: true };
+}
+
 export async function getCustomerFinancialSummary(customerId: string) {
   const org = await requireOrganization();
   const supabase = await createClient();

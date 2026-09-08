@@ -27,6 +27,12 @@ export type CheckoutPaymentLine = {
   method: PaymentMethod;
 };
 
+export type PriorDuePaymentLine = {
+  saleId: string;
+  amount: number;
+  expectedPaymentVersion: number;
+};
+
 export type CheckoutPayload = {
   items: CartItem[];
   customerId?: string | null;
@@ -40,7 +46,7 @@ export type CheckoutPayload = {
   tax?: number;
   /** Primary method when using single amountReceived */
   paymentMethod: PaymentMethod;
-  /** Amount collected now (partial allowed for named customers). Defaults to full due. */
+  /** Amount collected now toward THIS sale only (partial allowed for named customers). */
   amountReceived?: number;
   /** Split tender lines; if set, overrides amountReceived */
   payments?: CheckoutPaymentLine[];
@@ -49,4 +55,10 @@ export type CheckoutPayload = {
   /** Explicit unpaid/credit sale — requires manager */
   allowUnpaid?: boolean;
   notes?: string;
+  /**
+   * Optional past invoices to settle fully in the same POS visit.
+   * Amount for each line must equal that invoice's current amount_due.
+   * Validated before the new sale is created; applied after it succeeds.
+   */
+  priorDuePayments?: PriorDuePaymentLine[];
 };
