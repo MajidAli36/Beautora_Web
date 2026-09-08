@@ -25,7 +25,7 @@ export default async function PosPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeader
         title="Point of Sale"
-        description="Add items to cart and complete checkout. Select an appointment to apply advance credit."
+        description="Today’s appointments only. Add items, apply advances, and checkout."
       />
         <OpenDrawerButton hasDrawer={hasDrawer} source="pos" />
       </div>

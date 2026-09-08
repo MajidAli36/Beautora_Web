@@ -6,16 +6,16 @@ import { AppointmentOrderSummary } from "@/components/features/appointments/appo
 import { createAppointment } from "@/lib/actions/appointments";
 import { useActionToast } from "@/hooks/use-action-toast";
 import { SlotPicker } from "@/components/features/booking/slot-picker";
+import { CustomerPicker } from "@/components/features/customers/customer-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatCustomerName } from "@/lib/format";
 import { getLocalDateString } from "@/lib/dates/local";
 import type { ActionResult } from "@/types/commerce";
 
 type Props = {
-  customers: { id: string; first_name: string; last_name: string | null }[];
+  customers: { id: string; first_name: string; last_name: string | null; phone?: string | null }[];
   staff: { id: string; full_name: string }[];
   services: { id: string; name: string; price: number; duration_minutes: number }[];
 };
@@ -26,6 +26,8 @@ export function AppointmentForm({ customers, staff, services }: Props) {
   const [date, setDate] = useState(getLocalDateString);
   const [staffId, setStaffId] = useState("none");
   const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [customerMode, setCustomerMode] = useState<"existing" | "new">("existing");
+  const [customerId, setCustomerId] = useState("");
 
   function toggleService(id: string) {
     setServiceIds((prev) =>
@@ -37,21 +39,65 @@ export function AppointmentForm({ customers, staff, services }: Props) {
 
   return (
     <form action={formAction} className="grid gap-4 sm:grid-cols-2">
-      <div className="space-y-2">
-        <Label htmlFor="customer_id">Customer *</Label>
-        <select
-          id="customer_id"
-          name="customer_id"
-          required
-          className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-        >
-          <option value="">Select…</option>
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>
-              {formatCustomerName(c.first_name, c.last_name)}
-            </option>
-          ))}
-        </select>
+      <div className="space-y-3 sm:col-span-2">
+        <Label>Customer *</Label>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={customerMode === "existing" ? "default" : "outline"}
+            onClick={() => setCustomerMode("existing")}
+          >
+            Existing customer
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={customerMode === "new" ? "default" : "outline"}
+            onClick={() => {
+              setCustomerMode("new");
+              setCustomerId("");
+            }}
+          >
+            New customer
+          </Button>
+        </div>
+        {customerMode === "existing" ? (
+          <div className="space-y-2">
+            <CustomerPicker
+              customers={customers.map((c) => ({
+                id: c.id,
+                first_name: c.first_name,
+                last_name: c.last_name,
+                phone: c.phone ?? null,
+              }))}
+              value={customerId}
+              onValueChange={setCustomerId}
+              name="customer_id"
+              required
+              placeholder="Search name or phone…"
+            />
+          </div>
+        ) : (
+          <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-3">
+            <p className="sm:col-span-3 text-xs text-muted-foreground">
+              If this person is not in your customer list yet, we create their profile automatically
+              (matched by phone when provided).
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="first_name">First name *</Label>
+              <Input id="first_name" name="first_name" required placeholder="First name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="last_name">Last name</Label>
+              <Input id="last_name" name="last_name" placeholder="Optional" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input id="phone" name="phone" type="tel" placeholder="For matching / WhatsApp" />
+            </div>
+          </div>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="staff_id">Staff</Label>

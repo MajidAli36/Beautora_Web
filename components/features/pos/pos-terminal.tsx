@@ -17,12 +17,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatCustomerName, formatDate, formatTime } from "@/lib/format";
-import { getLocalDateString } from "@/lib/dates/local";
 import { calculateInvoiceTotals, roundMoney } from "@/lib/sales/calculate";
 import type { CartItem, PaymentMethod } from "@/types/commerce";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { CustomerPicker } from "@/components/features/customers/customer-picker";
+import { AppointmentPicker } from "@/components/features/pos/appointment-picker";
 
 type CatalogService = { id: string; name: string; price: number; duration_minutes: number };
 type CatalogProduct = { id: string; name: string; retail_price: number; stock_quantity: number };
@@ -41,15 +41,6 @@ type PosTerminalProps = {
   appointments: PosAppointment[];
   canManage?: boolean;
 };
-
-function formatApptLabel(a: PosAppointment) {
-  const date = new Date(a.scheduledAt);
-  const isToday = getLocalDateString(date) === getLocalDateString();
-  const time = formatTime(date);
-  const day = isToday ? time : `${formatDate(date)} ${time}`;
-  const advance = a.depositBalance > 0 ? ` · ${formatCurrency(a.depositBalance)} advance` : "";
-  return `${day} — ${a.customerName}${advance}`;
-}
 
 export function PosTerminal({
   services,
@@ -547,30 +538,25 @@ export function PosTerminal({
           <div>
             <p className="text-sm font-medium">Appointment &amp; advance</p>
             <p className="text-xs text-muted-foreground">
-              Link an appointment to load services and apply any advance paid at booking.
+              Today&apos;s open appointments only. Search by name or time, then link to apply any
+              advance.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="appointment">Select appointment</Label>
-            <select
+            <Label htmlFor="appointment">Select appointment (today)</Label>
+            <AppointmentPicker
               id="appointment"
+              appointments={customerId ? customerAppointments : appointments}
               value={appointmentId}
-              onChange={(e) => loadAppointment(e.target.value)}
-              className="flex h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-            >
-              <option value="">None — walk-in sale</option>
-              {(customerId ? customerAppointments : appointments).map((a) => (
-                <option key={a.id} value={a.id}>
-                  {formatApptLabel(a)}
-                </option>
-              ))}
-            </select>
+              onValueChange={(id) => loadAppointment(id)}
+              placeholder="Search today’s appointments…"
+            />
           </div>
 
           {appointmentsWithAdvance.length > 0 && !appointmentId && (
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Quick pick — has advance</p>
+              <p className="text-xs font-medium text-muted-foreground">Quick pick — has advance today</p>
               {appointmentsWithAdvance.slice(0, 4).map((a) => (
                 <button
                   key={a.id}
@@ -578,7 +564,9 @@ export function PosTerminal({
                   onClick={() => applyAppointment(a)}
                   className="flex w-full items-center justify-between rounded-md border border-primary/20 bg-background px-2.5 py-2 text-left text-xs hover:bg-primary/10"
                 >
-                  <span className="truncate pr-2">{a.customerName}</span>
+                  <span className="truncate pr-2">
+                    {formatTime(a.scheduledAt)} — {a.customerName}
+                  </span>
                   <Badge variant="secondary" className="shrink-0 text-primary">
                     {formatCurrency(a.depositBalance)}
                   </Badge>
@@ -600,7 +588,7 @@ export function PosTerminal({
 
           {appointments.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              No open appointments. Book one with an advance on the Appointments page first.
+              No open appointments for today. Book one on the Appointments page first.
             </p>
           )}
         </div>

@@ -13,7 +13,7 @@ import { validateAppointmentSlot } from "@/lib/actions/scheduling";
 import { assertCanAddDeposit, syncAppointmentAfterDepositChange } from "@/lib/actions/deposits";
 import { sumServiceDuration } from "@/lib/booking/availability";
 import { getDayRange } from "@/lib/booking/dates";
-import { addLocalDays, endOfLocalDay, getLocalDateString, startOfLocalDay } from "@/lib/dates/local";
+import { endOfLocalDay, getLocalDateString, startOfLocalDay } from "@/lib/dates/local";
 import { calculateRequiredAdvance, sumServicePrices } from "@/lib/booking/pricing";
 import {
   bookingNumberFromId,
@@ -29,14 +29,57 @@ export async function createAppointment(
   const org = await requireMinimumRole("RECEPTIONIST");
   const serviceIds = formData.getAll("service_ids") as string[];
   const scheduledAt = (formData.get("slot_iso") as string) || (formData.get("scheduled_at") as string);
-  const customerId = formData.get("customer_id") as string;
+  let customerId = ((formData.get("customer_id") as string) || "").trim();
   const staffId =
     (formData.get("slot_staff_id") as string) ||
     ((formData.get("staff_id") as string) !== "none" ? (formData.get("staff_id") as string) : null);
 
-  if (!customerId || !scheduledAt) return { error: "Customer and time slot required" };
+  const firstName = ((formData.get("first_name") as string) || "").trim();
+  const lastName = ((formData.get("last_name") as string) || "").trim();
+  const phone = ((formData.get("phone") as string) || "").trim();
+
+  if (!scheduledAt) return { error: "Time slot required" };
 
   const supabase = await createClient();
+
+  // Existing customer, or find-or-create from name/phone when booking a new person
+  if (!customerId) {
+    if (!firstName) {
+      return { error: "Select a customer, or enter a name to create one" };
+    }
+
+    if (phone) {
+      const { data: existingByPhone } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("organization_id", org.organizationId)
+        .eq("phone", phone)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (existingByPhone) {
+        customerId = existingByPhone.id;
+      }
+    }
+
+    if (!customerId) {
+      const { data: created, error: custErr } = await supabase
+        .from("customers")
+        .insert({
+          organization_id: org.organizationId,
+          first_name: firstName,
+          last_name: lastName || null,
+          phone: phone || null,
+        })
+        .select("id")
+        .single();
+      if (custErr || !created) {
+        return { error: custErr?.message ?? "Failed to create customer" };
+      }
+      customerId = created.id;
+      revalidatePath("/customers");
+      revalidatePath(`/customers/${customerId}`);
+    }
+  }
 
   let durationMinutes = Number(formData.get("duration_minutes") ?? 30);
   if (serviceIds.length > 0) {
@@ -130,6 +173,8 @@ export async function createAppointment(
   revalidatePath("/appointments");
   revalidatePath("/appointments/new");
   revalidatePath("/finances");
+  revalidatePath("/pos");
+  revalidatePath("/customers");
   redirect("/appointments");
 }
 
@@ -280,7 +325,6 @@ export async function getAppointmentsForPos(): Promise<PosAppointment[]> {
   const org = await requireMinimumRole("CASHIER");
   const supabase = await createClient();
   const today = getLocalDateString();
-  const since = addLocalDays(today, -30);
   const dayStart = startOfLocalDay(today).toISOString();
   const dayEnd = endOfLocalDay(today).toISOString();
 
@@ -316,35 +360,7 @@ export async function getAppointmentsForPos(): Promise<PosAppointment[]> {
     depositMap[d.appointment_id] = (depositMap[d.appointment_id] ?? 0) + Number(d.amount);
   }
 
-  const appointmentIdsWithDeposit = Object.keys(depositMap);
-  let depositAppointmentRows: typeof todayRows = [];
-
-  if (appointmentIdsWithDeposit.length > 0) {
-    const { data } = await supabase
-      .from("appointments")
-      .select(`
-        id,
-        customer_id,
-        staff_id,
-        scheduled_at,
-        status,
-        customer:customers(first_name, last_name),
-        staff:staff(full_name),
-        services:appointment_services(service_id, service_name, price)
-      `)
-      .eq("organization_id", org.organizationId)
-      .in("id", appointmentIdsWithDeposit)
-      .gte("scheduled_at", startOfLocalDay(since).toISOString())
-      .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
-      .order("scheduled_at", { ascending: false });
-    depositAppointmentRows = data ?? [];
-  }
-
-  const merged = new Map<string, NonNullable<typeof todayRows>[number]>();
-  for (const row of todayRows ?? []) merged.set(row.id, row);
-  for (const row of depositAppointmentRows) merged.set(row.id, row);
-
-  return Array.from(merged.values())
+  return (todayRows ?? [])
     .map((row) => {
       const customer = row.customer as unknown as {
         first_name: string;
@@ -384,6 +400,9 @@ export async function getCustomerAdvanceAppointments(
 ): Promise<PosAppointment[]> {
   const org = await requireMinimumRole("CASHIER");
   const supabase = await createClient();
+  const today = getLocalDateString();
+  const dayStart = startOfLocalDay(today).toISOString();
+  const dayEnd = endOfLocalDay(today).toISOString();
 
   const { data: deposits } = await supabase
     .from("appointment_deposits")
@@ -415,6 +434,9 @@ export async function getCustomerAdvanceAppointments(
     .eq("organization_id", org.organizationId)
     .eq("customer_id", customerId)
     .in("id", ids)
+    .gte("scheduled_at", dayStart)
+    .lte("scheduled_at", dayEnd)
+    .is("deleted_at", null)
     .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
     .order("scheduled_at", { ascending: false });
 
