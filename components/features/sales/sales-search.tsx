@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const PAYMENT_STATUS_OPTIONS = [
   { value: "", label: "All payment statuses" },
@@ -15,37 +16,59 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: "REFUNDED", label: "Refunded" },
 ] as const;
 
+const SEARCH_DEBOUNCE_MS = 350;
+
 export function SalesSearch() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const [value, setValue] = useState(searchParams.get("q") ?? "");
-  const [paymentStatus, setPaymentStatus] = useState(searchParams.get("payment") ?? "");
+  const urlQ = searchParams.get("q") ?? "";
+  const urlPayment = searchParams.get("payment") ?? "";
+  const [value, setValue] = useState(urlQ);
+  const [paymentStatus, setPaymentStatus] = useState(urlPayment);
+  const [focused, setFocused] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const paymentRef = useRef(paymentStatus);
+  paymentRef.current = paymentStatus;
 
   useEffect(() => {
-    setValue(searchParams.get("q") ?? "");
-    setPaymentStatus(searchParams.get("payment") ?? "");
-  }, [searchParams]);
+    if (!focused) setValue(urlQ);
+  }, [urlQ, focused]);
 
-  const replaceParams = useCallback(
-    (patch: { q?: string; payment?: string }) => {
-      const params = new URLSearchParams(searchParams.toString());
-      const nextQ = patch.q !== undefined ? patch.q : params.get("q") ?? "";
-      const nextPayment =
-        patch.payment !== undefined ? patch.payment : params.get("payment") ?? "";
+  useEffect(() => {
+    setPaymentStatus(urlPayment);
+  }, [urlPayment]);
 
-      if (nextQ.trim()) params.set("q", nextQ.trim());
-      else params.delete("q");
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
-      if (nextPayment) params.set("payment", nextPayment);
-      else params.delete("payment");
+  function commitUrl(nextQ: string, nextPayment: string) {
+    const params = new URLSearchParams();
+    if (nextQ.trim()) params.set("q", nextQ.trim());
+    if (nextPayment) params.set("payment", nextPayment);
+    const qs = params.toString();
+    if (qs === searchParams.toString()) return;
+    startTransition(() => {
+      router.replace(qs ? `/sales?${qs}` : "/sales");
+    });
+  }
 
-      startTransition(() => {
-        router.replace(`/sales?${params.toString()}`);
-      });
-    },
-    [router, searchParams]
-  );
+  function onSearchChange(next: string) {
+    setValue(next);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      commitUrl(next, paymentRef.current);
+    }, SEARCH_DEBOUNCE_MS);
+  }
+
+  function onPaymentChange(next: string) {
+    setPaymentStatus(next);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    commitUrl(value, next);
+  }
 
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -57,13 +80,18 @@ export function SalesSearch() {
         <Input
           id="sales-search"
           placeholder="Search invoice, customer, phone…"
-          className="pl-9"
+          className={cn("pl-9", isPending && "opacity-80")}
           value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            replaceParams({ q: e.target.value });
+          onChange={(e) => onSearchChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            if (debounceRef.current) {
+              clearTimeout(debounceRef.current);
+              debounceRef.current = null;
+            }
+            commitUrl(value, paymentRef.current);
           }}
-          disabled={isPending}
         />
       </div>
       <div className="w-full space-y-1 sm:w-52">
@@ -74,11 +102,7 @@ export function SalesSearch() {
           id="sales-payment-status"
           className="flex h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
           value={paymentStatus}
-          disabled={isPending}
-          onChange={(e) => {
-            setPaymentStatus(e.target.value);
-            replaceParams({ payment: e.target.value });
-          }}
+          onChange={(e) => onPaymentChange(e.target.value)}
         >
           {PAYMENT_STATUS_OPTIONS.map((opt) => (
             <option key={opt.value || "all"} value={opt.value}>
