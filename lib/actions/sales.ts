@@ -8,7 +8,7 @@ import { queueOpenCashDrawer } from "@/lib/devices/cash-drawer";
 import { requireMinimumRole } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
-import type { ActionResult, CheckoutPayload, SaleStatus } from "@/types/commerce";
+import type { ActionResult, CheckoutPayload, SalePaymentStatus, SaleStatus } from "@/types/commerce";
 import type { Sale } from "@/types";
 import { hasMinimumRole } from "@/lib/permissions/roles";
 import { calculateInvoiceTotals, roundMoney } from "@/lib/sales/calculate";
@@ -723,7 +723,9 @@ export async function voidSale(
 }
 
 export async function getSales(
-  statusOrOptions?: SaleStatus | { status?: SaleStatus; search?: string }
+  statusOrOptions?:
+    | SaleStatus
+    | { status?: SaleStatus; search?: string; paymentStatus?: SalePaymentStatus }
 ) {
   const org = await requireOrganization();
   const supabase = await createClient();
@@ -731,7 +733,7 @@ export async function getSales(
     typeof statusOrOptions === "string"
       ? { status: statusOrOptions }
       : statusOrOptions ?? {};
-  const { status, search } = options;
+  const { status, search, paymentStatus } = options;
 
   let saleIds: string[] | null = null;
 
@@ -803,6 +805,7 @@ export async function getSales(
     .order("created_at", { ascending: false });
 
   if (status) query = query.eq("status", status);
+  if (paymentStatus) query = query.eq("payment_status", paymentStatus);
   if (saleIds) query = query.in("id", saleIds);
 
   const { data, error } = await query;

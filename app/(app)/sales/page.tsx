@@ -7,17 +7,31 @@ import { SalesTableCard } from "@/components/features/sales/sales-table";
 import { SalesSearch } from "@/components/features/sales/sales-search";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { SalePaymentStatus } from "@/types/commerce";
+
+const PAYMENT_STATUSES = new Set<SalePaymentStatus>([
+  "PAID",
+  "PARTIALLY_PAID",
+  "UNPAID",
+  "PARTIALLY_REFUNDED",
+  "REFUNDED",
+]);
 
 type SalesPageProps = {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; payment?: string }>;
 };
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
   const params = await searchParams;
   const q = params.q?.trim() || undefined;
+  const paymentRaw = params.payment?.trim().toUpperCase();
+  const paymentStatus =
+    paymentRaw && PAYMENT_STATUSES.has(paymentRaw as SalePaymentStatus)
+      ? (paymentRaw as SalePaymentStatus)
+      : undefined;
 
   const [sales, canManage, canPos] = await Promise.all([
-    getSales({ search: q }),
+    getSales({ search: q, paymentStatus }),
     canManageRecords(),
     canUsePos(),
   ]);
@@ -53,13 +67,18 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     };
   });
 
+  const filterBits = [
+    q ? `“${q}”` : null,
+    paymentStatus ? paymentStatus.replaceAll("_", " ").toLowerCase() : null,
+  ].filter(Boolean);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeader
-        title="Sales"
-        description="View invoices, collect dues, amend, refund, or soft-delete. Deleted invoices stay listed as Disabled and are excluded from revenue and staff reports."
-      />
+          title="Sales"
+          description="View invoices, collect dues, amend, refund, or soft-delete. Deleted invoices stay listed as Disabled and are excluded from revenue and staff reports."
+        />
         <Button render={<Link href="/pos" />}>New sale</Button>
       </div>
 
@@ -72,8 +91,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         canManage={canManage}
         canReceivePayment={canPos || canManage}
         emptyLabel={
-          q
-            ? `No sales match “${q}”. Try invoice number, customer name, or phone.`
+          filterBits.length
+            ? `No sales match ${filterBits.join(" · ")}. Try another search or payment status.`
             : undefined
         }
       />
