@@ -1,6 +1,50 @@
-import { getActiveOrganization, requireOrganization } from "@/lib/auth/organization";
+import { cache } from "react";
+import {
+  getActiveOrganization,
+  requireOrganization,
+} from "@/lib/auth/organization";
+import {
+  canPerformAction,
+  getFeatureCapability,
+  type ActionKey,
+  type ActionPermissionsConfig,
+} from "@/lib/permissions/actions";
+import {
+  getEffectiveNavPermissions,
+  type NavKey,
+  type NavPermissionsConfig,
+} from "@/lib/permissions/nav";
 import { hasMinimumRole } from "@/lib/permissions/roles";
+import { createClient } from "@/lib/supabase/server";
 import type { MemberRole } from "@/types";
+
+async function loadOrgPermissionRows(organizationId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("organizations")
+    .select("nav_permissions, action_permissions")
+    .eq("id", organizationId)
+    .single();
+
+  return {
+    nav: (data?.nav_permissions as NavPermissionsConfig) ?? {},
+    actions: (data?.action_permissions as ActionPermissionsConfig) ?? {},
+  };
+}
+
+/** Cached once per request — used by nav + action checks. */
+export const getOrgPermissionConfig = cache(async () => {
+  const org = await getActiveOrganization();
+  if (!org) {
+    return {
+      org: null as null,
+      nav: {} as NavPermissionsConfig,
+      actions: {} as ActionPermissionsConfig,
+    };
+  }
+  const rows = await loadOrgPermissionRows(org.organizationId);
+  return { org, ...rows };
+});
 
 export async function requireMinimumRole(requiredRole: MemberRole) {
   const org = await requireOrganization();
@@ -10,76 +54,93 @@ export async function requireMinimumRole(requiredRole: MemberRole) {
   return org;
 }
 
-/** Catalog / staff / chairs / devices / settings mutations */
+/** Enforce a granular action (feature must also be visible). */
+export async function requireAction(action: ActionKey) {
+  const org = await requireOrganization();
+  const { nav, actions } = await getOrgPermissionConfig();
+  if (!canPerformAction(org.role, action, actions, nav)) {
+    throw new Error("Insufficient permissions");
+  }
+  return org;
+}
+
+export async function checkAction(action: ActionKey): Promise<boolean> {
+  const { org, nav, actions } = await getOrgPermissionConfig();
+  if (!org) return false;
+  return canPerformAction(org.role, action, actions, nav);
+}
+
+export async function getCapabilities(feature: NavKey) {
+  const { org, nav, actions } = await getOrgPermissionConfig();
+  if (!org) {
+    return getFeatureCapability("STAFF", feature, {}, {});
+  }
+  return getFeatureCapability(org.role, feature, nav, actions);
+}
+
+/** Catalog / staff / chairs / devices / settings mutations (legacy aggregate). */
 export async function canManageRecords() {
-  const org = await getActiveOrganization();
+  const { org, nav, actions } = await getOrgPermissionConfig();
   if (!org) return false;
-  return hasMinimumRole(org.role, "MANAGER");
+  if (org.role === "OWNER") return true;
+  const features: NavKey[] = [
+    "products",
+    "services",
+    "chairs",
+    "staff",
+    "devices",
+    "settings",
+  ];
+  return features.some((feature) => {
+    const caps = getFeatureCapability(org.role, feature, nav, actions);
+    return caps.canManage;
+  });
 }
 
-/** Create / update customer profiles (front desk + cashier) */
 export async function canManageCustomers() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "RECEPTIONIST");
+  return checkAction("customers.edit");
 }
 
-/** Soft-delete customers */
 export async function canDeleteCustomers() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "MANAGER");
+  return checkAction("customers.delete");
 }
 
 export async function canUsePos() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "CASHIER");
+  return checkAction("pos.sell");
 }
 
 export async function canViewReports() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "MANAGER");
+  return checkAction("reports.view");
 }
 
 export async function canUseWhatsApp() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "RECEPTIONIST");
+  return checkAction("whatsapp.send");
 }
 
-/** Collect customer feedback ratings */
 export async function canUseFeedback() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "RECEPTIONIST");
+  return checkAction("feedback.collect");
 }
 
-/** Issue tokens and update queue status */
 export async function canOperateQueue() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "RECEPTIONIST");
+  return checkAction("queue.operate");
 }
 
-/** Approve / reject online booking payment proofs */
 export async function canApproveDeposits() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "RECEPTIONIST");
+  return checkAction("online_booking.approve");
 }
 
-/** Booking advance settings, staff online toggles, schedules */
 export async function canConfigureOnlineBooking() {
-  const org = await getActiveOrganization();
-  if (!org) return false;
-  return hasMinimumRole(org.role, "MANAGER");
+  return checkAction("online_booking.configure");
 }
 
-/** Open cash drawer from queue / POS */
 export async function canOpenCashDrawer() {
-  const org = await getActiveOrganization();
+  const openQueue = await checkAction("queue.open_drawer");
+  const openPos = await checkAction("pos.open_drawer");
+  return openQueue || openPos;
+}
+
+export async function canAccessFeature(feature: NavKey) {
+  const { org, nav } = await getOrgPermissionConfig();
   if (!org) return false;
-  return hasMinimumRole(org.role, "RECEPTIONIST");
+  return getEffectiveNavPermissions(org.role, nav)[feature];
 }

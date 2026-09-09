@@ -1,6 +1,6 @@
--- Wipe ALL public business data. KEEP: auth.users (and auth identities).
--- Removes organizations, partners, memberships, and all salon operational data.
--- After this, existing logins can re-onboard into empty stores (no dummy seed).
+-- Full reset for clean live testing.
+-- KEEP only: platform admin auth user (admin@syncops.tech)
+-- REMOVE: all public business data + every other auth user (salon owners, partners, staff logins)
 
 do $$
 declare
@@ -45,6 +45,7 @@ declare
     'subscription_payments',
     'organization_payment_accounts',
     'organization_members',
+    'team_invitations',
     'organizations',
     'partners'
   ];
@@ -57,21 +58,18 @@ begin
   end loop;
 end $$;
 
--- Clear salon/partner onboarding flags so logins can create a fresh empty store.
+-- Delete every auth user except the SyncOps platform admin.
+-- Cascades clear identities / sessions / refresh tokens for those users.
+delete from auth.users
+where lower(coalesce(email, '')) <> lower('admin@syncops.tech');
+
+-- Ensure remaining platform admin metadata stays correct for /platform login.
 update auth.users
-set raw_user_meta_data = (
-  (
-    (
-      (
-        (
-          coalesce(raw_user_meta_data, '{}'::jsonb)
-          - 'onboarding_completed'
-        )
-        - 'account_type'
-      )
-      - 'partner_username'
+set
+  email_confirmed_at = coalesce(email_confirmed_at, now()),
+  raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb)
+    || jsonb_build_object(
+      'account_type', 'platform_admin',
+      'full_name', 'Beautora Platform Admin'
     )
-    - 'partner_status'
-  )
-  - 'salon_name'
-);
+where lower(email) = lower('admin@syncops.tech');

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit/log";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import { roundMoney } from "@/lib/sales/calculate";
@@ -37,7 +37,7 @@ export async function receiveSalePayment(input: {
   reference?: string | null;
   notes?: string | null;
 }): Promise<ActionResult & { changeGiven?: number; amountDue?: number }> {
-  const org = await requireMinimumRole("CASHIER");
+  const org = await requireAction("pos.sell");
   const supabase = await createClient();
   const {
     data: { user },
@@ -134,7 +134,7 @@ export async function previewCustomerAccountPayment(
   customerId: string,
   amount: number
 ) {
-  await requireMinimumRole("CASHIER");
+  await requireAction("pos.sell");
   const dues = await getCustomerDueInvoices(customerId);
   const lines = allocateAccountPayment(
     dues.map((d) => ({
@@ -170,7 +170,7 @@ export async function receiveCustomerAccountPayment(input: {
   allocations: { saleId: string; amount: number; expectedPaymentVersion: number }[];
   notes?: string | null;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("CASHIER");
+  const org = await requireAction("pos.sell");
   const supabase = await createClient();
   const {
     data: { user },
@@ -273,7 +273,7 @@ export async function validatePriorDuePayments(
   if (!lines.length) return { success: true };
   if (!customerId) return { error: "Select a customer to pay past dues" };
 
-  const org = await requireMinimumRole("CASHIER");
+  const org = await requireAction("pos.sell");
   const supabase = await createClient();
   const saleIds = [...new Set(lines.map((l) => l.saleId))];
 
@@ -397,7 +397,7 @@ export async function getCustomerStatement(
   from?: string,
   to?: string
 ): Promise<{ lines: StatementLine[]; openingBalance: number; closingBalance: number }> {
-  await requireMinimumRole("MANAGER");
+  await requireAction("reports.view");
   const org = await requireOrganization();
   const supabase = await createClient();
 

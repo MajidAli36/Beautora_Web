@@ -5,7 +5,7 @@ import {
   getServicesWithUsage,
 } from "@/lib/actions/services";
 import { getConsumableProducts } from "@/lib/actions/products";
-import { canManageRecords } from "@/lib/auth/permissions";
+import { getCapabilities } from "@/lib/auth/permissions";
 import { CategoryForm } from "@/components/features/services/category-form";
 import { PackageForm } from "@/components/features/services/package-form";
 import { ServiceForm } from "@/components/features/services/service-form";
@@ -24,13 +24,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function ServicesPage() {
-  const [categories, servicesRaw, packages, consumables, canManage] = await Promise.all([
+  const [categories, servicesRaw, packages, consumables, caps] = await Promise.all([
     getServiceCategories(),
     getServicesWithUsage(),
     getPackages(),
     getConsumableProducts(),
-    canManageRecords(),
+    getCapabilities("services"),
   ]);
+  const canManage = caps.canManage;
 
   const services = (servicesRaw ?? []).map((s) => {
     const usage = s.usage ?? [];

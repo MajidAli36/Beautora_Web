@@ -150,6 +150,14 @@ async function bootstrapAppliedMigrations(client) {
       file: "20250909020000_partners.sql",
       ok: () => tableExists(client, "partners"),
     },
+    {
+      file: "20250909120000_team_invitations.sql",
+      ok: () => tableExists(client, "team_invitations"),
+    },
+    {
+      file: "20250909130000_action_permissions.sql",
+      ok: () => columnExists(client, "organizations", "action_permissions"),
+    },
   ];
 
   let bootstrapped = 0;

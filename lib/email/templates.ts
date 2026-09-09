@@ -16,7 +16,7 @@ export function salonWelcomeVerifyEmail(input: {
   const hours = input.expiresHours ?? 24;
 
   return {
-    subject: `Welcome to ${SYNCOPS.name} — Verify Your Email`,
+    subject: `Welcome to ${SYNCOPS.name} — verify your email`,
     ...renderEmailLayout({
       preheader: `Verify your email to activate ${input.salonName} on Beautora.`,
       title: "Verify your email",
@@ -45,7 +45,7 @@ export function partnerWelcomeVerifyEmail(input: {
   const hours = input.expiresHours ?? 24;
 
   return {
-    subject: `Welcome to ${SYNCOPS.name} Partners — Verify Your Account`,
+    subject: `Welcome to ${SYNCOPS.name} Partners — verify your account`,
     ...renderEmailLayout({
       preheader: "Verify your partner account and wait for SyncOps approval.",
       title: "Verify your partner account",
@@ -112,7 +112,7 @@ export function passwordResetEmail(input: {
   const hours = input.expiresHours ?? 1;
 
   return {
-    subject: `Reset Your ${SYNCOPS.name} Password`,
+    subject: `Reset your ${SYNCOPS.name} password`,
     ...renderEmailLayout({
       preheader: "Use this secure link to choose a new password.",
       title: "Reset your password",
@@ -125,6 +125,35 @@ export function passwordResetEmail(input: {
       ctaUrl: input.resetUrl,
       footerNote:
         "Never share this link. Beautora will never email you a password.",
+    }),
+  };
+}
+
+export function teamInviteEmail(input: {
+  salonName: string;
+  roleLabel: string;
+  inviteUrl: string;
+  expiresDays?: number;
+}) {
+  const salon = escapeHtml(input.salonName);
+  const role = escapeHtml(input.roleLabel);
+  const days = input.expiresDays ?? 7;
+
+  return {
+    subject: `You're invited to join ${input.salonName} on ${SYNCOPS.name}`,
+    ...renderEmailLayout({
+      preheader: `Accept your ${input.roleLabel} invite for ${input.salonName}.`,
+      title: "You're invited to the team",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Hello,</p>
+        <p style="margin:0 0 12px;"><strong>${salon}</strong> invited you to join Beautora as <strong>${role}</strong>.</p>
+        <p style="margin:0 0 12px;">Click the button below to accept the invite and create your own secure password. This link expires in about <strong>${days} days</strong>.</p>
+        <p style="margin:0;font-size:13px;color:#6B7672;">If you weren’t expecting this invite, you can ignore this email.</p>
+      `,
+      ctaLabel: "Accept invite & create account",
+      ctaUrl: input.inviteUrl,
+      footerNote:
+        "This is a private team invite. Beautora will never ask for your password by email.",
     }),
   };
 }

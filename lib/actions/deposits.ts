@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit/log";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import {
   calculateRequiredAdvance,
@@ -108,7 +108,7 @@ export async function revertAppointmentDeposit(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("online_booking.approve");
   const parsed = refundSchema.safeParse({
     depositId: formData.get("depositId"),
     reason: formData.get("reason"),

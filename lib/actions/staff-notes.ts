@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
 import { getLocalDateString } from "@/lib/dates/local";
@@ -35,7 +35,7 @@ export async function createStaffNote(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("staff.edit");
   const parsed = noteSchema.safeParse({
     staff_id: formData.get("staff_id"),
     note_type: formData.get("note_type"),
@@ -105,7 +105,7 @@ export async function createStaffNote(
 }
 
 export async function deleteStaffNote(noteId: string, staffId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("staff.edit");
   const supabase = await createClient();
 
   const { error } = await supabase

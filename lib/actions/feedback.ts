@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit/log";
@@ -76,9 +76,7 @@ export async function submitCustomerFeedback(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("RECEPTIONIST");
-  // Cashiers are above receptionist in hierarchy — also allow explicit cashier path
-  // requireMinimumRole("RECEPTIONIST") already allows CASHIER+ 
+  const org = await requireAction("feedback.collect");
 
   const parsed = submitSchema.safeParse({
     customer_id: formData.get("customer_id") || "",

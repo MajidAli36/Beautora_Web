@@ -2,10 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import {
+  createInviteToken,
+  findAuthUserByEmail,
+  getEmailBlockReason,
+  hashInviteToken,
+  normalizeEmail,
+  TEAM_INVITE_TTL_DAYS,
+} from "@/lib/auth/email-guards";
+import { requireAction } from "@/lib/auth/permissions";
+import { sendTeamInviteEmail } from "@/lib/email/notify";
+import { ROLE_LABELS } from "@/lib/permissions/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_LABELS } from "@/lib/permissions/roles";
 import type { MemberRole } from "@/types";
 import type { ActionResult } from "@/types/commerce";
 
@@ -18,15 +27,29 @@ export type TeamMember = {
   joinedAt: string;
 };
 
+export type TeamInvitation = {
+  id: string;
+  email: string;
+  role: MemberRole;
+  roleLabel: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  expiresAt: string;
+  createdAt: string;
+};
+
 const inviteSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["ADMIN", "MANAGER", "CASHIER", "RECEPTIONIST", "STAFF"]),
 });
 
 const roleSchema = z.object({
   memberId: z.string().uuid(),
   role: z.enum(["ADMIN", "MANAGER", "CASHIER", "RECEPTIONIST", "STAFF"]),
+});
+
+const resetPasswordSchema = z.object({
+  memberId: z.string().uuid(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 async function getUserEmail(userId: string): Promise<string> {
@@ -40,8 +63,18 @@ async function getUserEmail(userId: string): Promise<string> {
   }
 }
 
+async function getOrgName(organizationId: string): Promise<string> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .maybeSingle();
+  return data?.name ?? "your salon";
+}
+
 export async function getTeamMembers(): Promise<TeamMember[]> {
-  const org = await requireMinimumRole("ADMIN");
+  const org = await requireAction("staff.manage_logins");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -52,7 +85,7 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
 
   if (error || !data) return [];
 
-  const members = await Promise.all(
+  return Promise.all(
     data.map(async (row) => {
       const role = row.role as MemberRole;
       return {
@@ -65,20 +98,42 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
       };
     })
   );
-
-  return members;
 }
 
-const resetPasswordSchema = z.object({
-  memberId: z.string().uuid(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
+export async function getPendingTeamInvitations(): Promise<TeamInvitation[]> {
+  const org = await requireAction("staff.manage_logins");
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("team_invitations")
+    .select("id, email, role, status, expires_at, created_at")
+    .eq("organization_id", org.organizationId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+
+  const now = Date.now();
+  return data.map((row) => {
+    const expired = new Date(row.expires_at).getTime() < now;
+    const role = row.role as MemberRole;
+    return {
+      id: row.id,
+      email: row.email,
+      role,
+      roleLabel: ROLE_LABELS[role],
+      status: expired ? "expired" : (row.status as TeamInvitation["status"]),
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+    };
+  });
+}
 
 export async function resetTeamMemberPassword(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("ADMIN");
+  const org = await requireAction("staff.manage_logins");
   const parsed = resetPasswordSchema.safeParse({
     memberId: formData.get("memberId"),
     password: formData.get("password"),
@@ -114,14 +169,17 @@ export async function resetTeamMemberPassword(
   return { success: true };
 }
 
+/**
+ * Invite a teammate by email. They receive a Beautora email and create their
+ * own password on accept. The email is reserved (blocks salon/partner signup).
+ */
 export async function inviteTeamMember(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("ADMIN");
+  const org = await requireAction("staff.manage_logins");
   const parsed = inviteSchema.safeParse({
     email: formData.get("email"),
-    password: formData.get("password"),
     role: formData.get("role"),
   });
   if (!parsed.success) {
@@ -138,56 +196,337 @@ export async function inviteTeamMember(
     };
   }
 
-  const email = parsed.data.email.toLowerCase();
-  const { data: list } = await admin.auth.admin.listUsers();
-  let userId = list?.users?.find((u) => u.email?.toLowerCase() === email)?.id;
+  const email = normalizeEmail(parsed.data.email);
+  const role = parsed.data.role;
+
+  const blocked = await getEmailBlockReason(admin, email, "team_invite");
+  if (blocked) return { error: blocked };
+
+  const { data: existingMember } = await admin
+    .from("organization_members")
+    .select("id, user_id")
+    .eq("organization_id", org.organizationId);
+
+  const existingUser = await findAuthUserByEmail(admin, email);
+  if (existingUser && existingMember?.some((m) => m.user_id === existingUser.id)) {
+    return { error: "This person is already on your team." };
+  }
+
+  const { data: otherPending } = await admin
+    .from("team_invitations")
+    .select("id, organization_id")
+    .eq("email", email)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (otherPending && otherPending.organization_id !== org.organizationId) {
+    return {
+      error:
+        "This email already has a pending invite from another salon. They must accept or that invite must be revoked first.",
+    };
+  }
+
+  // Revoke previous pending invite for this org+email (resend path)
+  await admin
+    .from("team_invitations")
+    .update({ status: "revoked" })
+    .eq("organization_id", org.organizationId)
+    .eq("email", email)
+    .eq("status", "pending");
+
+  const { token, tokenHash } = createInviteToken();
+  const expiresAt = new Date(
+    Date.now() + TEAM_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const supabase = await createClient();
+  const {
+    data: { user: actor },
+  } = await supabase.auth.getUser();
+
+  const { data: invite, error: insertError } = await admin
+    .from("team_invitations")
+    .insert({
+      organization_id: org.organizationId,
+      email,
+      role,
+      token_hash: tokenHash,
+      invited_by: actor?.id ?? null,
+      status: "pending",
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !invite) {
+    return { error: insertError?.message ?? "Could not create invitation" };
+  }
+
+  const salonName = await getOrgName(org.organizationId);
+  const mailed = await sendTeamInviteEmail({
+    email,
+    salonName,
+    role,
+    roleLabel: ROLE_LABELS[role],
+    inviteToken: token,
+    inviteId: invite.id,
+    expiresDays: TEAM_INVITE_TTL_DAYS,
+  });
+
+  if (!mailed.ok) {
+    await admin.from("team_invitations").delete().eq("id", invite.id);
+    return {
+      error: mailed.skipped
+        ? "Email is not configured. Add SMTP_PASSWORD / RESEND_API_KEY, then try again."
+        : mailed.error || "Could not send invite email. Try again.",
+    };
+  }
+
+  revalidatePath("/staff");
+  return { success: true };
+}
+
+export async function resendTeamInvitation(inviteId: string): Promise<ActionResult> {
+  const org = await requireAction("staff.manage_logins");
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY" };
+  }
+
+  const { data: invite } = await admin
+    .from("team_invitations")
+    .select("id, email, role, status, expires_at")
+    .eq("id", inviteId)
+    .eq("organization_id", org.organizationId)
+    .maybeSingle();
+
+  if (!invite || invite.status !== "pending") {
+    return { error: "Invitation not found" };
+  }
+
+  const { token, tokenHash } = createInviteToken();
+  const expiresAt = new Date(
+    Date.now() + TEAM_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const { error: updateError } = await admin
+    .from("team_invitations")
+    .update({ token_hash: tokenHash, expires_at: expiresAt })
+    .eq("id", invite.id);
+
+  if (updateError) return { error: updateError.message };
+
+  const salonName = await getOrgName(org.organizationId);
+  const role = invite.role as MemberRole;
+  const mailed = await sendTeamInviteEmail({
+    email: invite.email,
+    salonName,
+    role,
+    roleLabel: ROLE_LABELS[role],
+    inviteToken: token,
+    inviteId: invite.id,
+    expiresDays: TEAM_INVITE_TTL_DAYS,
+  });
+
+  if (!mailed.ok) {
+    return {
+      error: mailed.skipped
+        ? "Email is not configured. Add SMTP_PASSWORD / RESEND_API_KEY, then try again."
+        : mailed.error || "Could not resend invite email",
+    };
+  }
+
+  revalidatePath("/staff");
+  return { success: true };
+}
+
+export async function revokeTeamInvitation(inviteId: string): Promise<ActionResult> {
+  const org = await requireAction("staff.manage_logins");
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("team_invitations")
+    .update({ status: "revoked" })
+    .eq("id", inviteId)
+    .eq("organization_id", org.organizationId)
+    .eq("status", "pending");
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/staff");
+  return { success: true };
+}
+
+export type InvitePreview =
+  | {
+      ok: true;
+      email: string;
+      salonName: string;
+      role: MemberRole;
+      roleLabel: string;
+      needsPassword: boolean;
+    }
+  | { ok: false; error: string };
+
+export async function getTeamInvitePreview(token: string): Promise<InvitePreview> {
+  if (!token?.trim()) return { ok: false, error: "Invalid invite link" };
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { ok: false, error: "Invite service unavailable" };
+  }
+
+  const tokenHash = hashInviteToken(token.trim());
+  const { data: invite } = await admin
+    .from("team_invitations")
+    .select("id, email, role, status, expires_at, organization_id")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (!invite) return { ok: false, error: "This invite link is invalid." };
+  if (invite.status === "accepted") {
+    return { ok: false, error: "This invite was already accepted. Please sign in." };
+  }
+  if (invite.status !== "pending") {
+    return { ok: false, error: "This invite is no longer valid." };
+  }
+  if (new Date(invite.expires_at).getTime() < Date.now()) {
+    await admin
+      .from("team_invitations")
+      .update({ status: "expired" })
+      .eq("id", invite.id);
+    return { ok: false, error: "This invite has expired. Ask your salon admin to resend it." };
+  }
+
+  const existing = await findAuthUserByEmail(admin, invite.email);
+  const salonName = await getOrgName(invite.organization_id);
+  const role = invite.role as MemberRole;
+
+  return {
+    ok: true,
+    email: invite.email,
+    salonName,
+    role,
+    roleLabel: ROLE_LABELS[role],
+    needsPassword: !existing,
+  };
+}
+
+export async function acceptTeamInvite(input: {
+  token: string;
+  password?: string;
+  fullName?: string;
+}): Promise<ActionResult & { email?: string }> {
+  const token = input.token?.trim();
+  if (!token) return { error: "Invalid invite link" };
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: "Invite service unavailable" };
+  }
+
+  const tokenHash = hashInviteToken(token);
+  const { data: invite } = await admin
+    .from("team_invitations")
+    .select("id, email, role, status, expires_at, organization_id")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (!invite || invite.status !== "pending") {
+    return { error: "This invite is invalid or already used." };
+  }
+  if (new Date(invite.expires_at).getTime() < Date.now()) {
+    await admin
+      .from("team_invitations")
+      .update({ status: "expired" })
+      .eq("id", invite.id);
+    return { error: "This invite has expired. Ask your salon admin to resend it." };
+  }
+
+  const email = invite.email;
+  const role = invite.role as MemberRole;
+  let existing = await findAuthUserByEmail(admin, email);
+  let userId = existing?.id;
 
   if (!userId) {
-    const { data, error } = await admin.auth.admin.createUser({
+    const password = input.password ?? "";
+    if (password.length < 8) {
+      return { error: "Password must be at least 8 characters" };
+    }
+
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
-      password: parsed.data.password,
+      password,
       email_confirm: true,
       user_metadata: {
-        created_by_admin: true,
         account_type: "staff",
-        salon_role: parsed.data.role,
+        created_by_admin: true,
+        salon_role: role,
+        full_name: input.fullName?.trim() || null,
+        invited_organization_id: invite.organization_id,
       },
     });
-    if (error) return { error: error.message };
-    userId = data.user.id;
+
+    if (createErr || !created.user) {
+      return { error: createErr?.message ?? "Could not create your account" };
+    }
+    userId = created.user.id;
   } else {
-    // Ensure existing invited users are marked as staff (cannot open a new store).
+    const meta = (existing?.user_metadata ?? {}) as Record<string, unknown>;
+    const type = typeof meta.account_type === "string" ? meta.account_type : "";
+    if (type === "partner" || type === "owner" || type === "platform_admin") {
+      return {
+        error:
+          "This email already has a different Beautora account type and cannot join as staff.",
+      };
+    }
     await admin.auth.admin.updateUserById(userId, {
       user_metadata: {
-        created_by_admin: true,
+        ...meta,
         account_type: "staff",
-        salon_role: parsed.data.role,
+        created_by_admin: true,
+        salon_role: role,
+        full_name: input.fullName?.trim() || meta.full_name || null,
       },
     });
   }
 
-  const supabase = await createClient();
-  const { error: memberError } = await supabase.from("organization_members").upsert(
+  const { error: memberError } = await admin.from("organization_members").upsert(
     {
-      organization_id: org.organizationId,
+      organization_id: invite.organization_id,
       user_id: userId,
-      role: parsed.data.role,
+      role,
     },
     { onConflict: "organization_id,user_id" }
   );
 
-  if (memberError) return { error: memberError.message };
+  if (memberError) {
+    return { error: memberError.message };
+  }
 
-  revalidatePath("/staff");
-  revalidatePath("/", "layout");
-  return { success: true };
+  await admin
+    .from("team_invitations")
+    .update({
+      status: "accepted",
+      accepted_at: new Date().toISOString(),
+      accepted_user_id: userId,
+    })
+    .eq("id", invite.id);
+
+  return { success: true, email };
 }
 
 export async function updateTeamMemberRole(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("ADMIN");
+  const org = await requireAction("staff.manage_logins");
   const parsed = roleSchema.safeParse({
     memberId: formData.get("memberId"),
     role: formData.get("role"),
@@ -223,7 +562,7 @@ export async function updateTeamMemberRole(
 }
 
 export async function removeTeamMember(memberId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("ADMIN");
+  const org = await requireAction("staff.manage_logins");
   const supabase = await createClient();
 
   const { data: member } = await supabase
@@ -253,8 +592,8 @@ export async function removeTeamMember(memberId: string): Promise<ActionResult> 
 
 export async function canManageTeam(): Promise<boolean> {
   try {
-    await requireMinimumRole("ADMIN");
-    return true;
+    const { checkAction } = await import("@/lib/auth/permissions");
+    return await checkAction("staff.manage_logins");
   } catch {
     return false;
   }

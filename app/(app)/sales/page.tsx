@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Suspense } from "react";
 import Link from "next/link";
 import { getSales } from "@/lib/actions/sales";
-import { canManageRecords, canUsePos } from "@/lib/auth/permissions";
+import { getCapabilities } from "@/lib/auth/permissions";
 import { SalesTableCard } from "@/components/features/sales/sales-table";
 import { SalesSearch } from "@/components/features/sales/sales-search";
 import { Button } from "@/components/ui/button";
@@ -30,11 +30,13 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       ? (paymentRaw as SalePaymentStatus)
       : undefined;
 
-  const [sales, canManage, canPos] = await Promise.all([
+  const [sales, salesCaps, posCaps] = await Promise.all([
     getSales({ search: q, paymentStatus }),
-    canManageRecords(),
-    canUsePos(),
+    getCapabilities("sales"),
+    getCapabilities("pos"),
   ]);
+  const canManage = salesCaps.canEdit || salesCaps.canDelete;
+  const canPos = Boolean(posCaps.actions["pos.sell"]);
 
   const rows = sales.map((sale) => {
     const s = sale as typeof sale & {
@@ -79,7 +81,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           title="Sales"
           description="View invoices, collect dues, amend, refund, or soft-delete. Deleted invoices stay listed as Disabled and are excluded from revenue and staff reports."
         />
-        <Button render={<Link href="/pos" />}>New sale</Button>
+        {canPos && <Button render={<Link href="/pos" />}>New sale</Button>}
       </div>
 
       <Suspense fallback={<Skeleton className="h-10 max-w-md" />}>

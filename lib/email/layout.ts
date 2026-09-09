@@ -1,5 +1,5 @@
 import { SYNCOPS } from "@/lib/print/syncops";
-import { getAppBaseUrl } from "@/lib/email/config";
+import { getEmailLinkBaseUrl } from "@/lib/email/config";
 import { escapeHtml } from "@/lib/email/escape";
 
 type LayoutInput = {
@@ -12,7 +12,7 @@ type LayoutInput = {
 };
 
 export function renderEmailLayout(input: LayoutInput): { html: string; text: string } {
-  const base = getAppBaseUrl();
+  const base = getEmailLinkBaseUrl();
   const title = escapeHtml(input.title);
   const preheader = escapeHtml(input.preheader);
   const ctaLabel = input.ctaLabel ? escapeHtml(input.ctaLabel) : null;

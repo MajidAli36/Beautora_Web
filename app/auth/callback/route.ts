@@ -1,43 +1,86 @@
 import { NextResponse } from "next/server";
 import { getActiveOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
+function safeNextPath(raw: string | null) {
+  if (!raw) return "/dashboard";
+  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
+}
+
+/**
+ * Handles:
+ * - PKCE `?code=` (OAuth / some flows)
+ * - Custom Resend links `?token_hash=&type=magiclink|recovery` (verifyOtp)
+ */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const requestedRaw =
-    searchParams.get("next") ?? searchParams.get("redirect") ?? "/dashboard";
-  const requested = requestedRaw.startsWith("/") ? requestedRaw : "/dashboard";
+  const tokenHash = searchParams.get("token_hash");
+  const typeParam = searchParams.get("type");
+  const requested = safeNextPath(
+    searchParams.get("next") ?? searchParams.get("redirect")
+  );
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      // Password recovery / explicit next paths take priority
-      if (requested.startsWith("/reset-password")) {
-        return NextResponse.redirect(`${origin}/reset-password`);
-      }
+  const supabase = await createClient();
+  let sessionOk = false;
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const isPartner =
-        user?.user_metadata?.account_type === "partner" ||
-        requested.startsWith("/partner");
-
-      if (isPartner) {
-        return NextResponse.redirect(`${origin}/partner/dashboard`);
-      }
-
-      const org = await getActiveOrganization();
-      const destination = org
-        ? requested === "/onboarding"
-          ? "/dashboard"
-          : requested
-        : "/onboarding";
-      return NextResponse.redirect(`${origin}${destination}`);
+  if (tokenHash && typeParam) {
+    const type = typeParam as EmailOtpType;
+    const { error } = await supabase.auth.verifyOtp({
+      type,
+      token_hash: tokenHash,
+    });
+    if (error) {
+      console.error("[auth/callback] verifyOtp failed", {
+        type: typeParam,
+        message: error.message,
+      });
+      return NextResponse.redirect(
+        `${origin}/login?error=auth_callback_failed`
+      );
     }
+    sessionOk = true;
+  } else if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      console.error("[auth/callback] exchangeCode failed", {
+        message: error.message,
+      });
+      return NextResponse.redirect(
+        `${origin}/login?error=auth_callback_failed`
+      );
+    }
+    sessionOk = true;
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+  if (!sessionOk) {
+    return NextResponse.redirect(
+      `${origin}/login?error=auth_callback_failed`
+    );
+  }
+
+  if (requested.startsWith("/reset-password")) {
+    return NextResponse.redirect(`${origin}/reset-password`);
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const isPartner =
+    user?.user_metadata?.account_type === "partner" ||
+    requested.startsWith("/partner");
+
+  if (isPartner) {
+    return NextResponse.redirect(`${origin}/partner/dashboard`);
+  }
+
+  const org = await getActiveOrganization();
+  const destination = org
+    ? requested === "/onboarding"
+      ? "/dashboard"
+      : requested
+    : "/onboarding";
+  return NextResponse.redirect(`${origin}${destination}`);
 }

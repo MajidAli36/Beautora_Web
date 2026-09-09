@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { redirect } from "next/navigation";
 import { getDevices, getDeviceCommands } from "@/lib/actions/devices";
-import { canManageRecords } from "@/lib/auth/permissions";
+import { getCapabilities } from "@/lib/auth/permissions";
 import { DeviceRegisterForm } from "@/components/features/devices/device-form";
 import {
   DeviceCommandsTable,
@@ -10,8 +10,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function DevicesPage() {
-  const canManage = await canManageRecords();
-  if (!canManage) redirect("/dashboard");
+  const caps = await getCapabilities("devices");
+  if (!caps.visible) redirect("/dashboard");
 
   const [devices, commands] = await Promise.all([getDevices(), getDeviceCommands()]);
 
@@ -22,22 +22,24 @@ export default async function DevicesPage() {
         description="Attendance terminals, cash drawers, and printers. Devices can also auto-register via API."
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Register device</CardTitle>
-          <CardDescription>Manual registration for salon hardware</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DeviceRegisterForm />
-        </CardContent>
-      </Card>
+      {caps.canCreate && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Register device</CardTitle>
+            <CardDescription>Manual registration for salon hardware</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeviceRegisterForm />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle>Connected devices</CardTitle>
         </CardHeader>
         <CardContent>
-          <DevicesTable devices={devices} canManage={canManage} />
+          <DevicesTable devices={devices} canManage={caps.canManage} />
         </CardContent>
       </Card>
 

@@ -1,5 +1,10 @@
 "use server";
 
+import {
+  findAuthUserByEmail,
+  getEmailBlockReason,
+  normalizeEmail,
+} from "@/lib/auth/email-guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendPasswordResetEmail,
@@ -7,28 +12,8 @@ import {
 } from "@/lib/email/notify";
 import type { ActionResult } from "@/types/commerce";
 
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
-
 function normalizeSalonName(name: string) {
   return name.trim().replace(/\s+/g, " ");
-}
-
-async function findAuthUserByEmail(
-  admin: ReturnType<typeof createAdminClient>,
-  email: string
-) {
-  const target = normalizeEmail(email);
-  // Admin API has no get-by-email; page through users (fine for early-stage SaaS).
-  for (let page = 1; page <= 20; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) throw new Error(error.message);
-    const found = data.users.find((u) => u.email?.toLowerCase() === target);
-    if (found) return found;
-    if (data.users.length < 200) break;
-  }
-  return null;
 }
 
 async function salonNameTaken(
@@ -52,27 +37,9 @@ export async function checkEmailAvailable(emailInput: string): Promise<{
 
   try {
     const admin = createAdminClient();
-    const existing = await findAuthUserByEmail(admin, email);
-    if (!existing) return { available: true };
-
-    const meta = existing.user_metadata ?? {};
-    const isStaff =
-      meta.account_type === "staff" ||
-      meta.created_by_admin === true ||
-      Boolean(meta.salon_role);
-
-    if (isStaff) {
-      return {
-        available: false,
-        error:
-          "This email is already a staff login for a salon. Sign in with your credentials — you cannot open a new store with this email.",
-      };
-    }
-
-    return {
-      available: false,
-      error: "An account with this email already exists. Please sign in.",
-    };
+    const blocked = await getEmailBlockReason(admin, email, "salon_signup");
+    if (blocked) return { available: false, error: blocked };
+    return { available: true };
   } catch (err) {
     return {
       available: false,
@@ -139,22 +106,8 @@ export async function registerAccount(input: {
   }
 
   try {
-    const existing = await findAuthUserByEmail(admin, email);
-    if (existing) {
-      const meta = existing.user_metadata ?? {};
-      const isStaff =
-        meta.account_type === "staff" ||
-        meta.created_by_admin === true ||
-        Boolean(meta.salon_role);
-
-      if (isStaff) {
-        return {
-          error:
-            "This email is already a staff login for a salon. Sign in instead — staff cannot create a new store with this email.",
-        };
-      }
-      return { error: "An account with this email already exists. Please sign in." };
-    }
+    const blocked = await getEmailBlockReason(admin, email, "salon_signup");
+    if (blocked) return { error: blocked };
 
     if (await salonNameTaken(admin, salonName)) {
       return {
@@ -193,8 +146,13 @@ export async function registerAccount(input: {
     userId: data.user.id,
   });
 
-  if (!mailed.ok && !("skipped" in mailed && mailed.skipped)) {
-    console.error("[auth] verification email failed after signup", mailed.error);
+  if (!mailed.ok) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    return {
+      error: mailed.skipped
+        ? "Email is not configured on the server. Please try again later."
+        : `Could not send verification email: ${mailed.error}`,
+    };
   }
 
   return { success: true, needsEmailVerification: true };

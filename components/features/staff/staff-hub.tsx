@@ -1,7 +1,7 @@
 "use client";
 
-import type { TeamMember } from "@/lib/actions/team";
-import type { RoleNavMatrixRow } from "@/components/features/staff/role-permissions-editor";
+import type { TeamInvitation, TeamMember } from "@/lib/actions/team";
+import type { RolePermissionMatrix } from "@/lib/actions/role-permissions";
 import { TeamManagement } from "@/components/features/staff/team-management";
 import { RolePermissionsEditor } from "@/components/features/staff/role-permissions-editor";
 import { StaffForm } from "@/components/features/staff/staff-forms";
@@ -46,10 +46,12 @@ type StaffRow = {
 type StaffHubProps = {
   staffList: StaffRow[];
   teamMembers: TeamMember[];
-  roleMatrix: RoleNavMatrixRow[];
+  invitations: TeamInvitation[];
+  roleMatrix: RolePermissionMatrix[];
   canManage: boolean;
   canTeam: boolean;
   canInvite: boolean;
+  canConfigureRoles?: boolean;
 };
 
 function loginByEmail(teamMembers: TeamMember[]) {
@@ -63,10 +65,12 @@ function loginByEmail(teamMembers: TeamMember[]) {
 export function StaffHub({
   staffList,
   teamMembers,
+  invitations,
   roleMatrix,
   canManage,
   canTeam,
   canInvite,
+  canConfigureRoles = false,
 }: StaffHubProps) {
   const logins = loginByEmail(teamMembers);
   const defaultTab = "roster";
@@ -76,7 +80,7 @@ export function StaffHub({
       <TabsList className="h-auto flex-wrap">
         <TabsTrigger value="roster">Salon team</TabsTrigger>
         {canTeam && <TabsTrigger value="logins">App logins</TabsTrigger>}
-        {canTeam && roleMatrix.length > 0 && (
+        {canConfigureRoles && (
           <TabsTrigger value="access">Role access</TabsTrigger>
         )}
       </TabsList>
@@ -106,8 +110,8 @@ export function StaffHub({
                   <DialogHeader>
                     <DialogTitle>Add staff member</DialogTitle>
                     <DialogDescription>
-                      Create a salon profile. Use the same email when adding an app login so
-                      they appear linked here.
+                      Create a salon profile. Invite the same email under App logins so they can
+                      sign in to the dashboard.
                     </DialogDescription>
                   </DialogHeader>
                   <StaffForm />
@@ -233,11 +237,15 @@ export function StaffHub({
 
       {canTeam && (
         <TabsContent value="logins">
-          <TeamManagement members={teamMembers} canInvite={canInvite} />
+          <TeamManagement
+            members={teamMembers}
+            invitations={invitations}
+            canInvite={canInvite}
+          />
         </TabsContent>
       )}
 
-      {canTeam && roleMatrix.length > 0 && (
+      {canConfigureRoles && (
         <TabsContent value="access">
           <RolePermissionsEditor matrix={roleMatrix} />
         </TabsContent>

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
@@ -64,7 +64,7 @@ export async function createProductCategory(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("products.create");
   const name = formData.get("name") as string;
   if (!name?.trim()) return { error: "Name is required" };
 
@@ -80,7 +80,7 @@ export async function createProductCategory(
 }
 
 export async function deleteProductCategory(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("products.delete");
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("product_categories")
@@ -112,7 +112,7 @@ export async function createProduct(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("products.create");
   const categoryId = formData.get("category_id") as string;
   const kindRaw = String(formData.get("product_kind") ?? "RETAIL");
   const parsed = productSchema.safeParse({
@@ -173,7 +173,7 @@ export async function updateProduct(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("products.edit");
   const categoryId = formData.get("category_id") as string;
   const kindRaw = String(formData.get("product_kind") ?? "RETAIL");
   const parsed = productUpdateSchema.safeParse({
@@ -223,7 +223,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("products.delete");
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("products")
@@ -256,7 +256,7 @@ export async function adjustInventory(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("products.edit");
   const productId = formData.get("product_id") as string;
   const type = formData.get("type") as "IN" | "OUT" | "ADJUSTMENT";
   const quantity = Number(formData.get("quantity"));
@@ -589,7 +589,7 @@ export async function getInHouseProductDetail(productId: string) {
 export async function previewCheckoutUsage(
   items: { itemType: string; itemId: string; quantity: number }[]
 ) {
-  const org = await requireMinimumRole("CASHIER");
+  const org = await requireAction("pos.sell");
   const { resolveServiceUsageRequirements } = await import("@/lib/inventory/service-usage");
   return resolveServiceUsageRequirements(
     org.organizationId,

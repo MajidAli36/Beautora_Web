@@ -5,7 +5,7 @@ import {
   getProductCategories,
   getRetailProducts,
 } from "@/lib/actions/products";
-import { canManageRecords } from "@/lib/auth/permissions";
+import { getCapabilities } from "@/lib/auth/permissions";
 import { InventoryAdjustForm } from "@/components/features/products/product-actions";
 import { InventorySummaryCards } from "@/components/features/products/inventory-summary";
 import { ProductCategoryForm, ProductForm } from "@/components/features/products/product-forms";
@@ -19,13 +19,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function ProductsPage() {
-  const [categories, products, transactions, inventorySummary, canManage] = await Promise.all([
+  const [categories, products, transactions, inventorySummary, caps] = await Promise.all([
     getProductCategories(),
     getRetailProducts(),
     getInventoryTransactions(),
     getInventorySummaryStats(),
-    canManageRecords(),
+    getCapabilities("products"),
   ]);
+  const canManage = caps.canManage;
+  const canCreate = caps.canCreate;
 
   return (
     <div className="space-y-6">
@@ -42,7 +44,7 @@ export default async function ProductsPage() {
         </TabsList>
 
         <TabsContent value="products" className="space-y-6">
-          {canManage && (
+          {canCreate && (
             <Card>
               <CardHeader>
                 <CardTitle>Add product</CardTitle>
@@ -75,7 +77,7 @@ export default async function ProductsPage() {
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-6">
-          {canManage && (
+          {canCreate && (
             <Card>
               <CardHeader>
                 <CardTitle>Add category</CardTitle>
@@ -98,7 +100,7 @@ export default async function ProductsPage() {
         <TabsContent value="inventory" className="space-y-6">
           <InventorySummaryCards summary={inventorySummary} />
 
-          {canManage && (
+          {caps.canEdit && (
             <Card>
               <CardHeader>
                 <CardTitle>Adjust stock</CardTitle>

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
@@ -55,7 +55,7 @@ export async function createChair(
   const data = readFormData(prev, formData);
   if (!data) return { error: "Invalid form data" };
 
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("chairs.create");
   const parsed = chairSchema.safeParse({ name: data.get("name") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
@@ -91,7 +91,7 @@ export async function renameChair(
   const data = readFormData(prev, formData);
   if (!data) return { error: "Invalid form data" };
 
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("chairs.edit");
   const id = String(data.get("id") ?? "");
   const parsed = chairSchema.safeParse({ name: data.get("name") });
   if (!id) return { error: "Chair id required" };
@@ -115,7 +115,7 @@ export async function renameChair(
 }
 
 export async function setChairActive(id: string, isActive: boolean): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("chairs.edit");
   const supabase = await createClient();
   const { error } = await supabase
     .from("chairs")
@@ -129,7 +129,7 @@ export async function setChairActive(id: string, isActive: boolean): Promise<Act
 }
 
 export async function deleteChair(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("chairs.delete");
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("chairs")

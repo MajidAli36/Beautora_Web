@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization, getActiveOrganization } from "@/lib/auth/organization";
 import { hasMinimumRole } from "@/lib/permissions/roles";
 import {
@@ -130,7 +130,7 @@ export async function submitSubscriptionPayment(input: {
   notes?: string;
   invoice: File;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("ADMIN");
+  const org = await requireAction("billing.manage");
   const ref = input.transactionRef.trim();
   if (ref.length < 4) {
     return { error: "Enter your JazzCash transaction / reference ID" };

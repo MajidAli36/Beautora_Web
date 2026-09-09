@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireOrganization } from "@/lib/auth/organization";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { defaultThankYouTemplateBody } from "@/lib/whatsapp/templates";
 import type { ActionResult } from "@/types/commerce";
@@ -90,7 +90,7 @@ export async function createWhatsAppTemplate(input: {
   body: string;
   makeDefault?: boolean;
 }): Promise<ActionResult & { template?: WhatsAppTemplate }> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("whatsapp.send");
   const name = input.name.trim();
   const body = input.body.trim();
   if (name.length < 1) return { error: "Template name is required" };
@@ -136,7 +136,7 @@ export async function updateWhatsAppTemplate(input: {
   body: string;
   makeDefault?: boolean;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("whatsapp.send");
   const name = input.name.trim();
   const body = input.body.trim();
   if (name.length < 1) return { error: "Template name is required" };
@@ -181,7 +181,7 @@ export async function updateWhatsAppTemplate(input: {
 export async function setDefaultWhatsAppTemplate(
   id: string
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("whatsapp.send");
   const supabase = await createClient();
 
   await supabase
@@ -204,7 +204,7 @@ export async function setDefaultWhatsAppTemplate(
 export async function deleteWhatsAppTemplate(
   id: string
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("whatsapp.send");
   const supabase = await createClient();
 
   const { data: existing } = await supabase

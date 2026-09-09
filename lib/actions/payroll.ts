@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
 import type { StaffPaymentType } from "@/lib/finances/categories";
@@ -35,7 +35,7 @@ const paymentSchema = z.object({
 });
 
 export async function getStaffPayments(from?: string, to?: string): Promise<StaffPaymentRow[]> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("reports.view");
   const supabase = await createClient();
 
   let query = supabase
@@ -93,7 +93,7 @@ export async function createStaffPayment(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("finances.create");
   const parsed = paymentSchema.safeParse({
     staff_id: formData.get("staff_id"),
     amount: formData.get("amount"),
@@ -151,7 +151,7 @@ export async function createStaffPayment(
 }
 
 export async function deleteStaffPayment(paymentId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("finances.edit");
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -168,7 +168,7 @@ export async function deleteStaffPayment(paymentId: string): Promise<ActionResul
 }
 
 export async function getStaffPaymentSummaryByStaff(staffId: string) {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("reports.view");
   const supabase = await createClient();
 
   const { data } = await supabase

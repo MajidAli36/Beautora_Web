@@ -3,41 +3,42 @@
 import { useActionState, useTransition } from "react";
 import { RotateCcw } from "lucide-react";
 import {
-  getRoleNavMatrix,
+  updateRoleActionPermission,
   updateRoleNavPermission,
   resetRoleNavPermissions,
 } from "@/lib/actions/role-permissions";
+import type { RolePermissionMatrix } from "@/lib/actions/role-permissions";
 import { useActionToast } from "@/hooks/use-action-toast";
-import { NAV_KEYS, NAV_KEY_LABELS, type NavKey } from "@/lib/permissions/nav";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
+import type { ActionKey } from "@/lib/permissions/actions";
 import type { MemberRole } from "@/types";
+import type { NavKey } from "@/lib/permissions/nav";
 import type { ActionResult } from "@/types/commerce";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-export type RoleNavMatrixRow = Awaited<ReturnType<typeof getRoleNavMatrix>>[number];
+export type RoleNavMatrixRow = {
+  role: MemberRole;
+  roleLabel: string;
+  permissions: Record<NavKey, boolean>;
+};
 
 type RolePermissionsEditorProps = {
-  matrix: RoleNavMatrixRow[];
+  matrix: RolePermissionMatrix[];
 };
 
 export function RolePermissionsEditor({ matrix }: RolePermissionsEditorProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Navigation by role</CardTitle>
+        <CardTitle>Features & actions by role</CardTitle>
         <CardDescription>
-          Choose which sidebar pages each role can see. Changes apply immediately for all
-          users with that role. Owner always has full access.
+          Turn a feature Off to hide it from the sidebar. Leave it On and switch individual
+          actions Off when they may view the page but must not create, edit, delete, approve, or
+          similar. Owner always has full access.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -51,7 +52,7 @@ export function RolePermissionsEditor({ matrix }: RolePermissionsEditorProps) {
           </TabsList>
           {matrix.map((row) => (
             <TabsContent key={row.role} value={row.role}>
-              <RoleNavTable role={row.role} permissions={row.permissions} />
+              <RoleFeatureTable role={row.role} features={row.features} />
             </TabsContent>
           ))}
         </Tabs>
@@ -60,20 +61,20 @@ export function RolePermissionsEditor({ matrix }: RolePermissionsEditorProps) {
   );
 }
 
-function RoleNavTable({
+function RoleFeatureTable({
   role,
-  permissions,
+  features,
 }: {
   role: MemberRole;
-  permissions: Record<NavKey, boolean>;
+  features: RolePermissionMatrix["features"];
 }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          {ROLE_LABELS[role]} — toggle pages visible in the sidebar
+          {ROLE_LABELS[role]} — feature visibility + actions
         </p>
         <Button
           type="button"
@@ -90,61 +91,147 @@ function RoleNavTable({
           Reset defaults
         </Button>
       </div>
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Page</TableHead>
-              <TableHead className="w-[120px] text-right">Visible</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {NAV_KEYS.map((key) => (
-              <NavPermissionRow
-                key={key}
-                role={role}
-                navKey={key}
-                enabled={permissions[key]}
-              />
-            ))}
-          </TableBody>
-        </Table>
+
+      <div className="space-y-3">
+        {features.map((feature) => (
+          <FeaturePermissionCard key={feature.feature} role={role} feature={feature} />
+        ))}
       </div>
     </div>
   );
 }
 
-function NavPermissionRow({
+function FeaturePermissionCard({
   role,
-  navKey,
-  enabled,
+  feature,
 }: {
   role: MemberRole;
-  navKey: NavKey;
-  enabled: boolean;
+  feature: RolePermissionMatrix["features"][number];
 }) {
-  const [state, formAction, isPending] = useActionState(updateRoleNavPermission, {} as ActionResult);
-  useActionToast(state, { successMessage: "Permissions saved." });
+  const [navState, navAction, navPending] = useActionState(
+    updateRoleNavPermission,
+    {} as ActionResult
+  );
+  useActionToast(navState, { successMessage: "Feature visibility saved." });
+
+  const settingsLocked =
+    role === "ADMIN" &&
+    (feature.feature === "settings" || feature.feature === "staff");
 
   return (
-    <TableRow>
-      <TableCell className="font-medium">{NAV_KEY_LABELS[navKey]}</TableCell>
-      <TableCell className="text-right">
-        <form action={formAction}>
+    <div
+      className={cn(
+        "rounded-xl border p-4",
+        feature.visible ? "border-border bg-card" : "border-dashed bg-muted/30"
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-medium">{feature.featureLabel}</p>
+          <p className="text-xs text-muted-foreground">
+            {feature.visible
+              ? feature.actions.length
+                ? "Visible — control actions below"
+                : "Visible in sidebar"
+              : "Hidden from sidebar and blocked from actions"}
+          </p>
+        </div>
+        <form action={navAction}>
           <input type="hidden" name="role" value={role} />
-          <input type="hidden" name="navKey" value={navKey} />
-          <input type="hidden" name="enabled" value={enabled ? "false" : "true"} />
+          <input type="hidden" name="navKey" value={feature.feature} />
+          <input
+            type="hidden"
+            name="enabled"
+            value={feature.visible ? "false" : "true"}
+          />
           <Button
             type="submit"
             size="sm"
-            variant={enabled ? "default" : "outline"}
-            disabled={isPending}
-            className="min-w-[72px]"
+            variant={feature.visible ? "default" : "outline"}
+            disabled={navPending || settingsLocked}
+            className="min-w-[88px]"
           >
-            {isPending ? "…" : enabled ? "On" : "Off"}
+            {navPending ? "…" : feature.visible ? "Feature On" : "Feature Off"}
           </Button>
         </form>
-      </TableCell>
-    </TableRow>
+      </div>
+
+      {feature.actions.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
+          {feature.actions.map((action) => (
+            <ActionToggle
+              key={action.key}
+              role={role}
+              actionKey={action.key}
+              label={action.label}
+              enabled={action.enabled}
+              disabled={!feature.visible}
+            />
+          ))}
+        </div>
+      )}
+
+      {feature.actions.length === 0 && feature.visible && (
+        <div className="mt-3 border-t pt-3">
+          <Badge variant="secondary">View only</Badge>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionToggle({
+  role,
+  actionKey,
+  label,
+  enabled,
+  disabled,
+}: {
+  role: MemberRole;
+  actionKey: ActionKey;
+  label: string;
+  enabled: boolean;
+  disabled?: boolean;
+}) {
+  const [state, formAction, isPending] = useActionState(
+    updateRoleActionPermission,
+    {} as ActionResult
+  );
+  useActionToast(state, { successMessage: "Action permission saved." });
+
+  const lockedAdminAction =
+    role === "ADMIN" &&
+    (actionKey === "staff.manage_permissions" ||
+      actionKey === "staff.manage_logins" ||
+      actionKey === "settings.manage");
+
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="role" value={role} />
+      <input type="hidden" name="actionKey" value={actionKey} />
+      <input type="hidden" name="enabled" value={enabled ? "false" : "true"} />
+      <Button
+        type="submit"
+        size="sm"
+        variant={enabled ? "secondary" : "outline"}
+        disabled={isPending || disabled || lockedAdminAction}
+        className={cn(
+          "h-8 text-xs",
+          enabled && "border border-primary/30",
+          (disabled || lockedAdminAction) && "opacity-50"
+        )}
+        title={
+          lockedAdminAction
+            ? "Admin must keep this action"
+            : disabled
+              ? "Turn the feature On to configure actions"
+              : enabled
+                ? `Disable ${label}`
+                : `Enable ${label}`
+        }
+      >
+        {isPending ? "…" : `${label}: ${enabled ? "On" : "Off"}`}
+      </Button>
+    </form>
   );
 }

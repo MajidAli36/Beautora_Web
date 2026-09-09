@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createCustomer } from "@/lib/actions/customers";
-import { canManageCustomers } from "@/lib/auth/permissions";
+import { checkAction } from "@/lib/auth/permissions";
 import { CustomerForm } from "@/components/features/customers/customer-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/card";
 
 export default async function NewCustomerPage() {
-  const canEdit = await canManageCustomers();
-  if (!canEdit) redirect("/customers");
+  const canCreate = await checkAction("customers.create");
+  if (!canCreate) redirect("/customers");
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

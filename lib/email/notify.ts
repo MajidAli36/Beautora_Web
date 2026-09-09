@@ -1,5 +1,5 @@
 import { generateAuthActionLink } from "@/lib/email/auth-links";
-import { getAppBaseUrl } from "@/lib/email/config";
+import { getEmailLinkBaseUrl } from "@/lib/email/config";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import {
   partnerStatusEmail,
@@ -8,6 +8,7 @@ import {
   salonWelcomeVerifyEmail,
   subscriptionActivatedEmail,
   subscriptionDeactivatedEmail,
+  teamInviteEmail,
 } from "@/lib/email/templates";
 import { EmailType } from "@/lib/email/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -43,8 +44,8 @@ export async function sendSalonSignupVerificationEmail(input: {
     text: content.text,
     type: EmailType.SalonWelcomeVerify,
     idempotencyKey: input.userId
-      ? `salon-verify:${input.userId}`
-      : `salon-verify:${input.email}`,
+      ? `salon-verify:${input.userId}:${Math.floor(Date.now() / 60_000)}`
+      : `salon-verify:${input.email}:${Math.floor(Date.now() / 60_000)}`,
   });
 }
 
@@ -78,8 +79,8 @@ export async function sendPartnerSignupVerificationEmail(input: {
     text: content.text,
     type: EmailType.PartnerWelcomeVerify,
     idempotencyKey: input.userId
-      ? `partner-verify:${input.userId}`
-      : `partner-verify:${input.email}`,
+      ? `partner-verify:${input.userId}:${Math.floor(Date.now() / 60_000)}`
+      : `partner-verify:${input.email}:${Math.floor(Date.now() / 60_000)}`,
   });
 }
 
@@ -96,7 +97,7 @@ export async function sendPartnerReviewEmail(input: {
     username: input.username,
     status: input.status,
     notes: input.notes,
-    dashboardUrl: `${getAppBaseUrl()}/partner/dashboard`,
+    dashboardUrl: `${getEmailLinkBaseUrl()}/partner/dashboard`,
   });
 
   return sendTransactionalEmail({
@@ -144,6 +145,34 @@ export async function sendPasswordResetEmail(input: {
   });
 }
 
+export async function sendTeamInviteEmail(input: {
+  email: string;
+  salonName: string;
+  role: string;
+  roleLabel: string;
+  inviteToken: string;
+  inviteId: string;
+  expiresDays?: number;
+}) {
+  const inviteUrl = `${getEmailLinkBaseUrl()}/invite/${encodeURIComponent(input.inviteToken)}`;
+  const content = teamInviteEmail({
+    salonName: input.salonName,
+    roleLabel: input.roleLabel,
+    inviteUrl,
+    expiresDays: input.expiresDays,
+  });
+
+  return sendTransactionalEmail({
+    to: input.email,
+    toName: input.email.split("@")[0],
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
+    type: EmailType.TeamInvite,
+    idempotencyKey: `team-invite:${input.inviteId}:${Math.floor(Date.now() / 60_000)}`,
+  });
+}
+
 export async function sendSubscriptionActivatedEmail(input: {
   organizationId: string;
   paymentId: string;
@@ -173,7 +202,7 @@ export async function sendSubscriptionActivatedEmail(input: {
       month: "short",
       day: "numeric",
     }),
-    dashboardUrl: `${getAppBaseUrl()}/dashboard`,
+    dashboardUrl: `${getEmailLinkBaseUrl()}/dashboard`,
   });
 
   return sendTransactionalEmail({
@@ -206,7 +235,7 @@ export async function sendSubscriptionDeactivatedEmail(input: {
       month: "short",
       day: "numeric",
     }),
-    billingUrl: `${getAppBaseUrl()}/billing`,
+    billingUrl: `${getEmailLinkBaseUrl()}/billing`,
   });
 
   return sendTransactionalEmail({

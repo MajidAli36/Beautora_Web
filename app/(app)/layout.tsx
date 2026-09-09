@@ -5,7 +5,11 @@ import { getActiveOrganization } from "@/lib/auth/organization";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
 import { getOrgNavPermissions } from "@/lib/actions/role-permissions";
 import { getOrganizationSubscription, getPlatformAdminFlag } from "@/lib/actions/billing";
-import { getDefaultLandingPath } from "@/lib/permissions/nav";
+import {
+  canAccessPath,
+  getDefaultLandingPath,
+  type NavPermissionsConfig,
+} from "@/lib/permissions/nav";
 import { BRAND } from "@/lib/marketing/brand";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -31,17 +35,42 @@ export default async function AppLayout({
     redirect("/onboarding");
   }
   const overrides = await getOrgNavPermissions();
-  const landingPath = getDefaultLandingPath(org.role, overrides);
   const billing = await getOrganizationSubscription();
   const isPlatformAdmin = await getPlatformAdminFlag();
+  const locked = billing?.snapshot.phase === "locked";
+
+  // When locked, every role must reach /billing (avoid redirect loops)
+  const effectiveOverrides: NavPermissionsConfig = locked
+    ? {
+        ...overrides,
+        [org.role]: {
+          ...(overrides[org.role] ?? {}),
+          billing: true,
+        },
+      }
+    : overrides;
+
+  const landingPath = locked
+    ? "/billing"
+    : getDefaultLandingPath(org.role, effectiveOverrides);
 
   const headerList = await headers();
   const pathname = headerList.get("x-pathname") ?? "";
   const onBilling =
     pathname.startsWith("/billing") || pathname.startsWith("/platform");
 
-  if (billing?.snapshot.phase === "locked" && !onBilling) {
+  if (locked && !onBilling) {
     redirect("/billing");
+  }
+
+  // Server-side feature gate (not only client NavRouteGuard)
+  if (
+    pathname &&
+    !locked &&
+    !onBilling &&
+    !canAccessPath(org.role, pathname, effectiveOverrides)
+  ) {
+    redirect(landingPath);
   }
 
   return (
@@ -50,9 +79,10 @@ export default async function AppLayout({
       userEmail={user.email}
       userRole={ROLE_LABELS[org.role]}
       memberRole={org.role}
-      navOverrides={overrides}
+      navOverrides={effectiveOverrides}
       landingPath={landingPath}
       showPlatformBilling={isPlatformAdmin}
+      subscriptionLocked={Boolean(locked)}
     >
       {billing &&
         (billing.snapshot.phase === "grace" || billing.snapshot.phase === "locked") && (

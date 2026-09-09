@@ -16,9 +16,9 @@ import { getLocalDateString } from "@/lib/dates/local";
 import {
   canApproveDeposits,
   canConfigureOnlineBooking,
-  canManageRecords,
   canOperateQueue,
   canUsePos,
+  checkAction,
 } from "@/lib/auth/permissions";
 
 type PageProps = {
@@ -35,15 +35,17 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
     canCheckIn,
     canCollectPayment,
     canConfigureHours,
+    canCreateAppointment,
     staff,
     schedules,
   ] = await Promise.all([
     getAppointments(date, { source: "STAFF" }),
     canApproveDeposits(),
-    canManageRecords(),
+    checkAction("sales.refund"),
     canOperateQueue(),
     canUsePos(),
     canConfigureOnlineBooking(),
+    checkAction("appointments.create"),
     getStaff().catch(() => []),
     getStaffSchedulesForOrg().catch(() => []),
   ]);
@@ -72,10 +74,12 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
             <Button variant="outline" render={<Link href="/online-booking" />}>
               Online booking
             </Button>
-            <Button render={<Link href="/appointments/new" />}>
-              <Plus className="size-4" />
-              Add appointment
-            </Button>
+            {canCreateAppointment && (
+              <Button render={<Link href="/appointments/new" />}>
+                <Plus className="size-4" />
+                Add appointment
+              </Button>
+            )}
           </>
         }
       />

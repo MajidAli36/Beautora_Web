@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
@@ -10,7 +10,7 @@ export async function registerDevice(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult & { apiKey?: string }> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("devices.create");
   const name = formData.get("name") as string;
   const type = formData.get("type") as string;
   const location = (formData.get("location") as string) || null;
@@ -80,7 +80,7 @@ export async function setDeviceActive(
   deviceId: string,
   isActive: boolean
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("devices.edit");
   const supabase = await createClient();
   const { error } = await supabase
     .from("devices")
@@ -93,7 +93,7 @@ export async function setDeviceActive(
 }
 
 export async function deleteDevice(deviceId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("devices.delete");
   const supabase = await createClient();
 
   await supabase

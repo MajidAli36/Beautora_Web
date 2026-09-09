@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { writeAuditLog } from "@/lib/audit/log";
 import { queueDeviceCommand, findDeviceByType } from "@/lib/devices/helpers";
 import { queueOpenCashDrawer } from "@/lib/devices/cash-drawer";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult, CheckoutPayload, SalePaymentStatus, SaleStatus } from "@/types/commerce";
@@ -44,7 +44,7 @@ async function nextInvoiceNumber(organizationId: string) {
 export async function completeCheckout(
   payload: CheckoutPayload
 ): Promise<{ error?: string; saleId?: string; changeGiven?: number; amountDue?: number }> {
-  const org = await requireMinimumRole("CASHIER");
+  const org = await requireAction("pos.sell");
 
   if (!payload.items.length) {
     return { error: "Cart is empty" };
@@ -570,7 +570,7 @@ export async function voidSale(
   id: string,
   reason?: string
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("sales.void");
   const supabase = await createClient();
   const {
     data: { user },

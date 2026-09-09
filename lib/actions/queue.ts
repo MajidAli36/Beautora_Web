@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { queueDeviceCommand, findDeviceByType } from "@/lib/devices/helpers";
 import { queueOpenCashDrawer } from "@/lib/devices/cash-drawer";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import { getLocalDateString, pakistanDateTimeToIso } from "@/lib/dates/local";
@@ -43,7 +43,7 @@ export async function issueWalkInToken(
   const data = prev instanceof FormData ? prev : formData;
   if (!data) return { error: "Invalid form data" };
 
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("queue.operate");
   const parsed = issueSchema.safeParse({
     customer_id: data.get("customer_id"),
     token_date: data.get("token_date") || getLocalDateString(),
@@ -161,7 +161,7 @@ export async function updateTokenStatus(
   tokenId: string,
   status: "CALLED" | "SERVING" | "COMPLETED" | "CANCELLED"
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("queue.operate");
   const supabase = await createClient();
 
   const updates: Record<string, string> = { status };
@@ -288,14 +288,14 @@ export async function getTodayQueue() {
 }
 
 export async function openDrawer(source = "manual"): Promise<ActionResult> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("queue.open_drawer");
   const result = await queueOpenCashDrawer(org.organizationId, { source });
   if (!result.ok) return { error: result.error };
   return { success: true };
 }
 
 export async function printSaleReceipt(saleId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("CASHIER");
+  const org = await requireAction("pos.sell");
   const printerId = await findDeviceByType(org.organizationId, "PRINTER");
   if (!printerId) return { error: "No printer device registered" };
   await queueDeviceCommand(org.organizationId, printerId, "PRINT_RECEIPT", { saleId });

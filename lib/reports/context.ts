@@ -1,4 +1,4 @@
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import {
   compareMetric,
@@ -20,7 +20,7 @@ export type ReportContext = {
 };
 
 export async function createReportContext(from?: string, to?: string): Promise<ReportContext> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("reports.view");
   const { start, end, fromLabel, toLabel } = resolveReportRange(from, to);
   const prev = getPreviousPeriod(fromLabel, toLabel);
   const prevRange = resolveReportRange(prev.from, prev.to);

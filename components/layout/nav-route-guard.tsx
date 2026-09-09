@@ -10,6 +10,7 @@ type NavRouteGuardProps = {
   role: MemberRole;
   overrides: NavPermissionsConfig;
   landingPath: string;
+  subscriptionLocked?: boolean;
   children: React.ReactNode;
 };
 
@@ -17,11 +18,15 @@ export function NavRouteGuard({
   role,
   overrides,
   landingPath,
+  subscriptionLocked = false,
   children,
 }: NavRouteGuardProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const allowed = canAccessPath(role, pathname, overrides);
+  const onBilling = pathname.startsWith("/billing");
+  const allowed =
+    (subscriptionLocked && onBilling) ||
+    canAccessPath(role, pathname, overrides);
 
   useEffect(() => {
     if (!allowed) {

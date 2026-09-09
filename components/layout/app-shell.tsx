@@ -15,6 +15,7 @@ type AppShellProps = {
   navOverrides: NavPermissionsConfig;
   landingPath: string;
   showPlatformBilling?: boolean;
+  subscriptionLocked?: boolean;
 };
 
 export function AppShell({
@@ -26,6 +27,7 @@ export function AppShell({
   navOverrides,
   landingPath,
   showPlatformBilling = false,
+  subscriptionLocked = false,
 }: AppShellProps) {
   return (
     <SidebarProvider>
@@ -47,6 +49,7 @@ export function AppShell({
           role={memberRole}
           overrides={navOverrides}
           landingPath={landingPath}
+          subscriptionLocked={subscriptionLocked}
         >
           <div className="app-main flex-1 overflow-x-hidden overscroll-x-contain p-4 sm:p-6 lg:p-8">
             {children}

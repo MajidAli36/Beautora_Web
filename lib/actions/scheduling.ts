@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
@@ -221,7 +221,7 @@ export async function saveStaffSchedule(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("online_booking.configure");
   const parsed = scheduleSchema.safeParse({
     staff_id: formData.get("staff_id"),
     day_of_week: formData.get("day_of_week"),
@@ -255,7 +255,7 @@ export async function saveWeeklyStaffSchedule(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("online_booking.configure");
   const staffId = formData.get("staff_id");
   const days = [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
     const closed = formData.get(`day_${dayOfWeek}_closed`) === "1";
@@ -316,7 +316,7 @@ export async function setStaffOnlineBooking(
   staffId: string,
   enabled: boolean
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("online_booking.configure");
   const supabase = await createClient();
   const { error } = await supabase
     .from("staff")

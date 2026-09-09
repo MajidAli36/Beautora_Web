@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
@@ -77,7 +77,7 @@ function isLegacySaleRefundExpense(description: string | null | undefined) {
 }
 
 export async function getFinancialSummary(from?: string, to?: string): Promise<FinancialSummary> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("reports.view");
   const supabase = await createClient();
   const { start, end, fromLabel, toLabel } = parseDateRange(from, to);
 
@@ -264,7 +264,7 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
 }
 
 export async function getExpenses(from?: string, to?: string): Promise<ExpenseRow[]> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("reports.view");
   const supabase = await createClient();
   const { fromLabel, toLabel } = parseDateRange(from, to);
 
@@ -300,7 +300,7 @@ export async function createExpense(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("finances.create");
   const parsed = expenseSchema.safeParse({
     category: formData.get("category"),
     amount: formData.get("amount"),
@@ -336,7 +336,7 @@ export async function createExpense(
 }
 
 export async function deleteExpense(expenseId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("finances.delete");
   const supabase = await createClient();
 
   const { error } = await supabase

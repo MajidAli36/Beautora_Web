@@ -170,9 +170,10 @@ export function getEffectiveNavPermissions(
     }
   }
 
-  // Admins must keep Settings to manage team and permissions
+  // Admins must keep Settings + Staff to manage team and permissions
   if (role === "ADMIN") {
     base.settings = true;
+    base.staff = true;
   }
 
   return base;

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/actions/customers";
@@ -32,7 +32,7 @@ export async function createCategory(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.create");
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
     sort_order: formData.get("sort_order") || 0,
@@ -57,7 +57,7 @@ export async function createCategory(
 }
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.delete");
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("service_categories")
@@ -91,7 +91,7 @@ export async function createService(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.create");
   const categoryId = formData.get("category_id") as string;
 
   const parsed = serviceSchema.safeParse({
@@ -135,7 +135,7 @@ export async function updateService(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.edit");
   const categoryId = formData.get("category_id") as string;
 
   const parsed = serviceSchema.safeParse({
@@ -180,7 +180,7 @@ export async function updateServiceUsageRecipe(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.edit");
   const supabase = await createClient();
   const { data: svc } = await supabase
     .from("services")
@@ -207,7 +207,7 @@ export async function linkInHouseProductToService(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.edit");
   const serviceId = String(formData.get("service_id") ?? "").trim();
   if (!serviceId) return { error: "Choose a service" };
 
@@ -449,7 +449,7 @@ export async function getServicesWithUsage() {
 }
 
 export async function deleteService(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.delete");
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("services")
@@ -484,7 +484,7 @@ export async function createPackage(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.create");
   const parsed = packageSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || undefined,
@@ -536,7 +536,7 @@ export async function createPackage(
 }
 
 export async function deletePackage(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("services.delete");
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("packages")

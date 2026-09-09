@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
@@ -19,7 +19,7 @@ export async function createStaff(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("staff.create");
   const parsed = staffSchema.safeParse({
     full_name: formData.get("full_name"),
     phone: formData.get("phone") || undefined,
@@ -51,7 +51,7 @@ export async function setStaffActive(
   staffId: string,
   isActive: boolean
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("staff.edit");
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -74,7 +74,7 @@ export async function setStaffActive(
 }
 
 export async function deleteStaff(staffId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("staff.delete");
   const supabase = await createClient();
 
   const { data: staff } = await supabase
@@ -150,7 +150,7 @@ export async function recordManualAttendance(
   action: "in" | "out" | "session",
   options: ManualAttendanceOptions = {}
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("attendance.manage");
   const supabase = await createClient();
 
   const { data: staff } = await supabase
@@ -293,7 +293,7 @@ export async function enrollStaffThumb(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("staff.edit");
   const parsed = thumbSchema.safeParse({
     staff_id: formData.get("staff_id"),
     thumb_id: formData.get("thumb_id"),
@@ -330,7 +330,7 @@ export async function enrollStaffThumb(
 }
 
 export async function removeStaffThumb(staffId: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("staff.edit");
   const supabase = await createClient();
   const { error } = await supabase
     .from("staff")

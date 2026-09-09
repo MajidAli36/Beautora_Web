@@ -6,6 +6,7 @@ export const EmailType = {
   PasswordReset: "password_reset",
   SubscriptionActivated: "subscription_activated",
   SubscriptionDeactivated: "subscription_deactivated",
+  TeamInvite: "team_invite",
 } as const;
 
 export type EmailType = (typeof EmailType)[keyof typeof EmailType];

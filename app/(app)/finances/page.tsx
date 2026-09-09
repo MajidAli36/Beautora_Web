@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getExpenses, getFinancialSummary } from "@/lib/actions/finances";
 import { getStaffPayments } from "@/lib/actions/payroll";
 import { getStaff } from "@/lib/actions/staff";
-import { canViewReports } from "@/lib/auth/permissions";
+import { getCapabilities } from "@/lib/auth/permissions";
 import { FinancesDashboard } from "@/components/features/finances/finances-dashboard";
 import { getLocalDateString } from "@/lib/dates/local";
 
@@ -12,8 +12,8 @@ type PageProps = {
 };
 
 export default async function FinancesPage({ searchParams }: PageProps) {
-  const canView = await canViewReports();
-  if (!canView) redirect("/dashboard");
+  const caps = await getCapabilities("finances");
+  if (!caps.visible) redirect("/dashboard");
 
   const params = await searchParams;
   const today = getLocalDateString();

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
@@ -23,7 +23,7 @@ export async function createCustomer(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("customers.create");
   const parsed = customerSchema.safeParse({
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name") || undefined,
@@ -67,7 +67,7 @@ export async function createCustomerInline(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult & { customerId?: string }> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("customers.create");
   const parsed = customerSchema.safeParse({
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name") || undefined,
@@ -193,7 +193,7 @@ export async function updateCustomer(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("RECEPTIONIST");
+  const org = await requireAction("customers.edit");
   const parsed = customerSchema.safeParse({
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name") || undefined,
@@ -233,7 +233,7 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("customers.delete");
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")
@@ -267,7 +267,7 @@ export async function deleteCustomer(id: string): Promise<ActionResult> {
 
 /** Soft-delete without redirect — for list UIs that refresh in place. */
 export async function deleteCustomerInline(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("customers.delete");
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")

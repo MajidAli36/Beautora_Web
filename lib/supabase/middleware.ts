@@ -59,10 +59,12 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isServerAction = request.headers.has("next-action");
   const isResetPasswordRoute = pathname.startsWith("/reset-password");
+  const isInviteRoute = pathname.startsWith("/invite");
   const isAuthRoute =
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
-    isResetPasswordRoute;
+    isResetPasswordRoute ||
+    isInviteRoute;
   const isOnboardingRoute = pathname.startsWith("/onboarding");
   const isPartnerDashboard = pathname.startsWith("/partner/dashboard");
   const isProtectedRoute =
@@ -125,8 +127,8 @@ export async function updateSession(request: NextRequest) {
 
     const hasOrg = await userHasOrganization(supabase, user.id);
 
-    // Allow recovery session to stay on reset-password
-    if (isAuthRoute && !isResetPasswordRoute) {
+    // Allow recovery + invite accept pages while authenticated
+    if (isAuthRoute && !isResetPasswordRoute && !isInviteRoute) {
       const url = request.nextUrl.clone();
       url.pathname = isPlatformAdmin
         ? "/platform"

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -133,7 +133,7 @@ export async function getStoreProfile(): Promise<StoreProfile | null> {
 export async function setStorePublicListing(
   enabled: boolean
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   const supabase = await createClient();
 
   const { data: updated, error } = await supabase
@@ -160,7 +160,7 @@ export async function updateStoreProfile(input: {
   whatsappPhone?: string;
   arrivalNotes?: string;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   const name = input.name.trim();
   if (name.length < 2) return { error: "Salon name is required" };
 
@@ -260,7 +260,7 @@ export async function updateStoreProfile(input: {
 export async function updateStoreHours(
   hours: BusinessHoursDay[]
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   const normalized = parseBusinessHours(hours.length ? hours : DEFAULT_BUSINESS_HOURS);
   const supabase = await createClient();
 
@@ -280,7 +280,7 @@ export async function uploadStoreProfileImage(input: {
   kind: "logo" | "cover";
   file: File;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   const file = input.file;
   if (!file || !(file instanceof File) || file.size === 0) {
     return { error: "Choose an image to upload" };
@@ -323,7 +323,7 @@ export async function uploadStoreProfileImage(input: {
 export async function removeStoreProfileImage(
   kind: "logo" | "cover"
 ): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   const patch =
     kind === "logo" ? { logo_path: null } : { cover_path: null };
   const supabase = await createClient();
@@ -346,7 +346,7 @@ export async function createPaymentAccount(input: {
   bankName?: string;
   extraNote?: string;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   if (!ACCOUNT_TYPES.has(input.accountType)) {
     return { error: "Invalid account type" };
   }
@@ -394,7 +394,7 @@ export async function updatePaymentAccount(input: {
   extraNote?: string;
   isActive: boolean;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   if (!ACCOUNT_TYPES.has(input.accountType)) {
     return { error: "Invalid account type" };
   }
@@ -430,7 +430,7 @@ export async function updatePaymentAccount(input: {
 }
 
 export async function deletePaymentAccount(id: string): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("settings.manage");
   const supabase = await createClient();
   const { error } = await supabase
     .from("organization_payment_accounts")

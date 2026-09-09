@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit/log";
-import { requireMinimumRole } from "@/lib/auth/permissions";
+import { requireAction } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
 import {
@@ -278,7 +278,7 @@ async function compensateRetailRestore(
 
 /** Preview amendment financial impact (server-validated totals). */
 export async function previewSaleAmendment(payload: AmendPayload) {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("sales.edit");
   const supabase = await createClient();
 
   const { data: sale } = await supabase
@@ -321,7 +321,7 @@ export async function previewSaleAmendment(payload: AmendPayload) {
 export async function amendCompletedSale(
   payload: AmendPayload
 ): Promise<ActionResult & { saleId?: string; version?: number }> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("sales.edit");
   const supabase = await createClient();
   const {
     data: { user },
@@ -843,7 +843,7 @@ export async function refundSale(input: {
   method: "CASH" | "CARD" | "OTHER";
   reason: string;
 }): Promise<ActionResult> {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("sales.refund");
   const supabase = await createClient();
   const {
     data: { user },
@@ -1002,7 +1002,7 @@ export async function refundSale(input: {
 }
 
 export async function getSaleVersions(saleId: string) {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("sales.edit");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -1017,7 +1017,7 @@ export async function getSaleVersions(saleId: string) {
 }
 
 export async function getSaleRefunds(saleId: string) {
-  const org = await requireMinimumRole("MANAGER");
+  const org = await requireAction("sales.refund");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sale_refunds")

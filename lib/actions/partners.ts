@@ -12,6 +12,10 @@ import {
   PARTNER_REF_MAX_AGE_DAYS,
   validatePartnerUsername,
 } from "@/lib/partners/referral";
+import {
+  getEmailBlockReason,
+  normalizeEmail,
+} from "@/lib/auth/email-guards";
 import type { ActionResult } from "@/types/commerce";
 
 export type PartnerStatus = "pending" | "approved" | "rejected";
@@ -63,25 +67,6 @@ export type PartnerReferredStore = {
   commission_status: "earned" | "paid" | "void" | null;
   commission_at: string | null;
 };
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
-
-async function findAuthUserByEmail(
-  admin: ReturnType<typeof createAdminClient>,
-  email: string
-) {
-  const target = normalizeEmail(email);
-  for (let page = 1; page <= 20; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) throw new Error(error.message);
-    const found = data.users.find((u) => u.email?.toLowerCase() === target);
-    if (found) return found;
-    if (data.users.length < 200) break;
-  }
-  return null;
-}
 
 /** Persist referral code from marketing/signup links (30 days). */
 export async function rememberPartnerReferral(code: string): Promise<ActionResult> {
@@ -173,23 +158,9 @@ export async function applyAsPartner(input: {
     .maybeSingle();
   if (usernameClash) return { error: "This username is already taken" };
 
-  const { data: emailClash } = await admin
-    .from("partners")
-    .select("id")
-    .ilike("email", email)
-    .maybeSingle();
-  if (emailClash) {
-    return { error: "A partner application already exists for this email" };
-  }
-
   try {
-    const existing = await findAuthUserByEmail(admin, email);
-    if (existing) {
-      return {
-        error:
-          "An account with this email already exists. Sign in, or use a different email for partner registration.",
-      };
-    }
+    const blocked = await getEmailBlockReason(admin, email, "partner_apply");
+    if (blocked) return { error: blocked };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not check email" };
   }
@@ -231,12 +202,22 @@ export async function applyAsPartner(input: {
   }
 
   const { sendPartnerSignupVerificationEmail } = await import("@/lib/email/notify");
-  await sendPartnerSignupVerificationEmail({
+  const mailed = await sendPartnerSignupVerificationEmail({
     email,
     username,
     fullName,
     userId: created.user.id,
   });
+
+  if (!mailed.ok) {
+    await admin.from("partners").delete().eq("user_id", created.user.id);
+    await admin.auth.admin.deleteUser(created.user.id);
+    return {
+      error: mailed.skipped
+        ? "Email is not configured on the server. Please try again later."
+        : `Could not send verification email: ${mailed.error}`,
+    };
+  }
 
   revalidatePath("/platform");
   revalidatePath("/partner");

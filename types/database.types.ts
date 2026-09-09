@@ -52,6 +52,7 @@ export type Database = {
           arrival_notes: string | null;
           business_hours: Json | null;
           nav_permissions: Json;
+          action_permissions: Json;
           booking_slot_minutes: number;
           booking_days_ahead: number;
           booking_advance_amount: number;
@@ -83,6 +84,7 @@ export type Database = {
           arrival_notes?: string | null;
           business_hours?: Json | null;
           nav_permissions?: Json;
+          action_permissions?: Json;
           booking_slot_minutes?: number;
           booking_days_ahead?: number;
           booking_advance_amount?: number;
@@ -114,6 +116,7 @@ export type Database = {
           arrival_notes?: string | null;
           business_hours?: Json | null;
           nav_permissions?: Json;
+          action_permissions?: Json;
           booking_slot_minutes?: number;
           booking_days_ahead?: number;
           booking_advance_amount?: number;
@@ -172,6 +175,51 @@ export type Database = {
           review_notes?: string | null;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      team_invitations: {
+        Row: {
+          id: string;
+          organization_id: string;
+          email: string;
+          role: MemberRole;
+          token_hash: string;
+          invited_by: string | null;
+          status: string;
+          expires_at: string;
+          accepted_at: string | null;
+          accepted_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          email: string;
+          role: MemberRole;
+          token_hash: string;
+          invited_by?: string | null;
+          status?: string;
+          expires_at: string;
+          accepted_at?: string | null;
+          accepted_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          email?: string;
+          role?: MemberRole;
+          token_hash?: string;
+          invited_by?: string | null;
+          status?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          accepted_user_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
