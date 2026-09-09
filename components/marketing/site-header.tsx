@@ -56,6 +56,17 @@ export function SiteHeader() {
         >
           <Link
             href="/"
+            onClick={(e) => {
+              setOpen(false);
+              // Already on home (often with a #hash from nav) — force hero from the top
+              if (pathname === "/") {
+                e.preventDefault();
+                if (window.location.hash) {
+                  window.history.replaceState(null, "", "/");
+                }
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
             className={cn(
               "flex flex-col leading-none transition-colors",
               solid ? "text-[var(--m-ink)]" : "text-white"
