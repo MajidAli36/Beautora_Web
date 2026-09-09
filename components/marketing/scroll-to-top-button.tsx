@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
+import { scrollMarketingToTop } from "@/components/marketing/marketing-scroll-manager";
 import { cn } from "@/lib/utils";
 
 type ScrollToTopButtonProps = {
@@ -26,7 +27,10 @@ export function ScrollToTopButton({
   }, [threshold]);
 
   function scrollTop() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname || "/");
+    }
+    scrollMarketingToTop();
   }
 
   return (

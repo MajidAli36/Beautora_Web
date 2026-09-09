@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Outfit } from "next/font/google";
+import { MarketingScrollManager } from "@/components/marketing/marketing-scroll-manager";
 import { ScrollToTopButton } from "@/components/marketing/scroll-to-top-button";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SITE_SEO } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
+
 
 const display = Cormorant_Garamond({
   subsets: ["latin"],
@@ -54,6 +56,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       className={`${display.variable} ${sans.variable} marketing-site flex min-h-full flex-col`}
     >
       <SiteHeader />
+      <MarketingScrollManager />
       <main className="flex-1">{children}</main>
       <SiteFooter />
       <ScrollToTopButton />

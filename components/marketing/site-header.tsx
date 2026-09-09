@@ -1,25 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
+import { scrollMarketingToTop } from "@/components/marketing/marketing-scroll-manager";
 import { SiteTopBar } from "@/components/marketing/site-top-bar";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { label: "How it works", href: "/#how-it-works" },
-  { label: "Platform", href: "/#platform" },
-  { label: "Pricing", href: "/#pricing" },
+  { label: "How it works", href: "/#how-it-works", hash: "how-it-works" },
+  { label: "Platform", href: "/#platform", hash: "platform" },
+  { label: "Pricing", href: "/#pricing", hash: "pricing" },
   { label: "Stores", href: "/stores" },
   { label: "Apps", href: "/apps" },
   { label: "About", href: "/about" },
   { label: "Partner", href: "/partner" },
-];
+] as const;
+
+function scrollToHash(hash: string) {
+  const el = document.getElementById(hash);
+  if (!el) return;
+  el.scrollIntoView({ block: "start", behavior: "smooth" });
+}
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const isHome = pathname === "/";
@@ -34,6 +42,37 @@ export function SiteHeader() {
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  function goHome(e: MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    setOpen(false);
+    if (pathname === "/") {
+      if (window.location.hash) {
+        window.history.replaceState(null, "", "/");
+      }
+      scrollMarketingToTop();
+      return;
+    }
+    router.push("/");
+    // Fight App Router scroll restoration after navigation
+    requestAnimationFrame(() => {
+      scrollMarketingToTop();
+      window.setTimeout(scrollMarketingToTop, 0);
+      window.setTimeout(scrollMarketingToTop, 80);
+      window.setTimeout(scrollMarketingToTop, 200);
+    });
+  }
+
+  function goHash(e: MouseEvent<HTMLAnchorElement>, hash: string) {
+    e.preventDefault();
+    setOpen(false);
+    if (pathname === "/") {
+      window.history.pushState(null, "", `/#${hash}`);
+      scrollToHash(hash);
+      return;
+    }
+    router.push(`/#${hash}`);
+  }
 
   const solid = !isHome || scrolled || open;
 
@@ -55,18 +94,8 @@ export function SiteHeader() {
           )}
         >
           <Link
-            href="/"
-            onClick={(e) => {
-              setOpen(false);
-              // Already on home (often with a #hash from nav) — force hero from the top
-              if (pathname === "/") {
-                e.preventDefault();
-                if (window.location.hash) {
-                  window.history.replaceState(null, "", "/");
-                }
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
+            href="/#top"
+            onClick={goHome}
             className={cn(
               "flex flex-col leading-none transition-colors",
               solid ? "text-[var(--m-ink)]" : "text-white"
@@ -90,6 +119,7 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={"hash" in item && item.hash ? (e) => goHash(e, item.hash) : undefined}
                 className={cn(
                   "inline-flex items-center gap-1.5 text-sm font-medium tracking-wide transition-opacity duration-150 hover:opacity-70",
                   solid ? "text-[var(--m-ink-soft)]" : "text-white/90"
@@ -160,7 +190,13 @@ export function SiteHeader() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setOpen(false)}
+                  onClick={(e) => {
+                    if ("hash" in item && item.hash) {
+                      goHash(e, item.hash);
+                    } else {
+                      setOpen(false);
+                    }
+                  }}
                   className="flex min-h-11 items-center justify-between px-1 text-base font-medium text-[var(--m-ink)]"
                 >
                   {item.label}

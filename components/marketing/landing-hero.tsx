@@ -8,7 +8,10 @@ const HERO_IMAGE =
 
 export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
   return (
-    <section className="relative min-h-[100svh] overflow-hidden bg-[var(--m-ink)] text-white">
+    <section
+      id="top"
+      className="relative min-h-[100svh] overflow-hidden bg-[var(--m-ink)] text-white"
+    >
       <div className="absolute inset-0">
         <Image
           src={HERO_IMAGE}
