@@ -58,8 +58,11 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isServerAction = request.headers.has("next-action");
+  const isResetPasswordRoute = pathname.startsWith("/reset-password");
   const isAuthRoute =
-    pathname.startsWith("/login") || pathname.startsWith("/signup");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    isResetPasswordRoute;
   const isOnboardingRoute = pathname.startsWith("/onboarding");
   const isPartnerDashboard = pathname.startsWith("/partner/dashboard");
   const isProtectedRoute =
@@ -106,7 +109,11 @@ export async function updateSession(request: NextRequest) {
 
     // Partners only ever use the partner dashboard (never salon app / onboarding)
     if (isPartner && !isPlatformAdmin) {
-      if (isAuthRoute || isOnboardingRoute || (isProtectedRoute && !isPartnerDashboard)) {
+      if (
+        (isAuthRoute && !isResetPasswordRoute) ||
+        isOnboardingRoute ||
+        (isProtectedRoute && !isPartnerDashboard)
+      ) {
         const url = request.nextUrl.clone();
         url.pathname = "/partner/dashboard";
         return NextResponse.redirect(url);
@@ -118,7 +125,8 @@ export async function updateSession(request: NextRequest) {
 
     const hasOrg = await userHasOrganization(supabase, user.id);
 
-    if (isAuthRoute) {
+    // Allow recovery session to stay on reset-password
+    if (isAuthRoute && !isResetPasswordRoute) {
       const url = request.nextUrl.clone();
       url.pathname = isPlatformAdmin
         ? "/platform"

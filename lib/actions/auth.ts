@@ -1,6 +1,10 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  sendPasswordResetEmail,
+  sendSalonSignupVerificationEmail,
+} from "@/lib/email/notify";
 import type { ActionResult } from "@/types/commerce";
 
 function normalizeEmail(email: string) {
@@ -105,14 +109,14 @@ export async function checkSalonNameAvailable(nameInput: string): Promise<{
 }
 
 /**
- * Creates an auth user with email already confirmed (no confirmation email).
- * Client should then signInWithPassword with the same credentials.
+ * Creates an auth user (email unconfirmed) and sends Beautora verification email via Resend.
+ * User completes signup by clicking the email link (session + confirmed).
  */
 export async function registerAccount(input: {
   email: string;
   password: string;
   salonName: string;
-}): Promise<ActionResult> {
+}): Promise<ActionResult & { needsEmailVerification?: boolean }> {
   const email = normalizeEmail(input.email);
   const password = input.password;
   const salonName = normalizeSalonName(input.salonName);
@@ -164,7 +168,7 @@ export async function registerAccount(input: {
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: false,
     user_metadata: {
       salon_name: salonName,
       account_type: "owner",
@@ -183,10 +187,50 @@ export async function registerAccount(input: {
     return { error: "Could not create account" };
   }
 
+  const mailed = await sendSalonSignupVerificationEmail({
+    email,
+    salonName,
+    userId: data.user.id,
+  });
+
+  if (!mailed.ok && !("skipped" in mailed && mailed.skipped)) {
+    console.error("[auth] verification email failed after signup", mailed.error);
+  }
+
+  return { success: true, needsEmailVerification: true };
+}
+
+/**
+ * Request password reset via Resend (does not use Supabase's built-in SMTP).
+ * Always returns success to the client when the request is well-formed (anti-enumeration).
+ */
+export async function requestPasswordReset(
+  emailInput: string
+): Promise<ActionResult> {
+  const email = normalizeEmail(emailInput);
+  if (!email || !email.includes("@")) {
+    return { error: "Enter a valid email address" };
+  }
+
+  try {
+    const admin = createAdminClient();
+    const user = await findAuthUserByEmail(admin, email);
+    if (user?.email) {
+      const meta = user.user_metadata ?? {};
+      const name =
+        (typeof meta.full_name === "string" && meta.full_name) ||
+        (typeof meta.salon_name === "string" && meta.salon_name) ||
+        null;
+      await sendPasswordResetEmail({ email: user.email, name });
+    }
+  } catch (err) {
+    console.error("[auth] password reset request failed", err);
+  }
+
   return { success: true };
 }
 
-/** Force-confirm an email so login works without confirmation emails. */
+/** Force-confirm an email (platform admin bootstrap / legacy accounts only). */
 export async function confirmUserEmail(emailInput: string): Promise<ActionResult> {
   const email = normalizeEmail(emailInput);
   if (!email) return { error: "Enter a valid email" };

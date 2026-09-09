@@ -138,8 +138,8 @@ export async function resolveApprovedPartnerByUsername(code: string | null | und
 }
 
 /**
- * Partner application: creates confirmed auth user + pending partners row.
- * Client signs in afterward and lands on the partner dashboard (pending state).
+ * Partner application: creates unconfirmed auth user + pending partners row,
+ * then emails a verification link via Resend. Client should NOT auto-login.
  */
 export async function applyAsPartner(input: {
   email: string;
@@ -147,7 +147,7 @@ export async function applyAsPartner(input: {
   username: string;
   fullName?: string;
   phone?: string;
-}): Promise<ActionResult> {
+}): Promise<ActionResult & { needsEmailVerification?: boolean }> {
   const email = normalizeEmail(input.email);
   const password = input.password;
   const validated = validatePartnerUsername(input.username);
@@ -197,7 +197,7 @@ export async function applyAsPartner(input: {
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: false,
     user_metadata: {
       account_type: "partner",
       partner_username: username,
@@ -230,9 +230,17 @@ export async function applyAsPartner(input: {
     return { error: insertErr.message };
   }
 
+  const { sendPartnerSignupVerificationEmail } = await import("@/lib/email/notify");
+  await sendPartnerSignupVerificationEmail({
+    email,
+    username,
+    fullName,
+    userId: created.user.id,
+  });
+
   revalidatePath("/platform");
   revalidatePath("/partner");
-  return { success: true };
+  return { success: true, needsEmailVerification: true };
 }
 
 export async function getPartnerForUser(userId: string): Promise<{
@@ -550,7 +558,7 @@ export async function reviewPartnerApplication(input: {
   const admin = createAdminClient();
   const { data: partner, error } = await admin
     .from("partners")
-    .select("id, status, user_id, username")
+    .select("id, status, user_id, username, email, full_name")
     .eq("id", input.partnerId)
     .single();
 
@@ -558,17 +566,19 @@ export async function reviewPartnerApplication(input: {
   if (partner.status !== "pending") return { error: "Application already reviewed" };
 
   const now = new Date().toISOString();
+  const reviewNotes =
+    input.reviewNotes?.trim() ||
+    (input.decision === "approved"
+      ? "Approved — referral link is live"
+      : "Rejected");
+
   const { error: upd } = await admin
     .from("partners")
     .update({
       status: input.decision,
       reviewed_by: user.id,
       reviewed_at: now,
-      review_notes:
-        input.reviewNotes?.trim() ||
-        (input.decision === "approved"
-          ? "Approved — referral link is live"
-          : "Rejected"),
+      review_notes: reviewNotes,
     })
     .eq("id", partner.id);
 
@@ -586,6 +596,20 @@ export async function reviewPartnerApplication(input: {
         },
       });
     }
+  }
+
+  try {
+    const { sendPartnerReviewEmail } = await import("@/lib/email/notify");
+    await sendPartnerReviewEmail({
+      email: partner.email,
+      username: partner.username,
+      fullName: partner.full_name,
+      status: input.decision,
+      notes: reviewNotes,
+      partnerId: partner.id,
+    });
+  } catch (err) {
+    console.error("[partners] review email failed", err);
   }
 
   revalidatePath("/platform");

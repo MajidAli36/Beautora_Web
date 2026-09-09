@@ -21,7 +21,6 @@ const r2Host = hostnameFromUrl(process.env.R2_ENDPOINT);
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // Payment screenshots up to 5 MB + multipart overhead
   experimental: {
     serverActions: {
       bodySizeLimit: "6mb",
@@ -44,6 +43,16 @@ const nextConfig: NextConfig = {
           ]
         : []),
     ],
+  },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.beautora.app" }],
+        destination: "https://beautora.app/:path*",
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

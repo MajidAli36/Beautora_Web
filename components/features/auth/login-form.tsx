@@ -1,23 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { notify } from "@/lib/toast";
-// import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
-import { confirmUserEmail } from "@/lib/actions/auth";
+import { confirmUserEmail, requestPasswordReset } from "@/lib/actions/auth";
 import { ensureHardcodedPlatformAdmin } from "@/lib/actions/platform-auth";
 import { PLATFORM_HARDCODED_ADMIN } from "@/lib/platform/admin";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export function LoginForm() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
+
+  useEffect(() => {
+    const preset = searchParams.get("email");
+    if (preset) setEmail(preset);
+    if (searchParams.get("verified") === "pending") {
+      notify.success("Check your inbox for the Beautora verification link.");
+    }
+    if (searchParams.get("reset") === "1") {
+      notify.success("Password updated — sign in with your new password.");
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +49,6 @@ export function LoginForm() {
         return;
       }
       if (ensured.created) {
-        // New Auth user — short wait before first password grant
         await new Promise((r) => setTimeout(r, 500));
       }
     }
@@ -51,8 +62,11 @@ export function LoginForm() {
 
     let { error: authError } = await trySignIn();
 
-    // Auto-confirm older accounts so "Email not confirmed" never blocks login.
-    if (authError?.message?.toLowerCase().includes("email not confirmed")) {
+    // Platform admin only — auto-confirm so hardcoded admin never blocks
+    if (
+      isPlatformAdmin &&
+      authError?.message?.toLowerCase().includes("email not confirmed")
+    ) {
       const confirmed = await confirmUserEmail(trimmedEmail);
       if (confirmed.error) {
         notify.error(confirmed.error);
@@ -62,7 +76,14 @@ export function LoginForm() {
       ({ error: authError } = await trySignIn());
     }
 
-    // Admin first-login race: recreate/sync once and retry
+    if (authError?.message?.toLowerCase().includes("email not confirmed")) {
+      notify.error(
+        "Please verify your email first — open the link we sent from Beautora."
+      );
+      setLoading(false);
+      return;
+    }
+
     if (
       authError &&
       isPlatformAdmin &&
@@ -92,19 +113,15 @@ export function LoginForm() {
       return;
     }
     setResetting(true);
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      {
-        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-      }
-    );
+    const result = await requestPasswordReset(email.trim().toLowerCase());
     setResetting(false);
-    if (resetError) {
-      notify.error(resetError.message);
+    if (result.error) {
+      notify.error(result.error);
       return;
     }
-    notify.success("Password reset email sent");
+    notify.success(
+      "If an account exists for that email, password reset instructions were sent."
+    );
   }
 
   return (
@@ -205,31 +222,6 @@ export function LoginForm() {
           {!loading && <ArrowRight className="size-4" />}
         </button>
       </form>
-
-      {/* Social login — enable later when OAuth providers are configured
-      <div className="mt-7">
-        <AuthSocialButtons />
-      </div>
-      */}
-
-      {/* Platform admin shortcut — keep hidden from UI; credentials in lib/platform/admin.ts
-      <div className="mt-6 space-y-2 border-t border-[var(--m-line)] pt-5 text-xs text-[var(--m-muted)]">
-        <p className="font-medium text-[var(--m-ink-soft)]">Platform admin (SyncOps)</p>
-        <p>
-          {PLATFORM_HARDCODED_ADMIN.email} / {PLATFORM_HARDCODED_ADMIN.password}
-        </p>
-        <button
-          type="button"
-          className="font-medium text-[var(--m-accent)] underline-offset-4 hover:underline"
-          onClick={() => {
-            setEmail(PLATFORM_HARDCODED_ADMIN.email);
-            setPassword(PLATFORM_HARDCODED_ADMIN.password);
-          }}
-        >
-          Fill admin login
-        </button>
-      </div>
-      */}
     </div>
   );
 }

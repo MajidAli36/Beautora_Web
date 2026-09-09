@@ -140,6 +140,17 @@ export async function setPlatformStoreEnabled(input: {
       })
       .eq("id", input.organizationId);
     if (error) return { error: error.message };
+
+    try {
+      const { sendSubscriptionDeactivatedEmail } = await import("@/lib/email/notify");
+      await sendSubscriptionDeactivatedEmail({
+        organizationId: input.organizationId,
+        reason: "locked",
+        eventKey: `admin-lock:${input.organizationId}:${Date.now()}`,
+      });
+    } catch (err) {
+      console.error("[platform] lock email failed", err);
+    }
   } else {
     const now = new Date();
     const nextEnd = new Date(now.getTime());
@@ -155,6 +166,18 @@ export async function setPlatformStoreEnabled(input: {
       })
       .eq("id", input.organizationId);
     if (error) return { error: error.message };
+
+    try {
+      const { sendSubscriptionActivatedEmail } = await import("@/lib/email/notify");
+      await sendSubscriptionActivatedEmail({
+        organizationId: input.organizationId,
+        paymentId: `admin-enable:${input.organizationId}:${now.toISOString()}`,
+        amount: SUBSCRIPTION.monthlyAmountPkr,
+        renewsAt: nextEnd.toISOString(),
+      });
+    } catch (err) {
+      console.error("[platform] enable email failed", err);
+    }
   }
 
   revalidatePath("/platform");

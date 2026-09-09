@@ -7,25 +7,15 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: [
-          "/",
-          "/book",
-          "/book/",
-          "/stores",
-          "/stores/",
-          "/signup",
-          "/login",
-          "/syncops",
-          "/ceo",
-          "/partner",
-          "/apps",
-        ],
+        allow: "/",
         disallow: [
           "/dashboard",
           "/onboarding",
           "/billing",
           "/platform",
           "/partner/dashboard",
+          "/login",
+          "/reset-password",
           "/api/",
           "/pos",
           "/sales",
@@ -44,11 +34,12 @@ export default function robots(): MetadataRoute.Robots {
           "/services",
           "/chairs",
           "/online-booking",
+          "/in-house",
           "/kiosk/",
         ],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
+    host: siteUrl.replace(/^https?:\/\//, ""),
   };
 }

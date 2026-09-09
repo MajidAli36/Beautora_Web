@@ -47,6 +47,11 @@ export function SiteFooter() {
                 Apps
               </Link>
             </li>
+            <li>
+              <Link href="/signup" className="transition-colors hover:text-white">
+                Start free
+              </Link>
+            </li>
           </ul>
         </div>
 
@@ -55,6 +60,16 @@ export function SiteFooter() {
             Company
           </p>
           <ul className="mt-4 space-y-2.5 text-sm text-white/70">
+            <li>
+              <Link href="/about" className="transition-colors hover:text-white">
+                About Beautora
+              </Link>
+            </li>
+            <li>
+              <Link href="/contact" className="transition-colors hover:text-white">
+                Contact
+              </Link>
+            </li>
             <li>
               <Link href="/partner" className="transition-colors hover:text-white">
                 Partner
@@ -69,11 +84,6 @@ export function SiteFooter() {
               <Link href="/ceo" className="transition-colors hover:text-white">
                 CEO
               </Link>
-            </li>
-            <li>
-              <a href={`mailto:${SYNCOPS.email}`} className="transition-colors hover:text-white">
-                Contact
-              </a>
             </li>
           </ul>
         </div>
@@ -103,7 +113,7 @@ export function SiteFooter() {
                 rel="noopener noreferrer me author"
                 className="transition-colors hover:text-white"
               >
-                {SYNCOPS.builder.domain}
+                Built by SyncOps
               </a>
             </li>
           </ul>
@@ -112,14 +122,14 @@ export function SiteFooter() {
           </p>
           <ul className="mt-3 space-y-2 text-sm text-white/55">
             <li>
-              <span className="cursor-default" title="Coming soon">
+              <Link href="/privacy" className="transition-colors hover:text-white/80">
                 Privacy
-              </span>
+              </Link>
             </li>
             <li>
-              <span className="cursor-default" title="Coming soon">
+              <Link href="/terms" className="transition-colors hover:text-white/80">
                 Terms
-              </span>
+              </Link>
             </li>
           </ul>
         </div>
@@ -140,8 +150,8 @@ export function SiteFooter() {
               {SYNCOPS.builder.domain}
             </a>
             {" · "}
-            <Link href="/syncops" className="hover:text-white/70">
-              About {SYNCOPS.builder.name}
+            <Link href="/about" className="hover:text-white/70">
+              About Beautora
             </Link>
           </p>
         </div>

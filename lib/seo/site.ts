@@ -13,15 +13,15 @@ export function getSiteUrl(): string {
 
 const PRICE = SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK");
 
-/** Product SEO — Beautora (app) + SyncOps (studio). */
+/** Product SEO — Beautora (salon OS) + SyncOps (studio). */
 export const SITE_SEO = {
   product: SYNCOPS.name,
   builder: SYNCOPS.builder.name,
   tagline: "The operating system for modern salons",
-  titleDefault: `${SYNCOPS.name} by ${SYNCOPS.builder.name} — Salon Management Software`,
-  titleTemplate: `%s · ${SYNCOPS.name} by ${SYNCOPS.builder.name}`,
-  description: `${SYNCOPS.name} is an all-in-one salon management platform by ${SYNCOPS.builder.name} for bookings, POS, staff, customers, attendance, WhatsApp, and reports. ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month per store.`,
-  shortDescription: `${SYNCOPS.name} by ${SYNCOPS.builder.name} — bookings, POS, staff & reports for modern salons.`,
+  titleDefault: `${SYNCOPS.name} | Salon Management Software`,
+  titleTemplate: `%s | ${SYNCOPS.name}`,
+  description: `Discover ${SYNCOPS.name} — salon management software by ${SYNCOPS.builder.name} for online booking, POS, staff, queue, WhatsApp, and reports. ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month per store.`,
+  shortDescription: `${SYNCOPS.name} — bookings, POS, staff & reports for modern salons. Built by ${SYNCOPS.builder.name}.`,
   keywords: [
     SYNCOPS.name,
     SYNCOPS.builder.name,
@@ -29,8 +29,8 @@ export const SITE_SEO = {
     SYNCOPS.builder.domain,
     "Beautora by SyncOps",
     "SyncOps Beautora",
-    "SyncOps product",
     "salon software",
+    "salon POS",
     "salon POS Pakistan",
     "salon management system",
     "online salon booking",

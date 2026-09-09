@@ -12,7 +12,7 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
       <div className="absolute inset-0">
         <Image
           src={HERO_IMAGE}
-          alt="Salon floor with stylists at work"
+          alt="Modern salon interior with styling stations — Beautora salon operating system"
           fill
           priority
           sizes="100vw"

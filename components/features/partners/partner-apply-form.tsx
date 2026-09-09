@@ -9,7 +9,6 @@ import {
   applyAsPartner,
   checkPartnerUsernameAvailable,
 } from "@/lib/actions/partners";
-import { createClient } from "@/lib/supabase/client";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { cn } from "@/lib/utils";
 
@@ -76,21 +75,11 @@ export function PartnerApplyForm() {
       return;
     }
 
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
-
-    if (authError) {
-      notify.success("Application submitted — please sign in");
-      router.push("/login");
-      setLoading(false);
-      return;
-    }
-
-    notify.success("Application submitted — waiting for SyncOps approval");
-    window.location.assign("/partner/dashboard");
+    notify.success(
+      "Application submitted — check your email to verify your account."
+    );
+    router.push(`/login?verified=pending&email=${encodeURIComponent(email.trim().toLowerCase())}`);
+    setLoading(false);
   }
 
   return (

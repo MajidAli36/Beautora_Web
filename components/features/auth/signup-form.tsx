@@ -12,7 +12,6 @@ import {
   registerAccount,
 } from "@/lib/actions/auth";
 import { rememberPartnerReferral } from "@/lib/actions/partners";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export function SignupForm() {
@@ -112,21 +111,9 @@ export function SignupForm() {
       return;
     }
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: trimmedEmail,
-      password,
-    });
-
-    if (signInError) {
-      notify.error(signInError.message);
-      setLoading(false);
-      return;
-    }
-
-    notify.success("Account created — you’re signed in.");
-    router.push("/onboarding");
-    router.refresh();
+    notify.success("Account created — check your email to verify and continue.");
+    router.push(`/login?verified=pending&email=${encodeURIComponent(trimmedEmail)}`);
+    setLoading(false);
   }
 
   return (
@@ -285,7 +272,7 @@ export function SignupForm() {
           }
           className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[var(--m-ink)] text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)] disabled:opacity-60"
         >
-          {loading ? "Creating account…" : "Continue to setup"}
+          {loading ? "Creating account…" : "Create account"}
           {!loading && <ArrowRight className="size-4" />}
         </button>
       </form>

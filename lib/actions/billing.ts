@@ -389,6 +389,18 @@ export async function reviewSubscriptionPayment(input: {
     console.error("partner commission failed", err);
   }
 
+  try {
+    const { sendSubscriptionActivatedEmail } = await import("@/lib/email/notify");
+    await sendSubscriptionActivatedEmail({
+      organizationId: org.id,
+      paymentId: payment.id,
+      amount: Number(payment.amount),
+      renewsAt: nextEnd.toISOString(),
+    });
+  } catch (err) {
+    console.error("[billing] subscription activated email failed", err);
+  }
+
   revalidatePath("/platform/subscriptions");
   revalidatePath("/billing");
   revalidatePath("/dashboard");

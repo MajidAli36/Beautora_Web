@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublicStoreBySlug } from "@/lib/actions/stores";
 import { formatCurrency, formatDuration } from "@/lib/format";
+import { buildPageMetadata } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
 export const dynamic = "force-dynamic";
@@ -15,18 +16,28 @@ export async function generateMetadata({
 }: StoreDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
   const store = await getPublicStoreBySlug(slug);
-  if (!store) return { title: "Store not found" };
+  if (!store) {
+    return buildPageMetadata({
+      title: "Store not found",
+      description: `This salon is not available on ${SYNCOPS.name}.`,
+      path: `/stores/${slug}`,
+      noIndex: true,
+    });
+  }
   const blurb =
     store.highlightServices.length > 0
       ? store.highlightServices.join(" · ")
       : `Book online at ${store.name}`;
   const ogImage = store.coverUrl ?? store.visual.coverImage;
-  return {
+  const base = buildPageMetadata({
     title: store.name,
     description: `${blurb}. Book on ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
+    path: `/stores/${slug}`,
+  });
+  return {
+    ...base,
     openGraph: {
-      title: store.name,
-      description: blurb,
+      ...base.openGraph,
       images: [{ url: ogImage }],
     },
   };
