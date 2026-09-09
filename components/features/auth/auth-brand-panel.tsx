@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -111,41 +111,25 @@ const FEATURE_SLIDES: FeatureSlide[] = [
 ];
 
 const SLIDES = [CEO_SLIDE, ...FEATURE_SLIDES] as const;
-const FEATURE_START = 1;
-const ROTATE_MS = 2000;
+const ROTATE_MS = 3000;
 
 type AuthBrandPanelProps = {
-  /** Ignored for rotation — login & signup always start on the CEO slide once. */
+  /** Ignored for rotation — login & signup always start on the CEO slide. */
   slide?: number;
 };
 
 export function AuthBrandPanel(_props: AuthBrandPanelProps = {}) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
-  /** After CEO advances once, autoplay stays on feature slides only. */
-  const ceoDoneRef = useRef(false);
 
   const goTo = useCallback((index: number) => {
-    const next = Math.max(0, Math.min(index, SLIDES.length - 1));
-    if (next >= FEATURE_START) ceoDoneRef.current = true;
-    setActive(next);
+    setActive(Math.max(0, Math.min(index, SLIDES.length - 1)));
   }, []);
 
   useEffect(() => {
     if (paused) return;
     const id = window.setInterval(() => {
-      setActive((current) => {
-        if (current === 0 && !ceoDoneRef.current) {
-          ceoDoneRef.current = true;
-          return FEATURE_START;
-        }
-        if (current === 0) {
-          return FEATURE_START;
-        }
-        const next = current + 1;
-        if (next >= SLIDES.length) return FEATURE_START;
-        return next;
-      });
+      setActive((current) => (current + 1) % SLIDES.length);
     }, ROTATE_MS);
     return () => window.clearInterval(id);
   }, [paused, active]);

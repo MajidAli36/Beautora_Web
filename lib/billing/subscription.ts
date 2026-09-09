@@ -4,7 +4,11 @@ import { isHardcodedPlatformAdminEmail } from "@/lib/platform/admin";
 
 export const SUBSCRIPTION = {
   monthlyAmountPkr: 3000,
+  /** Free trial length after salon creation */
   trialDays: 30,
+  /** Paid access length after each approved JazzCash payment */
+  periodDays: 30,
+  /** Soft window after trial/period ends before hard lock (still operational) */
   graceDays: 3,
   /** Caution popup interval during grace (ms) */
   cautionPopupIntervalMs: 60 * 60 * 1000,

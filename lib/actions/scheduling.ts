@@ -143,8 +143,17 @@ export async function getPublicAvailableSlots(
 
   const { ensureOnlineBookableStaff } = await import("@/lib/booking/public-booking");
 
-  const { data: org } = await admin.from("organizations").select("id").eq("slug", orgSlug).single();
+  const { data: org } = await admin
+    .from("organizations")
+    .select(
+      "id, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+    )
+    .eq("slug", orgSlug)
+    .single();
   if (!org) return [];
+
+  const { resolveSubscription } = await import("@/lib/billing/subscription");
+  if (!resolveSubscription(org).isOperational) return [];
 
   await ensureOnlineBookableStaff(admin, org.id);
 

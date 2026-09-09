@@ -125,7 +125,7 @@ export function PartnerApplyForm() {
           </p>
         ) : (
           <p className="text-xs text-[var(--m-muted)]">
-            Clients open stores with{" "}
+            After SyncOps approves you, clients open stores with{" "}
             <span className="font-medium text-[var(--m-ink)]">
               /signup?ref={username.trim() || "yourname"}
             </span>

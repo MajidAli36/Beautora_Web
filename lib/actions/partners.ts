@@ -69,29 +69,35 @@ export type PartnerReferredStore = {
 };
 
 /** Persist referral code from marketing/signup links (30 days). */
-export async function rememberPartnerReferral(code: string): Promise<ActionResult> {
+export async function rememberPartnerReferral(
+  code: string
+): Promise<ActionResult & { username?: string }> {
   const validated = validatePartnerUsername(code);
   if (!validated.ok) return { error: validated.error };
 
   const admin = createAdminClient();
   const { data } = await admin
     .from("partners")
-    .select("id, status")
+    .select("id, status, username")
     .eq("username", validated.username)
     .maybeSingle();
 
   if (!data || data.status !== "approved") {
-    return { error: "This partner code is not active yet" };
+    return { error: "This partner referral link is not active yet" };
   }
 
   const jar = await cookies();
-  jar.set(PARTNER_REF_COOKIE, validated.username, {
+  const isProd =
+    process.env.VERCEL_ENV === "production" ||
+    process.env.NODE_ENV === "production";
+  jar.set(PARTNER_REF_COOKIE, data.username, {
     path: "/",
     maxAge: PARTNER_REF_MAX_AGE_DAYS * 24 * 60 * 60,
     sameSite: "lax",
-    httpOnly: false,
+    httpOnly: true,
+    secure: isProd,
   });
-  return { success: true };
+  return { success: true, username: data.username };
 }
 
 export async function getRememberedPartnerReferral(): Promise<string | null> {
@@ -106,6 +112,8 @@ export async function getRememberedPartnerReferral(): Promise<string | null> {
 export async function resolveApprovedPartnerByUsername(code: string | null | undefined): Promise<{
   id: string;
   username: string;
+  email: string;
+  user_id: string | null;
 } | null> {
   if (!code?.trim()) return null;
   const validated = validatePartnerUsername(code);
@@ -114,12 +122,17 @@ export async function resolveApprovedPartnerByUsername(code: string | null | und
   const admin = createAdminClient();
   const { data } = await admin
     .from("partners")
-    .select("id, username, status")
+    .select("id, username, email, user_id, status")
     .eq("username", validated.username)
     .maybeSingle();
 
   if (!data || data.status !== "approved") return null;
-  return { id: data.id, username: data.username };
+  return {
+    id: data.id,
+    username: data.username,
+    email: data.email,
+    user_id: data.user_id,
+  };
 }
 
 /**
@@ -621,11 +634,38 @@ export async function creditPartnerFirstSubscription(input: {
 
   const { data: partner } = await admin
     .from("partners")
-    .select("id, status")
+    .select("id, status, email, user_id")
     .eq("id", org.referred_by_partner_id)
     .maybeSingle();
 
   if (!partner || partner.status !== "approved") return;
+
+  // Block self-referral payout (partner email / auth user owns the store)
+  const { data: owners } = await admin
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", org.id)
+    .eq("role", "OWNER")
+    .limit(1);
+  const ownerId = owners?.[0]?.user_id ?? null;
+  if (ownerId && partner.user_id && ownerId === partner.user_id) {
+    console.warn("[partners] skipped self-referral commission", {
+      organizationId: org.id,
+      partnerId: partner.id,
+    });
+    return;
+  }
+  if (ownerId) {
+    const { data: ownerUser } = await admin.auth.admin.getUserById(ownerId);
+    const ownerEmail = ownerUser.user?.email?.toLowerCase() ?? "";
+    if (ownerEmail && ownerEmail === String(partner.email).toLowerCase()) {
+      console.warn("[partners] skipped self-referral commission (email)", {
+        organizationId: org.id,
+        partnerId: partner.id,
+      });
+      return;
+    }
+  }
 
   // Only the first approved payment for this org earns commission
   const { count } = await admin

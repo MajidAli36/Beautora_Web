@@ -29,7 +29,17 @@ async function userIsPartner(
 }
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
+
+  const next = () =>
+    NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+
+  let supabaseResponse = next();
 
   const supabase = createServerClient<Database>(
     getSupabaseUrl(),
@@ -43,7 +53,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = next();
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -56,7 +66,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const isServerAction = request.headers.has("next-action");
   const isResetPasswordRoute = pathname.startsWith("/reset-password");
   const isInviteRoute = pathname.startsWith("/invite");
@@ -90,8 +99,6 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/billing") ||
     pathname.startsWith("/platform") ||
     isPartnerDashboard;
-
-  supabaseResponse.headers.set("x-pathname", pathname);
 
   if (isServerAction) {
     return supabaseResponse;

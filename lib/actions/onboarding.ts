@@ -7,6 +7,7 @@ import {
   slugUniqueViolationMessage,
   validateStoreSlug,
 } from "@/lib/onboarding/slug";
+import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/types/commerce";
@@ -102,6 +103,13 @@ export async function createSalonOrganization(
     };
   }
 
+  if (meta.account_type === "partner") {
+    return {
+      error:
+        "Partner accounts cannot open a salon store. Use the partner dashboard, or sign up with a different email.",
+    };
+  }
+
   const nameTaken = await admin.from("organizations").select("id, name");
 
   if (nameTaken.error) {
@@ -153,21 +161,30 @@ export async function createSalonOrganization(
 
   const phone = input.whatsappPhone?.trim() || null;
   const trialEndsAt = new Date();
-  trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + 30);
+  trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + SUBSCRIPTION.trialDays);
 
   let referredByPartnerId: string | null = null;
   let referralCodeUsed: string | null = null;
   try {
     const { resolveApprovedPartnerByUsername, getRememberedPartnerReferral } =
       await import("@/lib/actions/partners");
+    const metaRef =
+      typeof meta.partner_referral === "string" ? meta.partner_referral : null;
     const code =
       input.referralCode?.trim() ||
+      metaRef ||
       (await getRememberedPartnerReferral()) ||
       null;
     const partner = await resolveApprovedPartnerByUsername(code);
     if (partner) {
-      referredByPartnerId = partner.id;
-      referralCodeUsed = partner.username;
+      const ownerEmail = (user.email ?? "").toLowerCase();
+      const isSelf =
+        (partner.user_id && partner.user_id === user.id) ||
+        (ownerEmail && partner.email.toLowerCase() === ownerEmail);
+      if (!isSelf) {
+        referredByPartnerId = partner.id;
+        referralCodeUsed = partner.username;
+      }
     }
   } catch {
     // Referral is best-effort — never block store creation
@@ -214,6 +231,8 @@ export async function createSalonOrganization(
       ...user.user_metadata,
       salon_name: salonName,
       onboarding_completed: true,
+      // Clear referral after attribution so it cannot be reused
+      partner_referral: null,
     },
   });
 

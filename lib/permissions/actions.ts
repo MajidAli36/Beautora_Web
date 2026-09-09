@@ -334,7 +334,7 @@ export const ACTION_META: Record<ActionKey, ActionMeta> = {
     key: "billing.manage",
     feature: "billing",
     label: "Manage billing",
-    defaultMinRole: "OWNER",
+    defaultMinRole: "ADMIN",
   },
   "settings.manage": {
     key: "settings.manage",

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { cn } from "@/lib/utils";
 
-const ROTATE_MS = 2000;
+const ROTATE_MS = 3000;
 
 const SLIDES = [
   {

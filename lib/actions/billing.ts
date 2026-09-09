@@ -352,7 +352,7 @@ export async function reviewSubscriptionPayment(input: {
       ? currentEnd
       : now;
   const nextEnd = new Date(base.getTime());
-  nextEnd.setUTCDate(nextEnd.getUTCDate() + 30);
+  nextEnd.setUTCDate(nextEnd.getUTCDate() + SUBSCRIPTION.periodDays);
 
   const { error: payUpd } = await admin
     .from("subscription_payments")
@@ -360,7 +360,9 @@ export async function reviewSubscriptionPayment(input: {
       status: "approved",
       reviewed_by: user.id,
       reviewed_at: now.toISOString(),
-      review_notes: input.reviewNotes?.trim() || "Approved — store re-enabled for 30 days",
+      review_notes:
+        input.reviewNotes?.trim() ||
+        `Approved — store re-enabled for ${SUBSCRIPTION.periodDays} days`,
     })
     .eq("id", payment.id);
 

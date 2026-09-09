@@ -3,6 +3,7 @@ import {
   getActiveOrganization,
   requireOrganization,
 } from "@/lib/auth/organization";
+import { assertOrgOperational } from "@/lib/billing/enforce";
 import {
   canPerformAction,
   getFeatureCapability,
@@ -17,6 +18,9 @@ import {
 import { hasMinimumRole } from "@/lib/permissions/roles";
 import { createClient } from "@/lib/supabase/server";
 import type { MemberRole } from "@/types";
+
+/** Actions allowed even when the store subscription is locked */
+const LOCKED_ALLOWED_ACTIONS = new Set<ActionKey>(["billing.manage"]);
 
 async function loadOrgPermissionRows(organizationId: string) {
   const supabase = await createClient();
@@ -51,6 +55,8 @@ export async function requireMinimumRole(requiredRole: MemberRole) {
   if (!hasMinimumRole(org.role, requiredRole)) {
     throw new Error("Insufficient permissions");
   }
+  // Monthly subscription hard lock (except billing flows use requireAction)
+  await assertOrgOperational(org.organizationId);
   return org;
 }
 
@@ -60,6 +66,9 @@ export async function requireAction(action: ActionKey) {
   const { nav, actions } = await getOrgPermissionConfig();
   if (!canPerformAction(org.role, action, actions, nav)) {
     throw new Error("Insufficient permissions");
+  }
+  if (!LOCKED_ALLOWED_ACTIONS.has(action)) {
+    await assertOrgOperational(org.organizationId);
   }
   return org;
 }

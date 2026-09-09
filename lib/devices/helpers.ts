@@ -1,3 +1,4 @@
+import { isOrgOperational } from "@/lib/billing/enforce";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServiceRoleKey } from "@/lib/supabase/env";
@@ -29,6 +30,11 @@ export async function authenticateDevice(apiKey: string) {
     .single();
 
   if (error || !data) return null;
+
+  // Locked / unpaid stores cannot use POS hardware APIs
+  if (!(await isOrgOperational(data.organization_id))) {
+    return null;
+  }
 
   await admin
     .from("devices")

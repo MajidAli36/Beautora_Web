@@ -29,15 +29,20 @@ export function SignupForm() {
   const [nameOk, setNameOk] = useState<boolean | null>(null);
   const [emailOk, setEmailOk] = useState<boolean | null>(null);
   const [partnerRef, setPartnerRef] = useState<string | null>(null);
+  const [refHint, setRefHint] = useState<string | null>(null);
 
   useEffect(() => {
     const ref = searchParams.get("ref")?.trim();
     if (!ref) return;
     void (async () => {
       const result = await rememberPartnerReferral(ref);
-      if (!result.error) {
-        setPartnerRef(ref.toLowerCase());
+      if (result.error) {
+        setPartnerRef(null);
+        setRefHint(result.error);
+        return;
       }
+      setPartnerRef(result.username ?? ref.toLowerCase());
+      setRefHint(null);
     })();
   }, [searchParams]);
 
@@ -103,6 +108,7 @@ export function SignupForm() {
       email: trimmedEmail,
       password,
       salonName: trimmedSalon,
+      referralCode: partnerRef,
     });
 
     if (created.error) {
@@ -135,6 +141,11 @@ export function SignupForm() {
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
             Referred by partner <span className="font-semibold">@{partnerRef}</span> — they
             earn your first month&apos;s subscription when you pay.
+          </p>
+        ) : null}
+        {refHint ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            {refHint}. You can still open a store without a partner referral.
           </p>
         ) : null}
       </div>

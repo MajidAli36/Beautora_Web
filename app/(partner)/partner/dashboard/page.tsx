@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { requireAuth } from "@/lib/auth/session";
 import { getPartnerDashboard } from "@/lib/actions/partners";
 import { PartnerDashboardClient } from "@/components/features/partners/partner-dashboard-client";
+import { getSiteUrl } from "@/lib/seo/site";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +22,7 @@ export default async function PartnerDashboardPage() {
     redirect("/dashboard");
   }
 
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const origin = `${proto}://${host}`;
+  const origin = getSiteUrl().replace(/\/$/, "");
 
   return (
     <PartnerDashboardClient

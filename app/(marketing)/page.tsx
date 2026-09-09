@@ -10,6 +10,7 @@ import { StoresSection } from "@/components/marketing/stores-section";
 import { ConfidenceSection } from "@/components/marketing/confidence-section";
 import { PricingSection } from "@/components/marketing/pricing-section";
 import { AppsComingSoonSection } from "@/components/marketing/apps-coming-soon-section";
+import { TeamBehindSection } from "@/components/marketing/team-behind-section";
 import { LandingFinalCta } from "@/components/marketing/landing-final-cta";
 import { buildPageMetadata, SITE_SEO } from "@/lib/seo/site";
 
@@ -36,6 +37,7 @@ export default async function HomePage() {
       <ConfidenceSection />
       <PricingSection />
       <AppsComingSoonSection />
+      <TeamBehindSection />
       <LandingFinalCta />
     </>
   );

@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 function phaseBadge(phase: string) {
   if (phase === "trial") return <Badge variant="secondary">Free trial</Badge>;
   if (phase === "active") return <Badge className="bg-emerald-600">Active</Badge>;
-  if (phase === "grace") return <Badge className="bg-amber-500">Grace (3-day caution)</Badge>;
+  if (phase === "grace") return <Badge className="bg-amber-500">Grace ({SUBSCRIPTION.graceDays}-day caution)</Badge>;
   return <Badge variant="destructive">Locked</Badge>;
 }
 
@@ -45,11 +45,12 @@ export default async function BillingPage() {
           <CardHeader>
             <CardTitle>Store access paused</CardTitle>
             <CardDescription>
-              The 3-day caution window has ended. Send{" "}
+              The {SUBSCRIPTION.graceDays}-day caution window has ended. Send{" "}
               {SUBSCRIPTION.currencyLabel}{" "}
               {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")} via JazzCash to{" "}
               <strong>{SUBSCRIPTION.jazzcashDisplay}</strong>, then submit proof below. After
-              Beautora verifies the payment, your store is re-enabled for 30 days.
+              Beautora verifies the payment, your store is re-enabled for{" "}
+              {SUBSCRIPTION.periodDays} days.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -76,7 +77,8 @@ export default async function BillingPage() {
               {snapshot.trialEndsAt
                 ? ` (${snapshot.trialEndsAt.toLocaleDateString("en-PK")})`
                 : ""}
-              . After that you get a <strong>3-day caution</strong> (hourly reminders) before
+              . After that you get a{" "}
+              <strong>{SUBSCRIPTION.graceDays}-day caution</strong> (hourly reminders) before
               lock.
             </p>
           )}

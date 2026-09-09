@@ -634,11 +634,22 @@ export async function createOnlineBooking(input: {
 
   const { data: org } = await admin
     .from("organizations")
-    .select("id, booking_advance_amount, booking_advance_percent")
+    .select(
+      "id, booking_advance_amount, booking_advance_percent, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+    )
     .eq("slug", input.orgSlug)
     .single();
 
   if (!org) return { error: "Salon not found" };
+
+  const { resolveSubscription } = await import("@/lib/billing/subscription");
+  if (!resolveSubscription(org).isOperational) {
+    return {
+      error:
+        "This salon is temporarily unavailable for online booking. Please try again later.",
+    };
+  }
+
   if (!input.staffId) return { error: "Please select a staff member" };
 
   const bookableStaff = await ensureOnlineBookableStaff(admin, org.id);

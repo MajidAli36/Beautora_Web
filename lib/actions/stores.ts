@@ -1,5 +1,6 @@
 "use server";
 
+import { resolveSubscription } from "@/lib/billing/subscription";
 import { getStoreVisual, type StoreVisual } from "@/lib/marketing/store-visuals";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getStoreAssetSignedUrl } from "@/lib/storage/store-assets";
@@ -52,15 +53,20 @@ export async function listPublicStores(): Promise<PublicStore[]> {
 
   const { data: orgs, error } = await admin
     .from("organizations")
-    .select("id, name, slug, city, address, tagline, whatsapp_phone, logo_path, cover_path")
+    .select(
+      "id, name, slug, city, address, tagline, whatsapp_phone, logo_path, cover_path, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+    )
     .is("admin_disabled_at", null)
     .eq("public_listing_enabled", true)
     .order("name");
 
   if (error || !orgs?.length) return [];
 
+  const operationalOrgs = orgs.filter((org) => resolveSubscription(org).isOperational);
+  if (!operationalOrgs.length) return [];
+
   const stores = await Promise.all(
-    orgs.map(async (org) => {
+    operationalOrgs.map(async (org) => {
       const [
         { count: serviceCount },
         { count: staffCount },
@@ -129,12 +135,13 @@ export async function getPublicStoreBySlug(slug: string): Promise<PublicStoreDet
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at, public_listing_enabled"
+      "id, name, slug, city, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at, public_listing_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, created_at"
     )
     .eq("slug", slug)
     .maybeSingle();
 
   if (!org || org.admin_disabled_at || !org.public_listing_enabled) return null;
+  if (!resolveSubscription(org).isOperational) return null;
 
   const [{ data: services }, { data: staff }, logoUrl, coverUrl] = await Promise.all([
     admin

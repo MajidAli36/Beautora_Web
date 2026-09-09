@@ -83,6 +83,8 @@ export async function registerAccount(input: {
   email: string;
   password: string;
   salonName: string;
+  /** Approved partner username from ?ref= */
+  referralCode?: string | null;
 }): Promise<ActionResult & { needsEmailVerification?: boolean }> {
   const email = normalizeEmail(input.email);
   const password = input.password;
@@ -105,6 +107,7 @@ export async function registerAccount(input: {
     return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY" };
   }
 
+  let partnerReferral: string | null = null;
   try {
     const blocked = await getEmailBlockReason(admin, email, "salon_signup");
     if (blocked) return { error: blocked };
@@ -113,6 +116,29 @@ export async function registerAccount(input: {
       return {
         error: "This salon name is already taken. Choose a different name.",
       };
+    }
+
+    // Persist referral on the user so email-verify on another device still attributes
+    const rawRef =
+      input.referralCode?.trim() ||
+      (await import("@/lib/actions/partners").then((m) =>
+        m.getRememberedPartnerReferral()
+      )) ||
+      null;
+    if (rawRef) {
+      const { resolveApprovedPartnerByUsername } = await import(
+        "@/lib/actions/partners"
+      );
+      const partner = await resolveApprovedPartnerByUsername(rawRef);
+      if (partner) {
+        if (partner.email.toLowerCase() === email) {
+          return {
+            error:
+              "You cannot open a salon with your own partner referral link. Use a different email, or sign up without your partner code.",
+          };
+        }
+        partnerReferral = partner.username;
+      }
     }
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Registration check failed" };
@@ -125,6 +151,7 @@ export async function registerAccount(input: {
     user_metadata: {
       salon_name: salonName,
       account_type: "owner",
+      ...(partnerReferral ? { partner_referral: partnerReferral } : {}),
     },
   });
 
