@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { notify } from "@/lib/toast";
 import { confirmUserEmail, requestPasswordReset } from "@/lib/actions/auth";
@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -104,7 +105,9 @@ export function LoginForm() {
 
     const { resolvePostLoginDestination } = await import("@/lib/actions/partners");
     const dest = await resolvePostLoginDestination();
-    window.location.assign(dest);
+    // Soft navigate — avoid full browser reload flash after login
+    router.replace(dest);
+    router.refresh();
   }
 
   async function handleForgotPassword() {

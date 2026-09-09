@@ -124,13 +124,3 @@ export function NavigationLoader() {
     </div>
   );
 }
-
-/** Suspense fallback used by `app/(app)/loading.tsx`. */
-export function AppRouteLoadingFallback() {
-  return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
-      <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-      <p className="text-sm font-medium text-muted-foreground">Loading…</p>
-    </div>
-  );
-}
