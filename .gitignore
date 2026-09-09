@@ -23,8 +23,13 @@
 # Env & secrets — never commit real keys
 .env
 .env.*
+!.env.development
+!.env.production
 !.env.local.example
+!.env.development.example
+!.env.production.example
 !.env*.example
+.env.local.bak
 .secrets/
 *.pem
 *.p12

@@ -71,7 +71,7 @@ export async function sendTransactionalEmail(
         message: error.message,
         hint:
           /domain|not verified|from/i.test(error.message)
-            ? "Verify beautora.app in Resend and use no-reply@beautora.app"
+            ? "Verify beautora.app domain in Resend and use no-reply@beautora.app"
             : undefined,
       });
       return { ok: false, error: error.message };

@@ -21,8 +21,7 @@ const POOLER_REGION_FALLBACKS = [
   "us-west-1",
 ];
 
-export function loadEnvLocal() {
-  const path = resolve(root, ".env.local");
+function parseEnvFile(path) {
   if (!existsSync(path)) return {};
   const content = readFileSync(path, "utf8");
   const env = {};
@@ -34,6 +33,24 @@ export function loadEnvLocal() {
     env[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
   }
   return env;
+}
+
+/**
+ * Load env for Node scripts.
+ * Preference: .env.development.local → .env.local → .env.production.local → .env.local.bak
+ */
+export function loadEnvLocal() {
+  const candidates = [
+    resolve(root, ".env.development.local"),
+    resolve(root, ".env.local"),
+    resolve(root, ".env.production.local"),
+    resolve(root, ".env.local.bak"),
+  ];
+  for (const path of candidates) {
+    const env = parseEnvFile(path);
+    if (Object.keys(env).length > 0) return env;
+  }
+  return {};
 }
 
 export function getProjectRef(env) {
@@ -143,7 +160,7 @@ export function run(cmd, opts = {}) {
 }
 
 export function printDbEnvHelp() {
-  console.error("\nAdd ONE of these to .env.local:\n");
+  console.error("\nAdd ONE of these to .env.development.local (or .env.local):\n");
   console.error("  Option 1 — Session/Transaction pooler URL (recommended on Windows):");
   console.error("    Supabase Dashboard → Connect → Connection string → Pooler");
   console.error(

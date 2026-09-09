@@ -68,7 +68,7 @@ export default function AboutPage() {
             name: "Where do I start?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Open a store at beautora.app/signup, explore live salons, or contact Beautora support.",
+              text: "Open a store at www.beautora.app/signup, explore live salons, or contact Beautora support.",
             },
           },
         ],

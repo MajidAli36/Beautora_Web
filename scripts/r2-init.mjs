@@ -14,22 +14,30 @@ import {
 const ROOT = "saas_salon";
 
 function loadEnvLocal() {
-  const path = resolve(process.cwd(), ".env.local");
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq <= 0) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
+  const candidates = [
+    resolve(process.cwd(), ".env.development.local"),
+    resolve(process.cwd(), ".env.local"),
+    resolve(process.cwd(), ".env.production.local"),
+    resolve(process.cwd(), ".env.local.bak"),
+  ];
+  for (const path of candidates) {
+    if (!existsSync(path)) continue;
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq <= 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let value = trimmed.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (!process.env[key]) process.env[key] = value;
     }
-    if (!process.env[key]) process.env[key] = value;
+    return;
   }
 }
 
@@ -41,7 +49,7 @@ const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 const bucket = process.env.R2_BUCKET;
 
 if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
-  console.error("Missing R2_* vars in .env.local");
+  console.error("Missing R2_* vars in .env.development.local (or .env.local)");
   process.exit(1);
 }
 

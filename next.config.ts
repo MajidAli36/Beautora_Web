@@ -44,16 +44,8 @@ const nextConfig: NextConfig = {
         : []),
     ],
   },
-  async redirects() {
-    return [
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "www.beautora.app" }],
-        destination: "https://beautora.app/:path*",
-        permanent: true,
-      },
-    ];
-  },
+  // Host redirects are owned by Vercel:
+  // beautora.app → www.beautora.app. Do NOT redirect www → apex here (causes a loop).
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

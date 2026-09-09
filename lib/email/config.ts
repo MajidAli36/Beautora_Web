@@ -18,7 +18,7 @@ function isProductionRuntime() {
 
 /**
  * Public app origin for email links (verify / reset / dashboard CTAs).
- * Production never emits localhost — falls back to beautora.app.
+ * Production never emits localhost — falls back to https://www.beautora.app.
  */
 export function getAppBaseUrl(): string {
   const fromApp = process.env.APP_BASE_URL?.trim()
@@ -29,7 +29,7 @@ export function getAppBaseUrl(): string {
   if (isProductionRuntime()) {
     if (fromApp && !isLocalHost(fromApp)) return fromApp;
     if (site && !isLocalHost(site)) return site;
-    return SYNCOPS.url;
+    return SYNCOPS.url; // https://www.beautora.app
   }
 
   if (fromApp) return fromApp;
