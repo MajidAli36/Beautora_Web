@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { NavigationLoader } from "@/components/layout/navigation-loader";
 import { NavRouteGuard } from "@/components/layout/nav-route-guard";
 import { QuickActionFab } from "@/components/dashboard/quick-action-fab";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -51,7 +52,8 @@ export function AppShell({
           landingPath={landingPath}
           subscriptionLocked={subscriptionLocked}
         >
-          <div className="app-main flex-1 overflow-x-hidden overscroll-x-contain p-4 sm:p-6 lg:p-8">
+          <div className="app-main relative flex-1 overflow-x-hidden overscroll-x-contain p-4 sm:p-6 lg:p-8">
+            <NavigationLoader />
             {children}
           </div>
           <QuickActionFab memberRole={memberRole} navOverrides={navOverrides} />
