@@ -1,5 +1,6 @@
 import { SYNCOPS } from "@/lib/print/syncops";
-import { formatCurrency, formatDate, formatTime } from "@/lib/format";
+import { formatDate, formatTime } from "@/lib/format";
+import { roundMoney } from "@/lib/sales/calculate";
 
 /** Thermal paper presets — content width leaves a printer-safe margin on both sides. */
 export type ThermalPaperWidth = "80mm" | "58mm";
@@ -183,9 +184,9 @@ function thermalStyles(paper: ThermalPaperWidth): string {
     margin: 6px 0 3px;
   }
   .items-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 28px 52px;
-    gap: 2px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
     font-size: 11px;
     font-weight: 900;
     color: #000;
@@ -194,8 +195,8 @@ function thermalStyles(paper: ThermalPaperWidth): string {
     margin-bottom: 3px;
     max-width: 100%;
   }
-  .items-head .col-qty,
   .items-head .col-price {
+    flex-shrink: 0;
     text-align: right;
   }
   .item {
@@ -206,40 +207,38 @@ function thermalStyles(paper: ThermalPaperWidth): string {
   .item:last-child {
     border-bottom: none;
   }
-  .item-top {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 28px 52px;
-    gap: 2px;
-    align-items: start;
-    font-size: 12px;
-    color: #000;
-    max-width: 100%;
-  }
   .item-name {
-    min-width: 0;
+    display: block;
+    width: 100%;
     font-weight: 700;
+    font-size: 12px;
     word-break: break-word;
     overflow-wrap: anywhere;
-    padding-right: 2px;
     color: #000;
   }
+  .item-money {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 2px;
+    max-width: 100%;
+  }
   .item-qty {
-    text-align: right;
-    font-weight: 700;
+    min-width: 0;
+    font-size: 11px;
+    font-weight: 600;
     color: #000;
     font-variant-numeric: tabular-nums;
   }
   .item-price {
+    flex-shrink: 0;
     text-align: right;
+    font-size: 12px;
     font-weight: 700;
     color: #000;
     font-variant-numeric: tabular-nums;
-  }
-  .item-unit {
-    margin-top: 1px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #000;
+    white-space: nowrap;
   }
 
   /* ── Totals ── */
@@ -346,22 +345,24 @@ function thermalStyles(paper: ThermalPaperWidth): string {
     margin-top: 8px;
     padding-top: 5px;
     border-top: 1px solid #000;
-    line-height: 1.35;
+    line-height: 1.4;
+  }
+  .credit-line {
+    display: block;
+    white-space: nowrap;
   }
   .credit a { color: #000; text-decoration: none; font-weight: 700; }
   .credit strong { color: #000; font-weight: 900; }
   .credit-phone { font-weight: 900; color: #000; }
 
-  /* Narrow paper: tighten columns */
-  html[data-paper="58mm"] .items-head,
-  html[data-paper="58mm"] .item-top {
-    grid-template-columns: minmax(0, 1fr) 24px 46px;
-  }
+  /* Narrow paper: slightly smaller type */
   html[data-paper="58mm"] .biz-name { font-size: 15px; }
   html[data-paper="58mm"] .doc-type-label { font-size: 12px; }
   html[data-paper="58mm"] .meta-row { font-size: 11px; }
   html[data-paper="58mm"] .total-row.grand { font-size: 14px; }
   html[data-paper="58mm"] .token-num { font-size: 40px; }
+  html[data-paper="58mm"] .item-price { font-size: 11px; }
+  html[data-paper="58mm"] .credit { font-size: 8px; }
 
   @media print {
     @page {
@@ -448,8 +449,18 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Thermal money — always exactly 2 decimals, never clipped by layout.
+ * Uses a stable "Rs 1,234.56" form (common for PKR salons / thermal).
+ */
 function formatMoney(amount: number): string {
-  return formatCurrency(amount);
+  const n = roundMoney(Number(amount) || 0);
+  const body = n.toLocaleString("en-PK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true,
+  });
+  return `Rs ${body}`;
 }
 
 export type BusinessPrintInfo = {
@@ -486,16 +497,11 @@ function businessHeader(business: BusinessPrintInfo) {
     </header>`;
 }
 
-/** Platform footer on every thermal slip (POS, token, appointment). */
+/** Platform footer on every thermal slip (POS, token, appointment) — exactly 2 lines. */
 function creditFooter() {
   return `<footer class="credit">
-    ${escapeHtml(SYNCOPS.receipt.builtBy)}<br/>
-    ${escapeHtml(SYNCOPS.receipt.platform)}<br/>
-    <a class="credit-phone" href="tel:${SYNCOPS.phone.replace(/\s/g, "")}">${escapeHtml(SYNCOPS.phone)}</a>
-    &nbsp;·&nbsp;
-    <a href="${SYNCOPS.url}">${escapeHtml(SYNCOPS.domain)}</a>
-    &nbsp;·&nbsp;
-    <a href="${SYNCOPS.builder.url}">${escapeHtml(SYNCOPS.builder.domain)}</a>
+    <span class="credit-line"><strong>${escapeHtml(SYNCOPS.receipt.builtBy)}</strong> · <strong>${escapeHtml(SYNCOPS.receipt.platform)}</strong></span>
+    <span class="credit-line"><a class="credit-phone" href="tel:${SYNCOPS.phone.replace(/\s/g, "")}">${escapeHtml(SYNCOPS.phone)}</a> · <a href="${SYNCOPS.url}">${escapeHtml(SYNCOPS.domain)}</a> · <a href="${SYNCOPS.builder.url}">${escapeHtml(SYNCOPS.builder.domain)}</a></span>
   </footer>`;
 }
 
@@ -536,19 +542,20 @@ export function renderSaleReceiptHtml(data: SaleReceiptInput): string {
 
   const itemsHtml = data.items
     .map((item) => {
-      const showUnit = item.qty > 1;
+      const qty = Number(item.qty) || 0;
+      const unit = roundMoney(Number(item.unitPrice) || 0);
+      const line = roundMoney(Number(item.lineTotal) || 0);
+      const qtyLabel =
+        qty > 1
+          ? `Qty ${qty} × ${formatMoney(unit)}`
+          : `Qty ${qty}`;
       return `
       <div class="item">
-        <div class="item-top">
-          <span class="item-name">${escapeHtml(item.name)}</span>
-          <span class="item-qty mono">${item.qty}</span>
-          <span class="item-price mono">${formatMoney(item.lineTotal)}</span>
+        <span class="item-name">${escapeHtml(item.name)}</span>
+        <div class="item-money">
+          <span class="item-qty mono">${qtyLabel}</span>
+          <span class="item-price mono">${formatMoney(line)}</span>
         </div>
-        ${
-          showUnit
-            ? `<div class="item-unit mono">${item.qty} × ${formatMoney(item.unitPrice)}</div>`
-            : ""
-        }
       </div>`;
     })
     .join("");
@@ -566,8 +573,7 @@ export function renderSaleReceiptHtml(data: SaleReceiptInput): string {
     <div class="section-label">Items</div>
     <div class="items-head">
       <span>ITEM</span>
-      <span class="col-qty">QTY</span>
-      <span class="col-price">PRICE</span>
+      <span class="col-price">AMOUNT</span>
     </div>
     ${itemsHtml}
     <div class="totals">
@@ -649,15 +655,17 @@ export function renderAppointmentReceiptHtml(data: AppointmentReceiptInput): str
   const scheduled = new Date(data.scheduledAt);
   const dateStr = formatDate(scheduled, "weekday");
   const timeStr = formatTime(scheduled);
-  const serviceTotal = data.services.reduce((s, x) => s + x.price, 0);
+  const serviceTotal = roundMoney(
+    data.services.reduce((s, x) => s + (Number(x.price) || 0), 0)
+  );
   const sourceLabel = data.source === "ONLINE" ? "Online booking" : "Reception";
 
   const servicesHtml = data.services
     .map(
       (s) => `
       <div class="item">
-        <div class="item-top">
-          <span class="item-name">${escapeHtml(s.name)}</span>
+        <span class="item-name">${escapeHtml(s.name)}</span>
+        <div class="item-money">
           <span class="item-qty"></span>
           <span class="item-price mono">${formatMoney(s.price)}</span>
         </div>
@@ -681,8 +689,7 @@ export function renderAppointmentReceiptHtml(data: AppointmentReceiptInput): str
     <div class="section-label">Services</div>
     <div class="items-head">
       <span>ITEM</span>
-      <span class="col-qty"></span>
-      <span class="col-price">PRICE</span>
+      <span class="col-price">AMOUNT</span>
     </div>
     ${servicesHtml}
     <div class="totals">
