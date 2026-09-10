@@ -154,7 +154,7 @@ export const ACTION_META: Record<ActionKey, ActionMeta> = {
     key: "pos.sell",
     feature: "pos",
     label: "Sell / checkout",
-    defaultMinRole: "CASHIER",
+    defaultMinRole: "RECEPTIONIST",
   },
   "pos.open_drawer": {
     key: "pos.open_drawer",
@@ -166,7 +166,7 @@ export const ACTION_META: Record<ActionKey, ActionMeta> = {
     key: "sales.create",
     feature: "sales",
     label: "Create",
-    defaultMinRole: "CASHIER",
+    defaultMinRole: "RECEPTIONIST",
   },
   "sales.edit": {
     key: "sales.edit",

@@ -1,0 +1,6 @@
+# Device Agent publish output
+publish/
+**/bin/
+**/obj/
+*.user
+.vs/
