@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { OnlineBookingForm } from "@/components/features/booking/online-booking-form";
+import { CurrencyProvider } from "@/components/providers/currency-provider";
 import {
   formatHoursLine,
   PAYMENT_ACCOUNT_TYPE_LABELS,
   type BusinessHoursDay,
   type PaymentAccount,
 } from "@/lib/store/profile";
+import {
+  isPlatformSupportPhone,
+  resolveStorePublicContact,
+} from "@/lib/marketing/store-contact";
 import { SYNCOPS } from "@/lib/print/syncops";
 
 export type BookingOrg = {
@@ -13,6 +18,8 @@ export type BookingOrg = {
   name: string;
   tagline: string | null;
   address: string | null;
+  city?: string | null;
+  country?: string | null;
   phone: string | null;
   email: string | null;
   whatsapp_phone: string | null;
@@ -27,6 +34,7 @@ export type BookingOrg = {
   booking_advance_amount?: number | null;
   booking_advance_percent?: number | null;
   booking_payment_instructions?: string | null;
+  public_booking_enabled?: boolean | null;
 };
 
 function arrivalLines(notes: string | null): string[] {
@@ -44,10 +52,19 @@ function arrivalLines(notes: string | null): string[] {
 }
 
 export function MarketingBookingPage({ org }: { org: BookingOrg | null }) {
-  const phone = org?.phone || org?.whatsapp_phone || null;
-  const phoneHref = phone?.replace(/\s/g, "") ?? null;
+  const contact = resolveStorePublicContact({
+    phone: org?.phone,
+    whatsappPhone: org?.whatsapp_phone,
+  });
+  const phone = contact?.display ?? null;
+  const phoneHref = contact?.telHref ?? null;
+  const orgWhatsApp =
+    org?.whatsapp_phone && !isPlatformSupportPhone(org.whatsapp_phone)
+      ? org.whatsapp_phone
+      : null;
 
   return (
+    <CurrencyProvider country={org?.country}>
     <div className="bg-[var(--m-paper)] pt-[calc(var(--m-chrome)+1rem)] sm:pt-[calc(var(--m-chrome)+1.5rem)]">
       <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
         <div className="max-w-2xl">
@@ -190,14 +207,14 @@ export function MarketingBookingPage({ org }: { org: BookingOrg | null }) {
           </aside>
 
           <div className="lg:col-span-3">
-            {org ? (
+            {org && org.public_booking_enabled !== false ? (
               <OnlineBookingForm
                 variant="marketing"
                 orgSlug={org.slug}
                 orgName={org.name}
                 orgPhone={phone}
                 orgAddress={org.address}
-                orgWhatsApp={org.whatsapp_phone}
+                orgWhatsApp={orgWhatsApp}
                 services={org.services}
                 staff={org.staff}
                 daysAhead={org.booking_days_ahead ?? 30}
@@ -211,19 +228,33 @@ export function MarketingBookingPage({ org }: { org: BookingOrg | null }) {
             ) : (
               <div className="border border-dashed border-[var(--m-line)] bg-[var(--m-mist)] p-10 text-center">
                 <p className="font-medium text-[var(--m-ink)]">
-                  Online booking is temporarily unavailable
+                  Online booking is currently disabled
                 </p>
-                <Link
-                  href="/"
-                  className="mt-6 inline-block text-sm font-medium text-[var(--m-accent)] hover:underline"
-                >
-                  ← Back to home
-                </Link>
+                <p className="mt-2 text-sm text-[var(--m-muted)]">
+                  Please call the salon or visit the store page for other ways to book.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+                  {org?.slug ? (
+                    <Link
+                      href={`/stores/${org.slug}`}
+                      className="text-sm font-medium text-[var(--m-accent)] hover:underline"
+                    >
+                      View store
+                    </Link>
+                  ) : null}
+                  <Link
+                    href="/"
+                    className="text-sm font-medium text-[var(--m-accent)] hover:underline"
+                  >
+                    ← Back to home
+                  </Link>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
     </div>
+    </CurrencyProvider>
   );
 }

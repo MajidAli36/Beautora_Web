@@ -5,7 +5,8 @@ import { roundMoney } from "@/lib/sales/calculate";
 /** Recalculate and persist denormalized payment fields on a sale. */
 export async function syncSalePaymentDenorm(
   organizationId: string,
-  saleId: string
+  saleId: string,
+  options?: { expectedPaymentVersion?: number; bumpVersion?: boolean }
 ): Promise<ReturnType<typeof computeSalePaymentState>> {
   const supabase = await createClient();
 
@@ -18,6 +19,14 @@ export async function syncSalePaymentDenorm(
 
   if (saleErr || !sale) {
     throw new Error(saleErr?.message ?? "Sale not found for payment sync");
+  }
+
+  const currentVersion = Number(sale.payment_version ?? 1);
+  if (
+    options?.expectedPaymentVersion != null &&
+    currentVersion !== options.expectedPaymentVersion
+  ) {
+    throw new Error("Invoice was updated by someone else — refresh and try again");
   }
 
   const [{ data: pays }, { data: refs }] = await Promise.all([
@@ -46,18 +55,30 @@ export async function syncSalePaymentDenorm(
     saleStatus: sale.status,
   });
 
-  const { error } = await supabase
+  const bump = options?.bumpVersion !== false;
+  const nextVersion = bump ? currentVersion + 1 : currentVersion;
+
+  let updateQuery = supabase
     .from("sales")
     .update({
       amount_paid: state.amountPaid,
       amount_refunded: state.amountRefunded,
       amount_due: state.amountDue,
       payment_status: state.paymentStatus,
-      payment_version: Number(sale.payment_version ?? 1) + 1,
+      payment_version: nextVersion,
     })
     .eq("id", saleId)
     .eq("organization_id", organizationId);
 
+  if (options?.expectedPaymentVersion != null) {
+    updateQuery = updateQuery.eq("payment_version", options.expectedPaymentVersion);
+  }
+
+  const { data: updated, error } = await updateQuery.select("id").maybeSingle();
+
   if (error) throw new Error(error.message);
+  if (options?.expectedPaymentVersion != null && !updated) {
+    throw new Error("Invoice was updated by someone else — refresh and try again");
+  }
   return state;
 }

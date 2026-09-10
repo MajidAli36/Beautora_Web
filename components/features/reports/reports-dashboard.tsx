@@ -91,7 +91,9 @@ export function ReportsDashboard({ report, from, to }: ReportsDashboardProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total revenue (POS)</CardDescription>
-            <CardTitle className="text-3xl">{formatCurrency(report.totalRevenue)}</CardTitle>
+            <CardTitle className="break-words text-3xl tabular-nums">
+              {formatCurrency(report.totalRevenue)}
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
             Services + products + packages
@@ -117,7 +119,9 @@ export function ReportsDashboard({ report, from, to }: ReportsDashboardProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Stock on hand (cost)</CardDescription>
-            <CardTitle className="text-3xl">{formatCurrency(report.inventoryOnHand.valueAtCost)}</CardTitle>
+            <CardTitle className="break-words text-3xl tabular-nums">
+              {formatCurrency(report.inventoryOnHand.valueAtCost)}
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
             {report.inventoryOnHand.totalUnits} units · retail value{" "}

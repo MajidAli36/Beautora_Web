@@ -53,14 +53,20 @@ export function computeSalePaymentState(input: {
     };
   }
 
-  const amountDue = roundMoney(Math.max(0, total - amountPaid + amountRefunded));
+  // Unpaid before any refund: refunds on a settled ticket are goodwill (no new AR).
+  // Refunds on a still-unpaid ticket reverse cash and increase what is owed.
+  const unpaidBeforeRefund = roundMoney(Math.max(0, total - amountPaid));
+  const amountDue =
+    amountRefunded > 0.009 && unpaidBeforeRefund <= 0.009
+      ? 0
+      : roundMoney(Math.max(0, total - amountPaid + amountRefunded));
 
   let paymentStatus: SalePaymentStatus;
-  if (amountRefunded > 0 && amountRefunded >= amountPaid && amountPaid > 0) {
+  if (amountRefunded > 0 && amountRefunded >= amountPaid && amountPaid > 0 && amountDue <= 0.009) {
     paymentStatus = "REFUNDED";
   } else if (amountRefunded > 0 && amountDue > 0) {
     paymentStatus = "PARTIALLY_REFUNDED";
-  } else if (amountRefunded > 0 && amountDue <= 0) {
+  } else if (amountRefunded > 0) {
     paymentStatus = "PARTIALLY_REFUNDED";
   } else if (amountPaid <= 0 && total > 0) {
     paymentStatus = "UNPAID";

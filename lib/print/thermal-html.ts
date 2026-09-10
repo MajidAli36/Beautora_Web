@@ -1,5 +1,5 @@
 import { SYNCOPS } from "@/lib/print/syncops";
-import { formatDate, formatTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 
 /** Thermal paper presets — content width leaves a printer-safe margin on both sides. */
 export type ThermalPaperWidth = "80mm" | "58mm";
@@ -449,11 +449,7 @@ function escapeHtml(value: string): string {
 }
 
 function formatMoney(amount: number): string {
-  const n = Math.round((Number(amount) || 0) * 100) / 100;
-  return `Rs ${n.toLocaleString("en-PK", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatCurrency(amount);
 }
 
 export type BusinessPrintInfo = {

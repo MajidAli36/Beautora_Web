@@ -50,7 +50,7 @@ export function QuickActions({ stats, todayFinances }: QuickActionsProps) {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Today&apos;s sales
               </p>
-              <p className="mt-1 text-2xl font-bold text-foreground">
+              <p className="mt-1 break-words text-2xl font-bold tabular-nums text-foreground">
                 {formatCurrency(todayFinances.salesRevenue)}
               </p>
               {todayFinances.productRetailRevenue > 0 && (

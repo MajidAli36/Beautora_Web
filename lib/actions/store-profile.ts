@@ -22,6 +22,7 @@ import {
   validateStoreSlug,
 } from "@/lib/onboarding/slug";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireStoreLocation } from "@/lib/location/store-location";
 import type { ActionResult } from "@/types/commerce";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -40,6 +41,7 @@ export type StoreProfile = {
   tagline: string | null;
   address: string | null;
   city: string | null;
+  country: string | null;
   phone: string | null;
   email: string | null;
   whatsapp_phone: string | null;
@@ -87,7 +89,7 @@ export async function getStoreProfile(): Promise<StoreProfile | null> {
     supabase
       .from("organizations")
       .select(
-        "id, name, slug, tagline, address, city, phone, email, whatsapp_phone, logo_path, cover_path, arrival_notes, business_hours, public_listing_enabled"
+        "id, name, slug, tagline, address, city, country, phone, email, whatsapp_phone, logo_path, cover_path, arrival_notes, business_hours, public_listing_enabled"
       )
       .eq("id", org.organizationId)
       .single(),
@@ -115,6 +117,7 @@ export async function getStoreProfile(): Promise<StoreProfile | null> {
     tagline: data.tagline,
     address: data.address,
     city: data.city,
+    country: data.country,
     phone: data.phone,
     email: data.email,
     whatsapp_phone: data.whatsapp_phone,
@@ -155,6 +158,7 @@ export async function updateStoreProfile(input: {
   tagline?: string;
   address?: string;
   city?: string;
+  country?: string;
   phone?: string;
   email?: string;
   whatsappPhone?: string;
@@ -163,6 +167,12 @@ export async function updateStoreProfile(input: {
   const org = await requireAction("settings.manage");
   const name = input.name.trim();
   if (name.length < 2) return { error: "Salon name is required" };
+
+  const location = requireStoreLocation({
+    city: input.city,
+    country: input.country,
+  });
+  if (!location.ok) return { error: location.error };
 
   const supabase = await createClient();
 
@@ -211,8 +221,6 @@ export async function updateStoreProfile(input: {
     .maybeSingle();
   if (clash) return { error: "Another salon already uses this name" };
 
-  const city = input.city?.trim() || null;
-
   const { data: updated, error } = await supabase
     .from("organizations")
     .update(
@@ -222,7 +230,8 @@ export async function updateStoreProfile(input: {
             slug: nextSlug,
             tagline: input.tagline?.trim() || null,
             address: input.address?.trim() || null,
-            city,
+            city: location.city,
+            country: location.country,
             phone: input.phone?.trim() || null,
             email: input.email?.trim() || null,
             whatsapp_phone: input.whatsappPhone?.trim() || null,
@@ -232,7 +241,8 @@ export async function updateStoreProfile(input: {
             name,
             tagline: input.tagline?.trim() || null,
             address: input.address?.trim() || null,
-            city,
+            city: location.city,
+            country: location.country,
             phone: input.phone?.trim() || null,
             email: input.email?.trim() || null,
             whatsapp_phone: input.whatsappPhone?.trim() || null,
@@ -461,7 +471,7 @@ export async function getPublicStoreBookingProfile(slug: string) {
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, tagline, address, city, phone, email, whatsapp_phone, logo_path, cover_path, arrival_notes, business_hours, booking_slot_minutes, booking_days_ahead, booking_advance_amount, booking_advance_percent, booking_payment_instructions, admin_disabled_at, public_listing_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, created_at"
+      "id, name, slug, tagline, address, city, country, phone, email, whatsapp_phone, logo_path, cover_path, arrival_notes, business_hours, booking_slot_minutes, booking_days_ahead, booking_advance_amount, booking_advance_percent, booking_payment_instructions, admin_disabled_at, public_listing_enabled, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, created_at"
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -471,9 +481,13 @@ export async function getPublicStoreBookingProfile(slug: string) {
   const { resolveSubscription } = await import("@/lib/billing/subscription");
   if (!resolveSubscription(org).isOperational) return null;
 
+  const bookingEnabled = org.public_booking_enabled !== false;
+
   const [staff, advance, { data: services }, { data: accounts }, logoUrl, coverUrl] =
     await Promise.all([
-      ensureOnlineBookableStaff(admin, org.id),
+      bookingEnabled
+        ? ensureOnlineBookableStaff(admin, org.id)
+        : Promise.resolve([] as { id: string; full_name: string; job_title: string | null }[]),
       ensureOnlineAdvanceDefaults(admin, org),
       admin
         .from("services")
@@ -495,6 +509,7 @@ export async function getPublicStoreBookingProfile(slug: string) {
 
   return {
     ...org,
+    public_booking_enabled: bookingEnabled,
     booking_advance_amount: advance.booking_advance_amount,
     booking_advance_percent: advance.booking_advance_percent,
     booking_payment_instructions: advance.booking_payment_instructions,

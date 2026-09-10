@@ -74,8 +74,8 @@ function isCountableSalePayment(
 ) {
   const s = statusMap.get(saleId);
   if (!s || s.deleted) return false;
-  // Voided sales keep payment rows but are not live tender for KPIs
-  return s.status !== "VOID";
+  // Voided / fully refunded sales keep payment rows but are not live tender for KPIs
+  return s.status !== "VOID" && s.status !== "REFUNDED";
 }
 
 export async function getPaymentsReport(from?: string, to?: string): Promise<PaymentsReport> {

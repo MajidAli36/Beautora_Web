@@ -199,7 +199,12 @@ export function canAccessPath(
 ): boolean {
   const key = pathnameToNavKey(pathname);
   if (!key) return true;
-  return canAccessNavKey(role, key, overrides);
+  if (canAccessNavKey(role, key, overrides)) return true;
+  // Merged appointments hub: online_booking permission also unlocks /appointments
+  if (key === "appointments" && canAccessNavKey(role, "online_booking", overrides)) {
+    return true;
+  }
+  return false;
 }
 
 export function filterNavGroupsForRole(
@@ -212,7 +217,7 @@ export function filterNavGroupsForRole(
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
-        const key = HREF_TO_NAV_KEY[item.href];
+        const key = (item.key as NavKey) || HREF_TO_NAV_KEY[item.href.split("?")[0] ?? ""];
         return key ? permissions[key] : true;
       }),
     }))

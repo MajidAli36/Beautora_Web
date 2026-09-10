@@ -33,12 +33,15 @@ export function calculateRequiredAdvance(
   serviceTotal: number,
   settings: AdvanceSettings
 ): number {
+  const total = Math.max(0, Number(serviceTotal) || 0);
   const fixed = Number(settings.booking_advance_amount ?? 0);
-  if (fixed > 0) return fixed;
+  if (fixed > 0) {
+    return Math.round(Math.min(fixed, total || fixed) * 100) / 100;
+  }
 
   const percent = Number(settings.booking_advance_percent ?? 0);
-  if (percent > 0 && serviceTotal > 0) {
-    return Math.round((serviceTotal * percent) / 100);
+  if (percent > 0 && total > 0) {
+    return Math.round((total * percent) / 100);
   }
   return 0;
 }
@@ -78,10 +81,11 @@ export function isAdvanceComplete(
   const required = advanceSettings
     ? calculateRequiredAdvance(serviceTotal, advanceSettings)
     : 0;
-  const approved = getApprovedDepositTotal(deposits);
+  const credited =
+    getApprovedDepositTotal(deposits) + getAppliedDepositTotal(deposits);
 
-  if (required > 0) return approved >= required;
-  return approved > 0;
+  if (required > 0) return credited >= required;
+  return credited > 0;
 }
 
 /** Whether staff can record another advance on this appointment. */
@@ -118,7 +122,7 @@ export function getAdvanceState(
   const pending = getPendingDepositTotal(deposits);
   const refunded = getRefundedDepositTotal(deposits);
   const applied = getAppliedDepositTotal(deposits);
-  const balanceDue = Math.max(0, serviceTotal - approved);
+  const balanceDue = Math.max(0, serviceTotal - approved - applied);
   const isComplete = isAdvanceComplete(deposits, serviceTotal, advanceSettings);
 
   return {

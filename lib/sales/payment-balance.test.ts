@@ -56,14 +56,25 @@ describe("computeSalePaymentState", () => {
     assert.equal(s.amountDue, 0);
   });
 
-  it("partial refund with remaining due", () => {
+  it("goodwill partial refund on settled ticket does not reopen AR", () => {
     const s = computeSalePaymentState({
       total: 7500,
       paymentsSum: 7500,
       refundsSum: 1500,
       saleStatus: "COMPLETED",
     });
-    assert.equal(s.amountDue, 1500);
+    assert.equal(s.amountDue, 0);
+    assert.equal(s.paymentStatus, "PARTIALLY_REFUNDED");
+  });
+
+  it("partial refund on unpaid ticket increases amount due", () => {
+    const s = computeSalePaymentState({
+      total: 7500,
+      paymentsSum: 3000,
+      refundsSum: 1000,
+      saleStatus: "COMPLETED",
+    });
+    assert.equal(s.amountDue, 5500);
     assert.equal(s.paymentStatus, "PARTIALLY_REFUNDED");
   });
 });

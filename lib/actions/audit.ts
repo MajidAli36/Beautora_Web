@@ -341,7 +341,7 @@ export async function getDeletedRecords(): Promise<DeletedRecordRow[]> {
       deleted_at: s.deleted_at,
       deleted_by: s.deleted_by,
       deleted_by_role: s.deleted_by_role as MemberRole | null,
-      label: `${invNo} · ${s.status} · Rs ${Number(s.total).toLocaleString("en-PK")}`,
+      label: `${invNo} · ${s.status} · ${formatCurrency(Number(s.total))}`,
     };
   });
 

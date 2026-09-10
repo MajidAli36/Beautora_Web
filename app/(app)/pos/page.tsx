@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { redirect } from "next/navigation";
 import { getPosCatalog } from "@/lib/actions/products";
 import { getAppointmentsForPos } from "@/lib/actions/appointments";
-import { canUsePos, canManageRecords } from "@/lib/auth/permissions";
+import { canUsePos, canManageRecords, checkAction } from "@/lib/auth/permissions";
 import { hasCashDrawerHardware } from "@/lib/devices/cash-drawer";
 import { requireOrganization } from "@/lib/auth/organization";
 import { PosTerminal } from "@/components/features/pos/pos-terminal";
@@ -13,10 +13,11 @@ export default async function PosPage() {
   if (!canPos) redirect("/dashboard");
 
   const org = await requireOrganization();
-  const [catalog, appointments, canManage, hasDrawer] = await Promise.all([
+  const [catalog, appointments, canManage, canMarkNoShow, hasDrawer] = await Promise.all([
     getPosCatalog(),
     getAppointmentsForPos().catch(() => []),
     canManageRecords(),
+    checkAction("appointments.cancel"),
     hasCashDrawerHardware(org.organizationId),
   ]);
 
@@ -25,7 +26,7 @@ export default async function PosPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeader
         title="Point of Sale"
-        description="Today’s appointments only. Add items, apply advances, and checkout."
+        description="Link any open appointment, apply advances, checkout to complete — or mark no-show if they never came."
       />
         <OpenDrawerButton hasDrawer={hasDrawer} source="pos" />
       </div>
@@ -37,6 +38,7 @@ export default async function PosPage() {
         staff={catalog.staff}
         appointments={appointments}
         canManage={canManage}
+        canMarkNoShow={canMarkNoShow}
       />
     </div>
   );

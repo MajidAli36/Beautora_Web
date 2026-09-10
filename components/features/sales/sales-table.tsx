@@ -271,7 +271,7 @@ export function SalesSummaryCards({
           <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{formatCurrency(total)}</p>
+          <p className="break-words text-2xl font-bold tabular-nums">{formatCurrency(total)}</p>
         </CardContent>
       </Card>
       <Card>
@@ -279,7 +279,7 @@ export function SalesSummaryCards({
           <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{formatCurrency(outstanding ?? 0)}</p>
+          <p className="break-words text-2xl font-bold tabular-nums">{formatCurrency(outstanding ?? 0)}</p>
         </CardContent>
       </Card>
     </div>

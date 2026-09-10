@@ -35,7 +35,7 @@ export function BookingAdvanceSettings({ settings }: Props) {
       <CardContent>
         <form action={formAction} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="booking_advance_amount">Fixed advance (Rs)</Label>
+            <Label htmlFor="booking_advance_amount">Fixed advance</Label>
             <Input
               id="booking_advance_amount"
               name="booking_advance_amount"

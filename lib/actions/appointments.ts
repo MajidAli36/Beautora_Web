@@ -37,46 +37,50 @@ export async function createAppointment(
   const firstName = ((formData.get("first_name") as string) || "").trim();
   const lastName = ((formData.get("last_name") as string) || "").trim();
   const phone = ((formData.get("phone") as string) || "").trim();
+  const email = ((formData.get("email") as string) || "").trim();
+  const bookingNotes = ((formData.get("notes") as string) || "").trim();
 
   if (!scheduledAt) return { error: "Time slot required" };
 
   const supabase = await createClient();
 
-  // Existing customer, or find-or-create from name/phone when booking a new person
+  // Always attach a customer: use selected id, or find/create from booking details.
   if (!customerId) {
-    if (!firstName) {
-      return { error: "Select a customer, or enter a name to create one" };
-    }
-
-    if (phone) {
-      const { data: existingByPhone } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("organization_id", org.organizationId)
-        .eq("phone", phone)
-        .is("deleted_at", null)
-        .maybeSingle();
-      if (existingByPhone) {
-        customerId = existingByPhone.id;
-      }
-    }
-
-    if (!customerId) {
-      const { data: created, error: custErr } = await supabase
-        .from("customers")
-        .insert({
-          organization_id: org.organizationId,
-          first_name: firstName,
-          last_name: lastName || null,
-          phone: phone || null,
-        })
-        .select("id")
-        .single();
-      if (custErr || !created) {
-        return { error: custErr?.message ?? "Failed to create customer" };
-      }
-      customerId = created.id;
+    const { ensureCustomerFromBooking } = await import("@/lib/customers/ensure-from-booking");
+    const ensured = await ensureCustomerFromBooking(supabase, org.organizationId, {
+      firstName,
+      lastName,
+      phone,
+      email,
+      notes: bookingNotes || null,
+    });
+    if ("error" in ensured) return { error: ensured.error };
+    customerId = ensured.customerId;
+    if (ensured.created) {
       revalidatePath("/customers");
+      revalidatePath(`/customers/${customerId}`);
+    }
+  } else {
+    const { data: selected } = await supabase
+      .from("customers")
+      .select("id, first_name, last_name, phone, email, notes")
+      .eq("id", customerId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!selected) return { error: "Selected customer not found" };
+
+    const patch: Record<string, string | null> = {};
+    if (!selected.last_name && lastName) patch.last_name = lastName;
+    if (!selected.phone && phone) patch.phone = phone;
+    if (!selected.email && email) patch.email = email;
+    if (!selected.notes && bookingNotes) patch.notes = bookingNotes;
+    if (Object.keys(patch).length > 0) {
+      await supabase
+        .from("customers")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", customerId)
+        .eq("organization_id", org.organizationId);
       revalidatePath(`/customers/${customerId}`);
     }
   }
@@ -140,7 +144,20 @@ export async function createAppointment(
   const advanceMethod = (formData.get("advance_method") as "CASH" | "CARD" | "OTHER") || "CASH";
   if (advanceAmount > 0) {
     const canAdd = await assertCanAddDeposit(appt.id, org.organizationId, advanceAmount);
-    if (canAdd.error) return { error: canAdd.error };
+    if (canAdd.error) {
+      const { resolveSoftDeleteActor, softDeletePatch } = await import("@/lib/db/soft-delete");
+      const actor = await resolveSoftDeleteActor();
+      await supabase
+        .from("appointments")
+        .update({
+          status: "CANCELLED",
+          ...softDeletePatch(actor),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", appt.id)
+        .eq("organization_id", org.organizationId);
+      return { error: canAdd.error };
+    }
 
     const {
       data: { user },
@@ -158,7 +175,21 @@ export async function createAppointment(
       approved_by: user?.id ?? null,
     });
 
-    if (depositError) return { error: depositError.message };
+    if (depositError) {
+      // Don't leave an orphan booking when advance fails.
+      const { resolveSoftDeleteActor, softDeletePatch } = await import("@/lib/db/soft-delete");
+      const actor = await resolveSoftDeleteActor();
+      await supabase
+        .from("appointments")
+        .update({
+          status: "CANCELLED",
+          ...softDeletePatch(actor),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", appt.id)
+        .eq("organization_id", org.organizationId);
+      return { error: depositError.message };
+    }
 
     await supabase
       .from("appointments")
@@ -314,6 +345,8 @@ export type PosAppointment = {
   customerId: string;
   customerName: string;
   scheduledAt: string;
+  /** When the appointment was created (DATE ADDED). */
+  createdAt: string;
   status: string;
   depositBalance: number;
   staffId: string | null;
@@ -321,14 +354,72 @@ export type PosAppointment = {
   services: { serviceId: string; name: string; price: number }[];
 };
 
+function mapPosAppointmentRow(
+  row: {
+    id: string;
+    customer_id: string;
+    staff_id: string | null;
+    scheduled_at: string;
+    created_at: string;
+    status: string;
+    customer: unknown;
+    staff: unknown;
+    services: unknown;
+  },
+  depositMap: Record<string, number>
+): PosAppointment {
+  const customer = row.customer as { first_name: string; last_name: string | null } | null;
+  const staff = row.staff as { full_name: string } | null;
+  const services =
+    (row.services as { service_id: string; service_name: string; price: number }[]) ?? [];
+
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    customerName: customer
+      ? [customer.first_name, customer.last_name].filter(Boolean).join(" ")
+      : "Customer",
+    scheduledAt: row.scheduled_at,
+    createdAt: row.created_at,
+    status: row.status,
+    depositBalance: depositMap[row.id] ?? 0,
+    staffId: row.staff_id ?? null,
+    staffName: staff?.full_name ?? null,
+    services: services.map((s) => ({
+      serviceId: s.service_id,
+      name: s.service_name,
+      price: Number(s.price),
+    })),
+  };
+}
+
+/** Today first, then upcoming, then past (most recent past first). Advances float up within each bucket. */
+function sortPosAppointments(rows: PosAppointment[]): PosAppointment[] {
+  const today = getLocalDateString();
+  const bucket = (scheduledAt: string) => {
+    const day = getLocalDateString(new Date(scheduledAt));
+    if (day === today) return 0;
+    if (day > today) return 1;
+    return 2;
+  };
+
+  return [...rows].sort((a, b) => {
+    const ba = bucket(a.scheduledAt);
+    const bb = bucket(b.scheduledAt);
+    if (ba !== bb) return ba - bb;
+    if ((b.depositBalance > 0) !== (a.depositBalance > 0)) {
+      return b.depositBalance > 0 ? 1 : -1;
+    }
+    if (ba === 2) return b.scheduledAt.localeCompare(a.scheduledAt);
+    return a.scheduledAt.localeCompare(b.scheduledAt);
+  });
+}
+
 export async function getAppointmentsForPos(): Promise<PosAppointment[]> {
   const org = await requireOrganization();
   const supabase = await createClient();
-  const today = getLocalDateString();
-  const dayStart = startOfLocalDay(today).toISOString();
-  const dayEnd = endOfLocalDay(today).toISOString();
 
-  const [{ data: todayRows }, { data: depositRows }] = await Promise.all([
+  const [{ data: rows }, { data: depositRows }, { data: billedSales }] = await Promise.all([
     supabase
       .from("appointments")
       .select(`
@@ -336,14 +427,13 @@ export async function getAppointmentsForPos(): Promise<PosAppointment[]> {
         customer_id,
         staff_id,
         scheduled_at,
+        created_at,
         status,
         customer:customers(first_name, last_name),
         staff:staff(full_name),
         services:appointment_services(service_id, service_name, price)
       `)
       .eq("organization_id", org.organizationId)
-      .gte("scheduled_at", dayStart)
-      .lte("scheduled_at", dayEnd)
       .is("deleted_at", null)
       .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
       .order("scheduled_at"),
@@ -353,46 +443,42 @@ export async function getAppointmentsForPos(): Promise<PosAppointment[]> {
       .eq("organization_id", org.organizationId)
       .eq("status", "APPROVED")
       .is("applied_to_sale_id", null),
+    // Safety net: hide appointments already invoiced even if status wasn't closed.
+    supabase
+      .from("sales")
+      .select("appointment_id")
+      .eq("organization_id", org.organizationId)
+      .not("appointment_id", "is", null)
+      .in("status", ["COMPLETED", "AMENDED", "REFUNDED"]),
   ]);
+
+  const billedIds = new Set(
+    (billedSales ?? [])
+      .map((s) => s.appointment_id as string | null)
+      .filter((id): id is string => Boolean(id))
+  );
+
+  // Heal stuck open appointments that already have an invoice/sale.
+  const stuckIds = (rows ?? []).map((r) => r.id).filter((id) => billedIds.has(id));
+  if (stuckIds.length > 0) {
+    await supabase
+      .from("appointments")
+      .update({ status: "COMPLETED", updated_at: new Date().toISOString() })
+      .eq("organization_id", org.organizationId)
+      .in("id", stuckIds)
+      .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")');
+  }
 
   const depositMap: Record<string, number> = {};
   for (const d of depositRows ?? []) {
     depositMap[d.appointment_id] = (depositMap[d.appointment_id] ?? 0) + Number(d.amount);
   }
 
-  return (todayRows ?? [])
-    .map((row) => {
-      const customer = row.customer as unknown as {
-        first_name: string;
-        last_name: string | null;
-      } | null;
-      const staff = row.staff as unknown as { full_name: string } | null;
-      const services =
-        (row.services as unknown as {
-          service_id: string;
-          service_name: string;
-          price: number;
-        }[]) ?? [];
-
-      return {
-        id: row.id,
-        customerId: row.customer_id,
-        customerName: customer
-          ? [customer.first_name, customer.last_name].filter(Boolean).join(" ")
-          : "Customer",
-        scheduledAt: row.scheduled_at,
-        status: row.status,
-        depositBalance: depositMap[row.id] ?? 0,
-        staffId: row.staff_id ?? null,
-        staffName: staff?.full_name ?? null,
-        services: services.map((s) => ({
-          serviceId: s.service_id,
-          name: s.service_name,
-          price: Number(s.price),
-        })),
-      };
-    })
-    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  return sortPosAppointments(
+    (rows ?? [])
+      .filter((row) => !billedIds.has(row.id))
+      .map((row) => mapPosAppointmentRow(row, depositMap))
+  );
 }
 
 export async function getCustomerAdvanceAppointments(
@@ -400,9 +486,6 @@ export async function getCustomerAdvanceAppointments(
 ): Promise<PosAppointment[]> {
   const org = await requireOrganization();
   const supabase = await createClient();
-  const today = getLocalDateString();
-  const dayStart = startOfLocalDay(today).toISOString();
-  const dayEnd = endOfLocalDay(today).toISOString();
 
   const { data: deposits } = await supabase
     .from("appointment_deposits")
@@ -426,6 +509,7 @@ export async function getCustomerAdvanceAppointments(
       customer_id,
       staff_id,
       scheduled_at,
+      created_at,
       status,
       customer:customers(first_name, last_name),
       staff:staff(full_name),
@@ -434,43 +518,13 @@ export async function getCustomerAdvanceAppointments(
     .eq("organization_id", org.organizationId)
     .eq("customer_id", customerId)
     .in("id", ids)
-    .gte("scheduled_at", dayStart)
-    .lte("scheduled_at", dayEnd)
     .is("deleted_at", null)
     .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
     .order("scheduled_at", { ascending: false });
 
-  return (data ?? []).map((row) => {
-    const customer = row.customer as unknown as {
-      first_name: string;
-      last_name: string | null;
-    } | null;
-    const staff = row.staff as unknown as { full_name: string } | null;
-    const services =
-      (row.services as unknown as {
-        service_id: string;
-        service_name: string;
-        price: number;
-      }[]) ?? [];
-
-    return {
-      id: row.id,
-      customerId: row.customer_id,
-      customerName: customer
-        ? [customer.first_name, customer.last_name].filter(Boolean).join(" ")
-        : "Customer",
-      scheduledAt: row.scheduled_at,
-      status: row.status,
-      depositBalance: depositMap[row.id] ?? 0,
-      staffId: row.staff_id ?? null,
-      staffName: staff?.full_name ?? null,
-      services: services.map((s) => ({
-        serviceId: s.service_id,
-        name: s.service_name,
-        price: Number(s.price),
-      })),
-    };
-  });
+  return sortPosAppointments(
+    (data ?? []).map((row) => mapPosAppointmentRow(row, depositMap))
+  );
 }
 
 export async function getAppointmentDepositTotal(appointmentId: string): Promise<number> {
@@ -490,7 +544,19 @@ export async function getAppointmentDepositTotal(appointmentId: string): Promise
 
 export async function getAppointments(
   date?: string,
-  options?: { source?: "STAFF" | "ONLINE" }
+  options?: {
+    source?: "STAFF" | "ONLINE";
+    /** Inclusive local YYYY-MM-DD range (used when `date` is omitted). */
+    from?: string;
+    /** Exclusive local YYYY-MM-DD end (used when `date` is omitted). */
+    to?: string;
+    /** Keep only these statuses (e.g. history). */
+    statuses?: string[];
+    /** Drop these statuses (e.g. open list). */
+    excludeStatuses?: string[];
+    /** Include soft-deleted rows (cancelled online bookings). */
+    includeSoftDeleted?: boolean;
+  }
 ) {
   const org = await requireOrganization();
   const supabase = await createClient();
@@ -504,16 +570,33 @@ export async function getAppointments(
       services:appointment_services(service_name, price, duration_minutes)
     `)
     .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .order("scheduled_at");
+    .order("scheduled_at", { ascending: options?.statuses ? false : true });
+
+  if (!options?.includeSoftDeleted) {
+    query = query.is("deleted_at", null);
+  }
 
   if (date) {
     const { start, end } = getDayRange(date);
     query = query.gte("scheduled_at", start).lt("scheduled_at", end);
+  } else if (options?.from || options?.to) {
+    if (options.from) {
+      query = query.gte("scheduled_at", getDayRange(options.from).start);
+    }
+    if (options.to) {
+      query = query.lt("scheduled_at", getDayRange(options.to).start);
+    }
   }
 
   if (options?.source) {
     query = query.eq("source", options.source);
+  }
+
+  if (options?.statuses?.length) {
+    query = query.in("status", options.statuses);
+  } else if (options?.excludeStatuses?.length) {
+    const list = options.excludeStatuses.map((s) => `"${s}"`).join(",");
+    query = query.not("status", "in", `(${list})`);
   }
 
   const { data, error } = await query;
@@ -635,7 +718,7 @@ export async function createOnlineBooking(input: {
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, booking_advance_amount, booking_advance_percent, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+      "id, booking_advance_amount, booking_advance_percent, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
     )
     .eq("slug", input.orgSlug)
     .single();
@@ -648,6 +731,10 @@ export async function createOnlineBooking(input: {
       error:
         "This salon is temporarily unavailable for online booking. Please try again later.",
     };
+  }
+
+  if (org.public_booking_enabled === false) {
+    return { error: "Online booking is currently disabled for this salon." };
   }
 
   if (!input.staffId) return { error: "Please select a staff member" };
@@ -717,30 +804,17 @@ export async function createOnlineBooking(input: {
   }
 
   let customerId: string;
-  const { data: existing } = await admin
-    .from("customers")
-    .select("id")
-    .eq("organization_id", org.id)
-    .eq("phone", input.phone)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (existing) {
-    customerId = existing.id;
-  } else {
-    const { data: created, error: custErr } = await admin
-      .from("customers")
-      .insert({
-        organization_id: org.id,
-        first_name: input.firstName,
-        last_name: input.lastName ?? null,
-        phone: input.phone,
-        email: input.email ?? null,
-      })
-      .select("id")
-      .single();
-    if (custErr || !created) return { error: custErr?.message ?? "Failed to create customer" };
-    customerId = created.id;
+  {
+    const { ensureCustomerFromBooking } = await import("@/lib/customers/ensure-from-booking");
+    const ensured = await ensureCustomerFromBooking(admin, org.id, {
+      firstName: input.firstName,
+      lastName: input.lastName ?? null,
+      phone: input.phone,
+      email: input.email ?? null,
+      notes: input.notes ?? null,
+    });
+    if ("error" in ensured) return { error: ensured.error };
+    customerId = ensured.customerId;
   }
 
   let bookingNumber: string | null = null;
@@ -829,6 +903,15 @@ export async function createOnlineBooking(input: {
         extension: ext,
       });
       if (!uploaded.ok) {
+        await admin
+          .from("appointments")
+          .update({
+            status: "CANCELLED",
+            deleted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", appt.id)
+          .eq("organization_id", org.id);
         return { error: uploaded.error };
       }
       proofPath = uploaded.result.path;
@@ -845,7 +928,18 @@ export async function createOnlineBooking(input: {
       status: needsApproval ? "PENDING" : "APPROVED",
       approved_at: needsApproval ? null : new Date().toISOString(),
     });
-    if (depErr) return { error: depErr.message };
+    if (depErr) {
+      await admin
+        .from("appointments")
+        .update({
+          status: "CANCELLED",
+          deleted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", appt.id)
+        .eq("organization_id", org.id);
+      return { error: depErr.message };
+    }
     pendingApproval = needsApproval;
 
     if (needsApproval) {
@@ -924,25 +1018,27 @@ export async function cancelOnlineAppointment(appointmentId: string): Promise<Ac
 
   if (fetchErr || !appt) return { error: "Appointment not found" };
   if (appt.source !== "ONLINE") return { error: "Only online appointments can be cancelled here" };
-
-  const { resolveSoftDeleteActor, softDeletePatch } = await import("@/lib/db/soft-delete");
-  const actor = await resolveSoftDeleteActor();
-  const soft = softDeletePatch(actor);
+  if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(appt.status)) {
+    return { error: "This appointment is already closed" };
+  }
 
   const { error } = await supabase
     .from("appointments")
-    .update({ status: "CANCELLED", ...soft })
+    .update({ status: "CANCELLED", updated_at: new Date().toISOString() })
     .eq("id", appointmentId)
     .eq("organization_id", org.organizationId);
 
   if (error) return { error: error.message };
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { writeAuditLog } = await import("@/lib/audit/log");
   await writeAuditLog({
     organizationId: org.organizationId,
-    userId: actor.userId,
-    actorRole: actor.role,
-    actorEmail: actor.email,
+    userId: user?.id,
+    actorRole: org.role,
     action: "appointment.cancel",
     entityType: "appointment",
     entityId: appointmentId,
@@ -953,6 +1049,58 @@ export async function cancelOnlineAppointment(appointmentId: string): Promise<Ac
   });
 
   revalidatePath("/appointments");
+  revalidatePath("/online-booking");
+  revalidatePath("/pos");
+  return { success: true };
+}
+
+/** Mark a no-show — customer booked but did not arrive. Moves to History. */
+export async function markAppointmentNoShow(appointmentId: string): Promise<ActionResult> {
+  const org = await requireAction("appointments.cancel");
+  const supabase = await createClient();
+
+  const { data: appt, error: fetchErr } = await supabase
+    .from("appointments")
+    .select("id, source, scheduled_at, customer_id, status")
+    .eq("id", appointmentId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .single();
+
+  if (fetchErr || !appt) return { error: "Appointment not found" };
+  if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(appt.status)) {
+    return { error: "This appointment is already closed" };
+  }
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({ status: "NO_SHOW", updated_at: new Date().toISOString() })
+    .eq("id", appointmentId)
+    .eq("organization_id", org.organizationId);
+
+  if (error) return { error: error.message };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  await writeAuditLog({
+    organizationId: org.organizationId,
+    userId: user?.id,
+    actorRole: org.role,
+    action: "appointment.no_show",
+    entityType: "appointment",
+    entityId: appointmentId,
+    metadata: {
+      summary: "Marked appointment as no-show",
+      before: appt as unknown as Record<string, unknown>,
+    },
+  });
+
+  revalidatePath("/appointments");
+  revalidatePath("/online-booking");
+  revalidatePath("/pos");
+  revalidatePath("/reports");
   return { success: true };
 }
 
@@ -1001,6 +1149,42 @@ export async function getBookingAdvanceSettings() {
     .eq("id", org.organizationId)
     .single();
   return data;
+}
+
+export async function getPublicBookingEnabled(): Promise<boolean> {
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("organizations")
+    .select("public_booking_enabled")
+    .eq("id", org.organizationId)
+    .single();
+  return data?.public_booking_enabled ?? true;
+}
+
+/** Turn public online booking on/off (store listing stays separate). */
+export async function setPublicBookingEnabled(
+  enabled: boolean
+): Promise<ActionResult> {
+  const org = await requireAction("online_booking.configure");
+  const supabase = await createClient();
+  const { data: orgRow, error } = await supabase
+    .from("organizations")
+    .update({ public_booking_enabled: enabled })
+    .eq("id", org.organizationId)
+    .select("slug")
+    .single();
+
+  if (error) return { error: error.message };
+  revalidatePath("/book");
+  revalidatePath("/online-booking");
+  revalidatePath("/stores");
+  revalidatePath("/");
+  if (orgRow?.slug) {
+    revalidatePath(`/book/${orgRow.slug}`);
+    revalidatePath(`/stores/${orgRow.slug}`);
+  }
+  return { success: true };
 }
 
 export async function saveBookingAdvanceSettings(

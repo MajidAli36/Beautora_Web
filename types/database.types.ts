@@ -45,6 +45,7 @@ export type Database = {
           tagline: string | null;
           address: string | null;
           city: string | null;
+          country: string | null;
           phone: string | null;
           email: string | null;
           logo_path: string | null;
@@ -58,6 +59,7 @@ export type Database = {
           booking_advance_amount: number;
           booking_advance_percent: number;
           booking_payment_instructions: string | null;
+          public_booking_enabled: boolean;
           trial_ends_at: string | null;
           subscription_ends_at: string | null;
           subscription_locked_at: string | null;
@@ -77,6 +79,7 @@ export type Database = {
           tagline?: string | null;
           address?: string | null;
           city?: string | null;
+          country?: string | null;
           phone?: string | null;
           email?: string | null;
           logo_path?: string | null;
@@ -90,6 +93,7 @@ export type Database = {
           booking_advance_amount?: number;
           booking_advance_percent?: number;
           booking_payment_instructions?: string | null;
+          public_booking_enabled?: boolean;
           trial_ends_at?: string | null;
           subscription_ends_at?: string | null;
           subscription_locked_at?: string | null;
@@ -109,6 +113,7 @@ export type Database = {
           tagline?: string | null;
           address?: string | null;
           city?: string | null;
+          country?: string | null;
           phone?: string | null;
           email?: string | null;
           logo_path?: string | null;
@@ -122,6 +127,7 @@ export type Database = {
           booking_advance_amount?: number;
           booking_advance_percent?: number;
           booking_payment_instructions?: string | null;
+          public_booking_enabled?: boolean;
           trial_ends_at?: string | null;
           subscription_ends_at?: string | null;
           subscription_locked_at?: string | null;

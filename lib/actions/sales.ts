@@ -41,9 +41,29 @@ async function nextInvoiceNumber(organizationId: string) {
   return `INV-${String((count ?? 0) + 1).padStart(5, "0")}`;
 }
 
+/** After sale row exists, always return saleId and resync denorm so POS does not retry. */
+async function checkoutFail(
+  organizationId: string,
+  saleId: string,
+  error: string
+): Promise<{ error: string; saleId: string }> {
+  try {
+    await syncSalePaymentDenorm(organizationId, saleId);
+  } catch {
+    /* best-effort */
+  }
+  return { error, saleId };
+}
+
 export async function completeCheckout(
   payload: CheckoutPayload
-): Promise<{ error?: string; saleId?: string; changeGiven?: number; amountDue?: number }> {
+): Promise<{
+  error?: string;
+  warning?: string;
+  saleId?: string;
+  changeGiven?: number;
+  amountDue?: number;
+}> {
   const org = await requireAction("pos.sell");
 
   if (!payload.items.length) {
@@ -233,6 +253,53 @@ export async function completeCheckout(
 
   const linkedAppointmentId = payload.appointmentId || null;
 
+  // Prevent double-billing the same appointment (retry / concurrent checkout).
+  if (linkedAppointmentId) {
+    const { data: existingSales } = await supabase
+      .from("sales")
+      .select("id, status")
+      .eq("organization_id", org.organizationId)
+      .eq("appointment_id", linkedAppointmentId)
+      .is("deleted_at", null)
+      .neq("status", "VOID")
+      .limit(1);
+    const existingSale = existingSales?.[0];
+    if (existingSale) {
+      return {
+        error: "This appointment already has an invoice",
+        saleId: existingSale.id,
+      };
+    }
+    const { data: apptRow } = await supabase
+      .from("appointments")
+      .select("id, status")
+      .eq("id", linkedAppointmentId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!apptRow) {
+      return { error: "Linked appointment not found" };
+    }
+    if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(apptRow.status)) {
+      const { data: billedRows } = await supabase
+        .from("sales")
+        .select("id")
+        .eq("organization_id", org.organizationId)
+        .eq("appointment_id", linkedAppointmentId)
+        .is("deleted_at", null)
+        .neq("status", "VOID")
+        .limit(1);
+      const billed = billedRows?.[0];
+      if (billed) {
+        return {
+          error: "This appointment is already billed",
+          saleId: billed.id,
+        };
+      }
+      return { error: `Cannot bill appointment with status ${apptRow.status}` };
+    }
+  }
+
   const amountDue = roundMoney(Math.max(0, total - depositApplied));
 
   const paymentLines =
@@ -308,7 +375,28 @@ export async function completeCheckout(
     .select("id")
     .single();
 
-  if (saleError || !sale) return { error: saleError?.message ?? "Failed to create sale" };
+  if (saleError || !sale) {
+    const msg = saleError?.message ?? "Failed to create sale";
+    if (
+      linkedAppointmentId &&
+      /sales_one_live_per_appointment|duplicate key|unique/i.test(msg)
+    ) {
+      const { data: existing } = await supabase
+        .from("sales")
+        .select("id")
+        .eq("organization_id", org.organizationId)
+        .eq("appointment_id", linkedAppointmentId)
+        .is("deleted_at", null)
+        .neq("status", "VOID")
+        .neq("status", "REFUNDED")
+        .limit(1);
+      return {
+        error: "This appointment already has an invoice",
+        saleId: existing?.[0]?.id,
+      };
+    }
+    return { error: msg };
+  }
 
   const saleItems = totals.lines.map((item) => ({
     organization_id: org.organizationId,
@@ -330,7 +418,9 @@ export async function completeCheckout(
   }));
 
   const { error: itemsError } = await supabase.from("sale_items").insert(saleItems);
-  if (itemsError) return { error: itemsError.message };
+  if (itemsError) {
+    return checkoutFail(org.organizationId, sale.id, itemsError.message);
+  }
 
   if (selectedStaffIds.length > 0) {
     const { error: saleStaffError } = await supabase.from("sale_staff").insert(
@@ -340,7 +430,9 @@ export async function completeCheckout(
         organization_id: org.organizationId,
       }))
     );
-    if (saleStaffError) return { error: saleStaffError.message };
+    if (saleStaffError) {
+      return checkoutFail(org.organizationId, sale.id, saleStaffError.message);
+    }
   }
 
   const invoiceNumber = await nextInvoiceNumber(org.organizationId);
@@ -349,7 +441,51 @@ export async function completeCheckout(
     sale_id: sale.id,
     invoice_number: invoiceNumber,
   });
-  if (invoiceError) return { error: invoiceError.message };
+  if (invoiceError) {
+    return checkoutFail(org.organizationId, sale.id, invoiceError.message);
+  }
+
+  // Close linked appointment as soon as the invoice exists so it leaves POS
+  // even if later stock/usage steps fail (sale + invoice already saved).
+  if (linkedAppointmentId) {
+    const { data: closedAppt, error: apptCloseErr } = await supabase
+      .from("appointments")
+      .update({ status: "COMPLETED", updated_at: new Date().toISOString() })
+      .eq("id", linkedAppointmentId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
+      .select("id")
+      .maybeSingle();
+
+    if (apptCloseErr) {
+      return checkoutFail(org.organizationId, sale.id, `Invoice saved but appointment could not be closed: ${apptCloseErr.message}`);
+    }
+
+    // Already closed is fine; if still open with no row returned, force status.
+    if (!closedAppt) {
+      const { data: stillOpen } = await supabase
+        .from("appointments")
+        .select("id, status")
+        .eq("id", linkedAppointmentId)
+        .eq("organization_id", org.organizationId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (
+        stillOpen &&
+        !["COMPLETED", "CANCELLED", "NO_SHOW"].includes(stillOpen.status)
+      ) {
+        const { error: forceErr } = await supabase
+          .from("appointments")
+          .update({ status: "COMPLETED", updated_at: new Date().toISOString() })
+          .eq("id", linkedAppointmentId)
+          .eq("organization_id", org.organizationId);
+        if (forceErr) {
+          return checkoutFail(org.organizationId, sale.id, `Invoice saved but appointment could not be closed: ${forceErr.message}`);
+        }
+      }
+    }
+  }
 
   let remainingTender = tendered;
   for (let i = 0; i < paymentLines.length; i++) {
@@ -370,7 +506,9 @@ export async function completeCheckout(
       change_given: line.method === "CASH" ? lineChange : null,
       notes: paymentState.amountDue > 0 ? "Partial payment at checkout" : null,
     });
-    if (paymentError) return { error: paymentError.message };
+    if (paymentError) {
+      return checkoutFail(org.organizationId, sale.id, paymentError.message);
+    }
   }
 
   if (depositApplied > 0) {
@@ -382,7 +520,9 @@ export async function completeCheckout(
       reference: "APPOINTMENT_DEPOSIT",
       created_by: user?.id ?? null,
     });
-    if (depositPaymentError) return { error: depositPaymentError.message };
+    if (depositPaymentError) {
+      return checkoutFail(org.organizationId, sale.id, depositPaymentError.message);
+    }
 
     let remaining = depositApplied;
     for (const deposit of depositRows) {
@@ -393,15 +533,22 @@ export async function completeCheckout(
 
       if (applyAmount < depositAmt) {
         // Partial consume: shrink applied row and keep leftover as a new unused deposit
-        const { error: shrinkErr } = await supabase
+        const { data: shrunk, error: shrinkErr } = await supabase
           .from("appointment_deposits")
           .update({
             amount: applyAmount,
             applied_to_sale_id: sale.id,
           })
           .eq("id", deposit.id)
-          .eq("organization_id", org.organizationId);
-        if (shrinkErr) return { error: shrinkErr.message };
+          .eq("organization_id", org.organizationId)
+          .is("applied_to_sale_id", null)
+          .select("id");
+        if (shrinkErr) {
+          return checkoutFail(org.organizationId, sale.id, shrinkErr.message);
+        }
+        if (!shrunk?.length) {
+          return checkoutFail(org.organizationId, sale.id, "Deposit was already applied or could not be updated");
+        }
 
         const { data: original } = await supabase
           .from("appointment_deposits")
@@ -412,34 +559,45 @@ export async function completeCheckout(
           .eq("organization_id", org.organizationId)
           .maybeSingle();
 
-        if (original) {
-          const leftover = roundMoney(depositAmt - applyAmount);
-          const { error: leftoverErr } = await supabase.from("appointment_deposits").insert({
-            organization_id: org.organizationId,
-            appointment_id: original.appointment_id,
-            amount: leftover,
-            method: original.method,
-            notes: original.notes
-              ? `${original.notes} (leftover after sale apply)`
-              : "Leftover after partial apply to sale",
-            status: original.status,
-            payment_reference: original.payment_reference,
-            proof_path: original.proof_path,
-            approved_at: original.approved_at,
-            approved_by: original.approved_by,
-            applied_to_sale_id: null,
-            paid_at: original.paid_at,
-            created_by: original.created_by,
-          });
-          if (leftoverErr) return { error: leftoverErr.message };
+        if (!original) {
+          return checkoutFail(org.organizationId, sale.id, "Deposit was partially applied but the original row could not be re-read; leftover was not created. Open this invoice — do not retry checkout.");
+        }
+
+        const leftover = roundMoney(depositAmt - applyAmount);
+        const { error: leftoverErr } = await supabase.from("appointment_deposits").insert({
+          organization_id: org.organizationId,
+          appointment_id: original.appointment_id,
+          amount: leftover,
+          method: original.method,
+          notes: original.notes
+            ? `${original.notes} (leftover after sale apply)`
+            : "Leftover after partial apply to sale",
+          status: original.status,
+          payment_reference: original.payment_reference,
+          proof_path: original.proof_path,
+          approved_at: original.approved_at,
+          approved_by: original.approved_by,
+          applied_to_sale_id: null,
+          paid_at: original.paid_at,
+          created_by: original.created_by,
+        });
+        if (leftoverErr) {
+          return checkoutFail(org.organizationId, sale.id, leftoverErr.message);
         }
       } else {
-        const { error: applyErr } = await supabase
+        const { data: applied, error: applyErr } = await supabase
           .from("appointment_deposits")
           .update({ applied_to_sale_id: sale.id })
           .eq("id", deposit.id)
-          .eq("organization_id", org.organizationId);
-        if (applyErr) return { error: applyErr.message };
+          .eq("organization_id", org.organizationId)
+          .is("applied_to_sale_id", null)
+          .select("id");
+        if (applyErr) {
+          return checkoutFail(org.organizationId, sale.id, applyErr.message);
+        }
+        if (!applied?.length) {
+          return checkoutFail(org.organizationId, sale.id, "Deposit was already applied or could not be updated");
+        }
       }
       remaining = roundMoney(remaining - applyAmount);
     }
@@ -462,10 +620,11 @@ export async function completeCheckout(
       created_by: user?.id ?? null,
     });
     if (invErr) {
-      return {
-        error: `Sale saved but stock update failed for a product: ${invErr.message}. Void this invoice or adjust inventory.`,
-        saleId: sale.id,
-      };
+      return checkoutFail(
+        org.organizationId,
+        sale.id,
+        `Sale saved but stock update failed for a product: ${invErr.message}. Void this invoice or adjust inventory.`
+      );
     }
   }
 
@@ -476,10 +635,11 @@ export async function completeCheckout(
       requirements: usageRequirements,
     });
     if (snap.error) {
-      return {
-        error: `Sale saved but usage snapshot failed: ${snap.error}. Void this invoice or adjust inventory.`,
-        saleId: sale.id,
-      };
+      return checkoutFail(
+        org.organizationId,
+        sale.id,
+        `Sale saved but usage snapshot failed: ${snap.error}`
+      );
     }
 
     const usageInv = await applyServiceUsageInventory({
@@ -492,10 +652,11 @@ export async function completeCheckout(
       notes: "In-house products used for service",
     });
     if (usageInv.error) {
-      return {
-        error: `Sale saved but in-house stock update failed: ${usageInv.error}. Void this invoice or adjust inventory.`,
-        saleId: sale.id,
-      };
+      return checkoutFail(
+        org.organizationId,
+        sale.id,
+        `Sale saved but in-house stock update failed: ${usageInv.error}`
+      );
     }
   }
 
@@ -503,6 +664,8 @@ export async function completeCheckout(
   revalidatePath("/reports");
   revalidatePath("/finances");
   revalidatePath("/appointments");
+  revalidatePath("/online-booking");
+  revalidatePath("/pos");
   revalidatePath("/products");
   revalidatePath("/in-house");
   revalidatePath("/services");
@@ -554,11 +717,12 @@ export async function completeCheckout(
       lines: priorDueLines,
     });
     if (priorResult.error) {
+      // Sale already committed — return saleId so POS does not retry a duplicate invoice.
       return {
-        error: priorResult.error,
         saleId: sale.id,
         changeGiven,
         amountDue: paymentState.amountDue,
+        warning: `Sale saved. Past dues could not be applied: ${priorResult.error}`,
       };
     }
   }
@@ -569,7 +733,7 @@ export async function completeCheckout(
 export async function voidSale(
   id: string,
   reason?: string
-): Promise<ActionResult> {
+): Promise<ActionResult & { saleId?: string }> {
   const org = await requireAction("sales.void");
   const supabase = await createClient();
   const {
@@ -583,7 +747,7 @@ export async function voidSale(
 
   const { data: sale } = await supabase
     .from("sales")
-    .select("id, status, total, customer_id")
+    .select("id, status, total, customer_id, appointment_id")
     .eq("id", id)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
@@ -601,7 +765,11 @@ export async function voidSale(
     .eq("organization_id", org.organizationId)
     .maybeSingle();
 
-  // Restore retail product stock still outstanding (nets prior amend restores)
+  const { resolveSoftDeleteActor, softDeletePatch } = await import("@/lib/db/soft-delete");
+  const actor = await resolveSoftDeleteActor();
+  const soft = softDeletePatch(actor);
+
+  // 1) Restore retail stock while sale is still live — abort void if this fails.
   {
     const [{ data: outs }, { data: ins }] = await Promise.all([
       supabase
@@ -644,23 +812,15 @@ export async function voidSale(
         notes: `Void restore — ${voidReason}`,
         created_by: user?.id ?? null,
       });
-      if (invErr) return { error: `Inventory restore failed: ${invErr.message}` };
+      if (invErr) {
+        return {
+          error: `Void aborted — inventory restore failed: ${invErr.message}`,
+        };
+      }
     }
   }
 
-  // In-house (cream/ml) is NOT restored on delete — product was already used on the client.
-  // Owner can restock manually under In-house if the service never happened.
-  // Retail PRODUCT lines are restored above.
-
-  // Unlink applied deposits so they can be reused or refunded separately
-  await supabase
-    .from("appointment_deposits")
-    .update({ applied_to_sale_id: null })
-    .eq("applied_to_sale_id", id)
-    .eq("organization_id", org.organizationId);
-
-  // Reconcile cash/card collected on void — do NOT cash-refund deposit applications
-  // (those deposits are unlinked above so the advance can be reused).
+  // 2) Record cash/card refund while sale is still live — abort if this fails.
   const [{ data: pays }, { data: refs }] = await Promise.all([
     supabase
       .from("payments")
@@ -679,27 +839,31 @@ export async function voidSale(
   }, 0);
   const refunded = (refs ?? []).reduce((s, p) => s + Number(p.amount), 0);
   const netCashToRefund = roundMoney(Math.max(0, cashCollected - refunded));
+  let voidRefundId: string | null = null;
   if (netCashToRefund > 0) {
-    const { error: refundErr } = await supabase.from("sale_refunds").insert({
-      organization_id: org.organizationId,
-      sale_id: id,
-      amount: netCashToRefund,
-      method: "CASH",
-      reason: `Void — ${voidReason}`,
-      reference: "SALE_VOID",
-      created_by: user?.id ?? null,
-    });
-    if (refundErr) return { error: `Void refund failed: ${refundErr.message}` };
-
-    // Do NOT insert an expenses row — void removes the sale from ticket revenue.
-    // Booking refunds as both lost revenue and expense double-hits net profit.
+    const { data: refundRow, error: refundErr } = await supabase
+      .from("sale_refunds")
+      .insert({
+        organization_id: org.organizationId,
+        sale_id: id,
+        amount: netCashToRefund,
+        method: "CASH",
+        reason: `Void — ${voidReason}`,
+        reference: "SALE_VOID",
+        created_by: user?.id ?? null,
+      })
+      .select("id")
+      .single();
+    if (refundErr || !refundRow) {
+      return {
+        error: `Void aborted — refund record failed: ${refundErr?.message ?? "unknown"}`,
+      };
+    }
+    voidRefundId = refundRow.id;
   }
 
-  const { resolveSoftDeleteActor, softDeletePatch } = await import("@/lib/db/soft-delete");
-  const actor = await resolveSoftDeleteActor();
-  const soft = softDeletePatch(actor);
-
-  const { error } = await supabase
+  // 3) Only now mark VOID (+ soft delete). Sale stays live if steps above failed.
+  const { data: voided, error } = await supabase
     .from("sales")
     .update({
       status: "VOID",
@@ -710,9 +874,23 @@ export async function voidSale(
     })
     .eq("id", id)
     .eq("organization_id", org.organizationId)
-    .in("status", ["COMPLETED", "AMENDED"]);
+    .in("status", ["COMPLETED", "AMENDED"])
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (voidRefundId) {
+      await supabase.from("sale_refunds").delete().eq("id", voidRefundId);
+    }
+    return { error: error.message };
+  }
+  if (!voided) {
+    if (voidRefundId) {
+      await supabase.from("sale_refunds").delete().eq("id", voidRefundId);
+    }
+    return { error: "Sale was already voided or changed by someone else" };
+  }
 
   if (invoice?.id) {
     await supabase
@@ -722,10 +900,36 @@ export async function voidSale(
       .eq("organization_id", org.organizationId);
   }
 
+  // Unlink applied deposits so they can be reused or refunded separately
+  await supabase
+    .from("appointment_deposits")
+    .update({ applied_to_sale_id: null })
+    .eq("applied_to_sale_id", id)
+    .eq("organization_id", org.organizationId);
+
+  // Reopen appointment so the booking can be rebilled after void
+  if (sale.appointment_id) {
+    await supabase
+      .from("appointments")
+      .update({
+        status: "CONFIRMED",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sale.appointment_id)
+      .eq("organization_id", org.organizationId)
+      .eq("status", "COMPLETED")
+      .is("deleted_at", null);
+  }
+
+  // In-house (cream/ml) is NOT restored on delete — product was already used on the client.
+
   try {
     await syncSalePaymentDenorm(org.organizationId, id);
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to sync payment status" };
+    return {
+      error: e instanceof Error ? e.message : "Failed to sync payment status",
+      saleId: id,
+    };
   }
 
   await writeAuditLog({
@@ -743,6 +947,7 @@ export async function voidSale(
       invoice_number: invoice?.invoice_number ?? null,
       before: { status: sale.status, total: sale.total },
       soft_delete: true,
+      appointment_reopened: Boolean(sale.appointment_id),
     },
   });
 
@@ -753,6 +958,8 @@ export async function voidSale(
   revalidatePath("/in-house");
   revalidatePath("/dashboard");
   revalidatePath("/staff");
+  revalidatePath("/appointments");
+  revalidatePath("/pos");
   if (sale.customer_id) {
     revalidatePath(`/customers/${sale.customer_id}`);
   }

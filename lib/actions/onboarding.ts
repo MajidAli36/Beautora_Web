@@ -8,12 +8,17 @@ import {
   validateStoreSlug,
 } from "@/lib/onboarding/slug";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
+import { requireStoreLocation } from "@/lib/location/store-location";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/types/commerce";
 
 export type CreateOrganizationInput = {
   salonName: string;
+  /** Required — used for directory filters and future country/city grouping. */
+  city: string;
+  /** Required — used for directory filters and future country/city grouping. */
+  country: string;
   slug?: string;
   whatsappPhone?: string;
   bookingSlotMinutes?: number;
@@ -29,6 +34,12 @@ export async function createSalonOrganization(
   if (salonName.length < 2) {
     return { error: "Salon name must be at least 2 characters" };
   }
+
+  const location = requireStoreLocation({
+    city: input.city,
+    country: input.country,
+  });
+  if (!location.ok) return { error: location.error };
 
   const explicitSlug = Boolean(input.slug?.trim());
   const rawBase = input.slug?.trim() || salonName;
@@ -195,6 +206,8 @@ export async function createSalonOrganization(
     .insert({
       name: salonName,
       slug,
+      city: location.city,
+      country: location.country,
       whatsapp_phone: phone,
       booking_slot_minutes: safeSlot,
       booking_days_ahead: safeDays,

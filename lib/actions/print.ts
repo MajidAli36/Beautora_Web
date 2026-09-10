@@ -14,17 +14,21 @@ import {
 import { getSale } from "@/lib/actions/sales";
 import { displayBookingNumber } from "@/lib/booking/booking-number";
 import { formatCustomerName, formatDate, formatTime } from "@/lib/format";
+import { runWithCountryCurrency } from "@/lib/currency/runtime.server";
 
-async function getBusinessInfo() {
+async function getOrgPrintContext() {
   const org = await requireOrganization();
   const supabase = await createClient();
   const { data } = await supabase
     .from("organizations")
-    .select("name, address, city, phone, whatsapp_phone")
+    .select("name, address, city, country, phone, whatsapp_phone")
     .eq("id", org.organizationId)
     .single();
 
-  return orgToBusinessPrintInfo(data, org.organizationName || "Salon");
+  return {
+    country: data?.country ?? org.country ?? null,
+    business: orgToBusinessPrintInfo(data, org.organizationName || "Salon"),
+  };
 }
 
 function nowParts() {
@@ -36,11 +40,10 @@ function nowParts() {
 }
 
 export async function getSaleReceiptHtml(saleId: string): Promise<string | null> {
-  await requireOrganization();
+  const { country, business } = await getOrgPrintContext();
   const sale = await getSale(saleId);
   if (!sale || (sale.status !== "COMPLETED" && sale.status !== "AMENDED")) return null;
 
-  const business = await getBusinessInfo();
   const customer = sale.customer as {
     first_name: string;
     last_name: string | null;
@@ -104,7 +107,7 @@ export async function getSaleReceiptHtml(saleId: string): Promise<string | null>
     changeGiven,
   };
 
-  return renderSaleReceiptHtml(data);
+  return runWithCountryCurrency(country, () => renderSaleReceiptHtml(data));
 }
 
 export async function getTokenReceiptHtml(input: {
@@ -116,8 +119,7 @@ export async function getTokenReceiptHtml(input: {
   queueDate?: string;
   issuedAt?: string;
 }): Promise<string> {
-  await requireOrganization();
-  const business = await getBusinessInfo();
+  const { country, business } = await getOrgPrintContext();
   const parts = input.issuedAt
     ? (() => {
         const d = new Date(input.issuedAt);
@@ -140,7 +142,7 @@ export async function getTokenReceiptHtml(input: {
     time: parts.time,
   };
 
-  return renderTokenReceiptHtml(data);
+  return runWithCountryCurrency(country, () => renderTokenReceiptHtml(data));
 }
 
 export async function getAppointmentReceiptHtml(
@@ -180,7 +182,7 @@ export async function getAppointmentReceiptHtml(
         .eq("appointment_id", appointmentId),
     ]);
 
-  const business = await getBusinessInfo();
+  const { country, business } = await getOrgPrintContext();
   const advance = (deposits ?? [])
     .filter((d) => d.status === "APPROVED")
     .reduce((s, d) => s + Number(d.amount), 0);
@@ -208,5 +210,5 @@ export async function getAppointmentReceiptHtml(
     pendingApproval,
   };
 
-  return renderAppointmentReceiptHtml(data);
+  return runWithCountryCurrency(country, () => renderAppointmentReceiptHtml(data));
 }

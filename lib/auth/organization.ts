@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import { enterCurrencyFromCountry } from "@/lib/currency/runtime.server";
 import type { MemberRole } from "@/types";
 
 export type OrganizationMembership = {
   organizationId: string;
   organizationName: string;
   role: MemberRole;
+  /** Store country from Settings / onboarding — drives display currency. */
+  country: string | null;
 };
 
 export async function getUserMemberships(): Promise<OrganizationMembership[]> {
@@ -22,7 +25,8 @@ export async function getUserMemberships(): Promise<OrganizationMembership[]> {
       role,
       organization:organizations (
         id,
-        name
+        name,
+        country
       )
     `
     )
@@ -36,6 +40,7 @@ export async function getUserMemberships(): Promise<OrganizationMembership[]> {
       organizationId: row.organization!.id,
       organizationName: row.organization!.name,
       role: row.role as MemberRole,
+      country: (row.organization as { country?: string | null }).country ?? null,
     }));
 }
 
@@ -43,7 +48,9 @@ export async function getActiveOrganization(): Promise<OrganizationMembership | 
   const memberships = await getUserMemberships();
   if (memberships.length === 0) return null;
   // Single-salon MVP: auto-select the first (only) organization.
-  return memberships[0];
+  const org = memberships[0];
+  enterCurrencyFromCountry(org.country);
+  return org;
 }
 
 export async function requireOrganization(): Promise<OrganizationMembership> {
@@ -51,5 +58,6 @@ export async function requireOrganization(): Promise<OrganizationMembership> {
   if (!org) {
     throw new Error("No organization membership found");
   }
+  enterCurrencyFromCountry(org.country);
   return org;
 }

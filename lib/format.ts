@@ -1,20 +1,66 @@
 import { APP_TIMEZONE, getLocalHour } from "@/lib/dates/local";
+import {
+  currencyFromCode,
+  currencyFromCountry,
+  DEFAULT_CURRENCY,
+} from "@/lib/currency/from-country";
+import { getCurrencyConfig } from "@/lib/currency/runtime";
 
-export function formatCurrency(amount: number | string) {
-  const value = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (Number.isNaN(value)) return "Rs 0";
-  return new Intl.NumberFormat("en-PK", {
-    style: "currency",
-    currency: "PKR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+export type FormatCurrencyOptions = {
+  /** Override using store country (e.g. public store page). */
+  country?: string | null;
+  /** Override using ISO currency code. */
+  currency?: string | null;
+};
+
+function resolveFormatCurrency(opts?: FormatCurrencyOptions) {
+  if (opts?.currency) return currencyFromCode(opts.currency);
+  if (opts?.country) return currencyFromCountry(opts.country);
+  return getCurrencyConfig();
 }
 
-export function formatCurrencyCompact(amount: number) {
-  if (amount >= 1_000_000) return `Rs ${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `Rs ${(amount / 1_000).toFixed(1)}K`;
-  return formatCurrency(amount);
+/** Money display — store-country currency, always 2 decimal places. */
+export function formatCurrency(
+  amount: number | string,
+  opts?: FormatCurrencyOptions
+) {
+  const value = typeof amount === "string" ? parseFloat(amount) : amount;
+  const safe = Number.isNaN(value) ? 0 : value;
+  const config = resolveFormatCurrency(opts);
+
+  try {
+    return new Intl.NumberFormat(config.locale, {
+      style: "currency",
+      currency: config.code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(safe);
+  } catch {
+    return new Intl.NumberFormat(DEFAULT_CURRENCY.locale, {
+      style: "currency",
+      currency: DEFAULT_CURRENCY.code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(safe);
+  }
+}
+
+export function formatCurrencyCompact(
+  amount: number,
+  opts?: FormatCurrencyOptions
+) {
+  const config = resolveFormatCurrency(opts);
+  try {
+    return new Intl.NumberFormat(config.locale, {
+      style: "currency",
+      currency: config.code,
+      notation: Math.abs(amount) >= 1000 ? "compact" : "standard",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return formatCurrency(amount, opts);
+  }
 }
 
 export function formatCustomerName(firstName: string, lastName?: string | null) {

@@ -10,6 +10,7 @@ export type PublicStore = {
   name: string;
   slug: string;
   city: string | null;
+  country: string | null;
   address: string | null;
   tagline: string | null;
   whatsappPhone: string | null;
@@ -26,6 +27,8 @@ export type PublicStore = {
 export type PublicStoreDetail = PublicStore & {
   bookingSlotMinutes: number;
   bookingDaysAhead: number;
+  /** When false, hide Book CTAs (store page can still be public). */
+  publicBookingEnabled: boolean;
   phone: string | null;
   email: string | null;
   services: {
@@ -33,6 +36,13 @@ export type PublicStoreDetail = PublicStore & {
     name: string;
     price: number;
     duration_minutes: number;
+  }[];
+  /** Customer-facing retail products (RETAIL / BOTH — not in-house only). */
+  products: {
+    id: string;
+    name: string;
+    price: number;
+    description: string | null;
   }[];
   staff: {
     id: string;
@@ -54,7 +64,7 @@ export async function listPublicStores(): Promise<PublicStore[]> {
   const { data: orgs, error } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, address, tagline, whatsapp_phone, logo_path, cover_path, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+      "id, name, slug, city, country, address, tagline, whatsapp_phone, logo_path, cover_path, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
     )
     .is("admin_disabled_at", null)
     .eq("public_listing_enabled", true)
@@ -101,6 +111,7 @@ export async function listPublicStores(): Promise<PublicStore[]> {
         name: org.name,
         slug: org.slug,
         city: org.city,
+        country: org.country ?? null,
         address: org.address,
         tagline: org.tagline,
         whatsappPhone: org.whatsapp_phone,
@@ -135,7 +146,7 @@ export async function getPublicStoreBySlug(slug: string): Promise<PublicStoreDet
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at, public_listing_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, created_at"
+      "id, name, slug, city, country, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at, public_listing_enabled, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, created_at"
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -143,31 +154,47 @@ export async function getPublicStoreBySlug(slug: string): Promise<PublicStoreDet
   if (!org || org.admin_disabled_at || !org.public_listing_enabled) return null;
   if (!resolveSubscription(org).isOperational) return null;
 
-  const [{ data: services }, { data: staff }, logoUrl, coverUrl] = await Promise.all([
-    admin
-      .from("services")
-      .select("id, name, price, duration_minutes")
-      .eq("organization_id", org.id)
-      .eq("is_active", true)
-      .order("name"),
-    admin
-      .from("staff")
-      .select("id, full_name, job_title")
-      .eq("organization_id", org.id)
-      .eq("is_active", true)
-      .eq("online_booking_enabled", true)
-      .order("full_name"),
-    resolveAssetUrl(org.logo_path),
-    resolveAssetUrl(org.cover_path),
-  ]);
+  const [{ data: services }, { data: products }, { data: staff }, logoUrl, coverUrl] =
+    await Promise.all([
+      admin
+        .from("services")
+        .select("id, name, price, duration_minutes")
+        .eq("organization_id", org.id)
+        .eq("is_active", true)
+        .order("name"),
+      admin
+        .from("products")
+        .select("id, name, retail_price, description")
+        .eq("organization_id", org.id)
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .in("product_kind", ["RETAIL", "BOTH"])
+        .order("name"),
+      admin
+        .from("staff")
+        .select("id, full_name, job_title")
+        .eq("organization_id", org.id)
+        .eq("is_active", true)
+        .eq("online_booking_enabled", true)
+        .order("full_name"),
+      resolveAssetUrl(org.logo_path),
+      resolveAssetUrl(org.cover_path),
+    ]);
 
   const serviceList = services ?? [];
+  const productList = (products ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: Number(p.retail_price),
+    description: p.description,
+  }));
 
   return {
     id: org.id,
     name: org.name,
     slug: org.slug,
     city: org.city,
+    country: org.country ?? null,
     address: org.address,
     tagline: org.tagline,
     phone: org.phone,
@@ -175,10 +202,12 @@ export async function getPublicStoreBySlug(slug: string): Promise<PublicStoreDet
     whatsappPhone: org.whatsapp_phone,
     bookingSlotMinutes: org.booking_slot_minutes,
     bookingDaysAhead: org.booking_days_ahead,
+    publicBookingEnabled: org.public_booking_enabled ?? true,
     serviceCount: serviceList.length,
     staffCount: staff?.length ?? 0,
     highlightServices: serviceList.slice(0, 3).map((s) => s.name),
     services: serviceList,
+    products: productList,
     staff: staff ?? [],
     logoUrl,
     coverUrl,

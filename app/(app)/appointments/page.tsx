@@ -1,155 +1,148 @@
-import { PageHeader } from "@/components/layout/page-header";
-import Link from "next/link";
-import { Plus } from "lucide-react";
-import { getAppointments } from "@/lib/actions/appointments";
-import { getStaff } from "@/lib/actions/staff";
-import { getStaffSchedulesForOrg } from "@/lib/actions/scheduling";
-import { AppointmentsScheduleTable } from "@/components/features/appointments/appointments-schedule-table";
-import { StaffScheduleForm } from "@/components/features/staff/staff-schedule-form";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { getApprovedDepositTotal, getPendingDepositTotal, sumServicePrices } from "@/lib/booking/pricing";
-import { formatCurrency, formatDate } from "@/lib/format";
-import { getLocalDateString } from "@/lib/dates/local";
 import {
+  getBookingAdvanceSettings,
+  getPendingDepositCount,
+  getPublicBookingEnabled,
+} from "@/lib/actions/appointments";
+import {
+  fetchAppointmentHistory,
+  fetchIncomingAppointments,
+  fetchInHouseAppointments,
+  fetchOnlineAppointments,
+} from "@/lib/actions/online-booking";
+import { getOnlineBookingStaff, getStaffSchedulesForOrg } from "@/lib/actions/scheduling";
+import {
+  AppointmentsHub,
+  type AppointmentsTab,
+} from "@/components/features/appointments/appointments-hub";
+import {
+  canAccessFeature,
   canApproveDeposits,
   canConfigureOnlineBooking,
   canOperateQueue,
   canUsePos,
   checkAction,
 } from "@/lib/auth/permissions";
+import { requireOrganization } from "@/lib/auth/organization";
+import { createClient } from "@/lib/supabase/server";
+import { getLocalDateString } from "@/lib/dates/local";
 
 type PageProps = {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; tab?: string; focus?: string }>;
 };
+
+function isValidDateParam(value: string | undefined): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+function parseTab(value: string | undefined): AppointmentsTab {
+  if (
+    value === "online" ||
+    value === "incoming" ||
+    value === "history" ||
+    value === "setup"
+  ) {
+    return value;
+  }
+  return "in-house";
+}
 
 export default async function AppointmentsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const date = params.date ?? getLocalDateString();
+  const dateParam = isValidDateParam(params.date) ? params.date : null;
+  const today = getLocalDateString();
+  const focus = params.focus === "deposits" ? "deposits" : null;
+
+  const canViewInHouse = await canAccessFeature("appointments");
+  const canViewOnline = (await canAccessFeature("online_booking")) || canViewInHouse;
+
+  let initialTab = focus === "deposits" ? "incoming" : parseTab(params.tab);
+  if (!canViewInHouse && initialTab === "in-house") initialTab = "online";
+  if (!canViewOnline && initialTab === "online") initialTab = canViewInHouse ? "in-house" : "history";
+  if (params.tab === "setup") {
+    const canConfigureEarly = await canConfigureOnlineBooking();
+    if (!canConfigureEarly) initialTab = canViewInHouse ? "in-house" : "online";
+  }
+
+  // `date` applies to the active schedule tab (in-house or online), not both blindly.
+  const inHouseDate = initialTab === "in-house" ? dateParam ?? today : today;
+  const onlineDate =
+    initialTab === "online" || initialTab === "history" ? dateParam : null;
+
+  const org = await requireOrganization();
+  const supabase = await createClient();
+  const { data: orgRow } = await supabase
+    .from("organizations")
+    .select("slug")
+    .eq("id", org.organizationId)
+    .single();
+
+  const historySource = canViewInHouse ? "ALL" : "ONLINE";
+
   const [
-    appointments,
+    inHouse,
+    online,
+    incoming,
+    history,
+    staff,
+    schedules,
+    advanceSettings,
+    pendingCount,
+    publicBookingEnabled,
     canReviewDeposits,
     canRefund,
     canCheckIn,
     canCollectPayment,
-    canConfigureHours,
+    canConfigure,
     canCreateAppointment,
-    staff,
-    schedules,
+    canMarkNoShow,
   ] = await Promise.all([
-    getAppointments(date, { source: "STAFF" }),
+    canViewInHouse ? fetchInHouseAppointments(inHouseDate).catch(() => []) : Promise.resolve([]),
+    canViewOnline
+      ? fetchOnlineAppointments({ date: onlineDate }).catch(() => [])
+      : Promise.resolve([]),
+    fetchIncomingAppointments({ onlineOnly: !canViewInHouse }).catch(() => []),
+    fetchAppointmentHistory({ date: onlineDate, source: historySource }).catch(() => []),
+    getOnlineBookingStaff().catch(() => []),
+    getStaffSchedulesForOrg().catch(() => []),
+    getBookingAdvanceSettings().catch(() => null),
+    getPendingDepositCount().catch(() => 0),
+    getPublicBookingEnabled().catch(() => true),
     canApproveDeposits(),
     checkAction("sales.refund"),
     canOperateQueue(),
     canUsePos(),
     canConfigureOnlineBooking(),
     checkAction("appointments.create"),
-    getStaff().catch(() => []),
-    getStaffSchedulesForOrg().catch(() => []),
+    checkAction("appointments.cancel"),
   ]);
 
-  const formattedDate = formatDate(`${date}T12:00:00+05:00`, "long");
-
-  const totalServices = appointments.reduce(
-    (sum, a) => sum + sumServicePrices(a.services ?? []),
-    0
-  );
-  const totalAdvance = appointments.reduce(
-    (sum, a) => sum + getApprovedDepositTotal(a.deposits ?? []),
-    0
-  );
-  const pendingCount = appointments.filter(
-    (a) => getPendingDepositTotal(a.deposits ?? []) > 0
-  ).length;
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Appointments"
-        description={`Reception schedule for ${formattedDate} — services, advances, and balances.`}
-        actions={
-          <>
-            <Button variant="outline" render={<Link href="/online-booking" />}>
-              Online booking
-            </Button>
-            {canCreateAppointment && (
-              <Button render={<Link href="/appointments/new" />}>
-                <Plus className="size-4" />
-                Add appointment
-              </Button>
-            )}
-          </>
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Appointments</p>
-            <p className="text-3xl font-bold">{appointments.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Services value</p>
-            <p className="text-3xl font-bold">{formatCurrency(totalServices)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              Advances collected{pendingCount > 0 ? ` · ${pendingCount} pending approval` : ""}
-            </p>
-            <p className="text-3xl font-bold text-primary">{formatCurrency(totalAdvance)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Checked in</p>
-            <p className="text-3xl font-bold">
-              {appointments.filter((a) => a.status === "CHECKED_IN").length}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-          <CardTitle>Schedule</CardTitle>
-          <form className="flex items-end gap-2" action="/appointments" method="get">
-            <div className="space-y-1">
-              <Label htmlFor="date" className="text-xs">
-                Date
-              </Label>
-              <Input id="date" name="date" type="date" defaultValue={date} className="h-10 w-full min-w-[9.5rem] sm:h-8 sm:w-40" />
-            </div>
-            <Button type="submit" size="sm" variant="outline">
-              View
-            </Button>
-          </form>
-        </CardHeader>
-        <CardContent>
-          <AppointmentsScheduleTable
-            appointments={appointments}
-            mode="staff"
-            emptyMessage="No reception appointments on this date."
-            emptyAction={{ label: "Add appointment", href: "/appointments/new" }}
-            canReviewDeposits={canReviewDeposits}
-            canRefundDeposits={canRefund}
-            canCheckIn={canCheckIn}
-            canCollectPayment={canCollectPayment}
-          />
-        </CardContent>
-      </Card>
-
-      {canConfigureHours && (
-        <StaffScheduleForm
-          staff={staff.map((s) => ({ id: s.id, full_name: s.full_name }))}
-          schedules={schedules}
-        />
-      )}
-    </div>
+    <AppointmentsHub
+      key={`${initialTab}-${inHouseDate}-${onlineDate ?? "all"}-${focus ?? "none"}`}
+      initialTab={initialTab}
+      inHouseDate={inHouseDate}
+      initialOnlineDate={onlineDate}
+      initialInHouse={inHouse}
+      initialOnline={online}
+      initialIncoming={incoming}
+      initialHistory={history}
+      initialHistorySource={historySource}
+      staff={staff}
+      schedules={schedules}
+      advanceSettings={advanceSettings}
+      initialPendingCount={pendingCount}
+      publicUrl={`/book/${orgRow?.slug ?? "hair-salon"}`}
+      publicBookingEnabled={publicBookingEnabled}
+      focus={focus}
+      canViewInHouse={canViewInHouse}
+      canViewOnline={canViewOnline}
+      canConfigure={canConfigure}
+      canReviewDeposits={canReviewDeposits}
+      canRefundDeposits={canRefund}
+      canCollectPayment={canCollectPayment}
+      canCheckIn={canCheckIn}
+      canCreateAppointment={canCreateAppointment}
+      canMarkNoShow={canMarkNoShow}
+    />
   );
 }

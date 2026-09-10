@@ -9,6 +9,10 @@ import {
   createSalonOrganization,
 } from "@/lib/actions/onboarding";
 import { getRememberedPartnerReferral } from "@/lib/actions/partners";
+import {
+  DEFAULT_STORE_COUNTRY,
+} from "@/lib/location/store-location";
+import { CountrySearchSelect } from "@/components/features/location/country-search-select";
 import { cn } from "@/lib/utils";
 
 type OrganizationOnboardingProps = {
@@ -22,6 +26,8 @@ export function OrganizationOnboarding({
 }: OrganizationOnboardingProps) {
   const router = useRouter();
   const [salonName, setSalonName] = useState(initialSalonName);
+  const [city, setCity] = useState("");
+  const [country, setCountry] = useState<string>(DEFAULT_STORE_COUNTRY);
   const [nameOk, setNameOk] = useState<boolean | null>(null);
   const [nameHint, setNameHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,10 +67,20 @@ export function OrganizationOnboarding({
       notify.error(nameHint ?? "This salon name is already taken");
       return;
     }
+    if (city.trim().length < 2) {
+      notify.error("Enter your city");
+      return;
+    }
+    if (country.trim().length < 2) {
+      notify.error("Select your country");
+      return;
+    }
 
     setLoading(true);
     const result = await createSalonOrganization({
       salonName: name,
+      city,
+      country,
       // Quiet defaults — online booking can be configured later
       bookingSlotMinutes: 30,
       bookingDaysAhead: 14,
@@ -76,6 +92,8 @@ export function OrganizationOnboarding({
       return;
     }
     notify.success("Salon ready — welcome to Beautora");
+    const { markGuideAutoOpen } = await import("@/lib/guide/storage");
+    markGuideAutoOpen();
     router.push("/dashboard");
     router.refresh();
   }
@@ -89,8 +107,8 @@ export function OrganizationOnboarding({
         Name your salon
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-[var(--m-muted)]">
-        Start with POS, staff, and sales. Online booking is optional — turn it on later when you
-        want it.
+        Start with POS, staff, and sales. City and country help customers find you — and power
+        store grouping later.
       </p>
 
       {userEmail && (
@@ -109,7 +127,7 @@ export function OrganizationOnboarding({
       <div className="mt-6 space-y-4">
         <div className="space-y-2">
           <label htmlFor="salonName" className="text-sm font-medium text-[var(--m-ink-soft)]">
-            Salon name
+            Salon name <span className="text-[var(--m-accent)]">*</span>
           </label>
           <input
             id="salonName"
@@ -122,12 +140,47 @@ export function OrganizationOnboarding({
             className={fieldClassName}
             autoFocus
             autoComplete="organization"
+            required
           />
           {nameHint && (
             <p className={cn("text-xs", nameOk === false ? "text-red-700" : "text-[var(--m-muted)]")}>
               {nameHint}
             </p>
           )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label htmlFor="city" className="text-sm font-medium text-[var(--m-ink-soft)]">
+              City <span className="text-[var(--m-accent)]">*</span>
+            </label>
+            <input
+              id="city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void finish();
+              }}
+              placeholder="e.g. Lahore"
+              className={fieldClassName}
+              autoComplete="address-level2"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="country" className="text-sm font-medium text-[var(--m-ink-soft)]">
+              Country <span className="text-[var(--m-accent)]">*</span>
+            </label>
+            <CountrySearchSelect
+              id="country"
+              name="country"
+              value={country}
+              onValueChange={setCountry}
+              variant="marketing"
+              required
+              placeholder="Type to search country…"
+            />
+          </div>
         </div>
 
         <button

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublicStoreBySlug } from "@/lib/actions/stores";
 import { formatCurrency, formatDuration } from "@/lib/format";
+import { resolveStorePublicContact } from "@/lib/marketing/store-contact";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -48,7 +49,11 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const store = await getPublicStoreBySlug(slug);
   if (!store) notFound();
 
-  const phone = store.whatsappPhone?.replace(/\s/g, "") ?? null;
+  // Store phone / WhatsApp only — never platform SyncOps support number.
+  const contact = resolveStorePublicContact({
+    phone: store.phone,
+    whatsappPhone: store.whatsappPhone,
+  });
   const coverSrc = store.coverUrl ?? store.visual.coverImage;
   const coverAlt = store.coverUrl ? `${store.name} cover` : store.visual.coverAlt;
 
@@ -111,17 +116,19 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             </div>
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
+            {store.publicBookingEnabled ? (
+              <Link
+                href={`/book/${store.slug}`}
+                className="inline-flex h-12 items-center bg-white px-7 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
+              >
+                Book now
+              </Link>
+            ) : null}
             <Link
-              href={`/book/${store.slug}`}
-              className="inline-flex h-12 items-center bg-white px-7 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
-            >
-              Book now
-            </Link>
-            <Link
-              href="#services"
+              href="#menu"
               className="inline-flex h-12 items-center border border-white/35 px-7 text-sm font-medium tracking-wide text-white transition-colors hover:border-white hover:bg-white/10"
             >
-              View services
+              View menu
             </Link>
           </div>
         </div>
@@ -147,43 +154,82 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         </div>
       </section>
 
-      <section id="services" className="scroll-mt-24 py-20 sm:py-24">
+      <section id="menu" className="scroll-mt-24 py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
-              Services
+              Services &amp; products
             </p>
             <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)]">
               The menu
             </h2>
             <p className="mt-4 text-lg text-[var(--m-muted)]">
-              Live prices and durations from this store.
+              Services you can book and retail products available at this store.
             </p>
           </div>
 
-          {store.services.length === 0 ? (
+          {store.services.length === 0 && store.products.length === 0 ? (
             <p className="mt-12 border-y border-[var(--m-line)] py-8 text-[var(--m-muted)]">
-              No services published yet.
+              No services or products published yet.
             </p>
           ) : (
-            <ul className="mt-12 divide-y divide-[var(--m-line)] border-y border-[var(--m-line)]">
-              {store.services.map((service) => (
-                <li
-                  key={service.id}
-                  className="grid gap-2 py-7 sm:grid-cols-[1.4fr_auto_auto] sm:items-baseline sm:gap-8"
-                >
-                  <h3 className="font-display text-2xl font-medium text-[var(--m-ink)]">
-                    {service.name}
+            <div className="mt-12 space-y-14">
+              {store.services.length > 0 ? (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-muted)]">
+                    Services
                   </h3>
-                  <span className="text-sm text-[var(--m-muted)]">
-                    {formatDuration(service.duration_minutes)}
-                  </span>
-                  <span className="text-sm font-semibold text-[var(--m-ink)] sm:text-right">
-                    from {formatCurrency(service.price)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  <ul className="mt-5 divide-y divide-[var(--m-line)] border-y border-[var(--m-line)]">
+                    {store.services.map((service) => (
+                      <li
+                        key={service.id}
+                        className="grid gap-2 py-7 sm:grid-cols-[1.4fr_auto_auto] sm:items-baseline sm:gap-8"
+                      >
+                        <h4 className="font-display text-2xl font-medium text-[var(--m-ink)]">
+                          {service.name}
+                        </h4>
+                        <span className="text-sm text-[var(--m-muted)]">
+                          {formatDuration(service.duration_minutes)}
+                        </span>
+                        <span className="text-sm font-semibold text-[var(--m-ink)] sm:text-right">
+                          from {formatCurrency(service.price, { country: store.country })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {store.products.length > 0 ? (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-muted)]">
+                    Products
+                  </h3>
+                  <ul className="mt-5 divide-y divide-[var(--m-line)] border-y border-[var(--m-line)]">
+                    {store.products.map((product) => (
+                      <li
+                        key={product.id}
+                        className="grid gap-2 py-7 sm:grid-cols-[1.4fr_auto] sm:items-baseline sm:gap-8"
+                      >
+                        <div className="min-w-0">
+                          <h4 className="font-display text-2xl font-medium text-[var(--m-ink)]">
+                            {product.name}
+                          </h4>
+                          {product.description?.trim() ? (
+                            <p className="mt-1 text-sm text-[var(--m-muted)]">
+                              {product.description.trim()}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span className="text-sm font-semibold text-[var(--m-ink)] sm:text-right">
+                          {formatCurrency(product.price, { country: store.country })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       </section>
@@ -243,15 +289,25 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               Reserve your chair
             </h2>
             <p className="mt-4 max-w-xl text-lg text-[var(--m-muted)]">
-              Book online at {store.name}. Slots open for the next {store.bookingDaysAhead}{" "}
-              days.
+              {store.publicBookingEnabled
+                ? `Book online at ${store.name}. Slots open for the next ${store.bookingDaysAhead} days.`
+                : `Visit ${store.name} or call to reserve — online booking is currently off.`}
             </p>
-            <Link
-              href={`/book/${store.slug}`}
-              className="mt-8 inline-flex h-12 items-center bg-[var(--m-ink)] px-8 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]"
-            >
-              Book online
-            </Link>
+            {store.publicBookingEnabled ? (
+              <Link
+                href={`/book/${store.slug}`}
+                className="mt-8 inline-flex h-12 items-center bg-[var(--m-ink)] px-8 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]"
+              >
+                Book online
+              </Link>
+            ) : contact ? (
+              <a
+                href={`tel:${contact.telHref}`}
+                className="mt-8 inline-flex h-12 items-center bg-[var(--m-ink)] px-8 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]"
+              >
+                Call the salon
+              </a>
+            ) : null}
           </div>
           <div className="space-y-6 border-t border-[var(--m-line)] pt-8 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
             <div>
@@ -267,19 +323,31 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               )}
               <p className="mt-1 text-sm text-[var(--m-muted)]">/{store.slug}</p>
             </div>
-            {phone && (
+            {contact ? (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--m-muted)]">
                   Call / WhatsApp
                 </p>
                 <a
-                  href={`tel:${phone}`}
+                  href={`tel:${contact.telHref}`}
                   className="mt-2 inline-block text-base text-[var(--m-ink)] underline-offset-4 hover:underline"
                 >
-                  {store.whatsappPhone}
+                  {contact.display}
                 </a>
+                {contact.whatsappHref ? (
+                  <p className="mt-2">
+                    <a
+                      href={contact.whatsappHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-[var(--m-accent)] underline-offset-4 hover:underline"
+                    >
+                      Message on WhatsApp
+                    </a>
+                  </p>
+                ) : null}
               </div>
-            )}
+            ) : null}
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--m-muted)]">
                 Platform

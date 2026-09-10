@@ -8,6 +8,11 @@ import { cn } from "@/lib/utils";
 import { checkSlugAvailable } from "@/lib/actions/onboarding";
 import { slugify } from "@/lib/onboarding/slug";
 import {
+  DEFAULT_STORE_COUNTRY,
+  STORE_COUNTRY_OPTIONS,
+} from "@/lib/location/store-location";
+import { CountrySearchSelect } from "@/components/features/location/country-search-select";
+import {
   removeStoreProfileImage,
   updateStoreProfile,
   uploadStoreProfileImage,
@@ -191,6 +196,14 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
   const [tagline, setTagline] = useState(profile.tagline ?? "");
   const [address, setAddress] = useState(profile.address ?? "");
   const [city, setCity] = useState(profile.city ?? "");
+  const [country, setCountry] = useState(() => {
+    const existing = profile.country?.trim();
+    if (!existing) return DEFAULT_STORE_COUNTRY;
+    const match = STORE_COUNTRY_OPTIONS.find(
+      (c) => c.toLowerCase() === existing.toLowerCase()
+    );
+    return match ?? existing;
+  });
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [email, setEmail] = useState(profile.email ?? "");
   const [whatsapp, setWhatsapp] = useState(profile.whatsapp_phone ?? "");
@@ -242,6 +255,14 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
       notify.error(slugHint ?? "That booking URL is already taken.");
       return;
     }
+    if (city.trim().length < 2) {
+      notify.error("City is required.");
+      return;
+    }
+    if (country.trim().length < 2) {
+      notify.error("Country is required.");
+      return;
+    }
     setSaving(true);
     const result = await updateStoreProfile({
       name,
@@ -249,6 +270,7 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
       tagline,
       address,
       city,
+      country,
       phone,
       email,
       whatsappPhone: whatsapp,
@@ -396,18 +418,39 @@ export function StoreProfileForm({ profile }: { profile: StoreProfile }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">
+                City <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="city"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="e.g. Lahore, Gujranwala, Islamabad"
+                required
+                autoComplete="address-level2"
               />
               <p className="text-xs text-muted-foreground">
-                Used for store directory search and city filters.
+                Required for directory search and future country/city grouping.
               </p>
             </div>
-            <div className="space-y-2 sm:col-span-1">
+            <div className="space-y-2">
+              <Label htmlFor="country">
+                Country <span className="text-destructive">*</span>
+              </Label>
+              <CountrySearchSelect
+                id="country"
+                name="country"
+                value={country}
+                onValueChange={setCountry}
+                variant="app"
+                required
+                placeholder="Type to search country…"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used with city for store grouping and filters.
+              </p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="address">Address</Label>
               <Textarea
                 id="address"

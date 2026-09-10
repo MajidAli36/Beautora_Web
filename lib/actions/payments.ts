@@ -84,6 +84,23 @@ export async function receiveSalePayment(input: {
 
   if (!check.ok) return { error: check.error };
 
+  const expectedVersion = input.expectedPaymentVersion;
+
+  // Claim the payment version before insert so concurrent receives cannot both succeed.
+  const { data: claimed, error: claimErr } = await supabase
+    .from("sales")
+    .update({ payment_version: expectedVersion + 1 })
+    .eq("id", sale.id)
+    .eq("organization_id", org.organizationId)
+    .eq("payment_version", expectedVersion)
+    .select("id")
+    .maybeSingle();
+
+  if (claimErr) return { error: claimErr.message };
+  if (!claimed) {
+    return { error: "Invoice was updated by someone else — refresh and try again" };
+  }
+
   const { error: payErr } = await supabase.from("payments").insert({
     organization_id: org.organizationId,
     sale_id: sale.id,
@@ -98,11 +115,24 @@ export async function receiveSalePayment(input: {
         : null,
     change_given: input.method === "CASH" ? check.changeGiven : null,
   });
-  if (payErr) return { error: payErr.message };
+  if (payErr) {
+    // Roll version back so the operator can retry cleanly.
+    await supabase
+      .from("sales")
+      .update({ payment_version: expectedVersion })
+      .eq("id", sale.id)
+      .eq("organization_id", org.organizationId)
+      .eq("payment_version", expectedVersion + 1);
+    return { error: payErr.message };
+  }
 
   let state;
   try {
-    state = await syncSalePaymentDenorm(org.organizationId, sale.id);
+    // Version already bumped by claim; sync without re-bumping via expected.
+    state = await syncSalePaymentDenorm(org.organizationId, sale.id, {
+      expectedPaymentVersion: expectedVersion + 1,
+      bumpVersion: false,
+    });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to update invoice balance" };
   }
@@ -495,6 +525,12 @@ export async function getCustomerStatement(
       });
     }
     for (const r of refundsBySale.get(sale.id) ?? []) {
+      // Goodwill: ticket was fully paid — refund is cash out, not new AR.
+      const paid = (paymentsBySale.get(sale.id) ?? []).reduce(
+        (s, p) => s + Number(p.amount),
+        0
+      );
+      if (paid + 0.009 >= Number(sale.total)) continue;
       events.push({
         date: r.created_at,
         reference: invNo,

@@ -13,6 +13,7 @@ import {
   roundMoney,
 } from "@/lib/sales/calculate";
 import { isPostedSaleStatus } from "@/lib/sales/lifecycle";
+import { computeSalePaymentState } from "@/lib/sales/payment-balance";
 import { syncSalePaymentDenorm } from "@/lib/sales/sync-payment-denorm";
 import {
   applyUsageOverrides,
@@ -410,8 +411,43 @@ export async function amendCompletedSale(
   );
   let inventoryApplied = false;
   let usageDeltasApplied: { productId: string; delta: number }[] = [];
+  let itemsReplaced = false;
+  let amendRefundId: string | null = null;
+  let amendPaymentId: string | null = null;
+  const oldItemRows = (oldItems ?? []).map((item) => ({
+    organization_id: org.organizationId,
+    sale_id: sale.id,
+    item_type: item.item_type,
+    item_id: item.item_id,
+    name: item.name,
+    quantity: Number(item.quantity),
+    unit_price: Number(item.unit_price),
+    line_total: Number(item.line_total),
+  }));
 
   try {
+    // Claim version first so concurrent amends cannot both proceed.
+    const { data: claimed, error: claimErr } = await supabase
+      .from("sales")
+      .update({
+        current_version: currentVersion + 1,
+        last_amended_at: new Date().toISOString(),
+        last_amended_by: userId,
+      })
+      .eq("id", sale.id)
+      .eq("organization_id", org.organizationId)
+      .eq("current_version", currentVersion)
+      .in("status", ["COMPLETED", "AMENDED"])
+      .select("id")
+      .maybeSingle();
+    if (claimErr) throw new Error(claimErr.message);
+    if (!claimed) {
+      return {
+        error:
+          "This invoice was changed by someone else. Reload and try again (concurrency protection).",
+      };
+    }
+
     await ensureVersionOne(
       org.organizationId,
       {
@@ -514,6 +550,7 @@ export async function amendCompletedSale(
       .eq("sale_id", sale.id)
       .eq("organization_id", org.organizationId);
     if (delErr) throw new Error(delErr.message);
+    itemsReplaced = true;
 
     // Snapshot costs for new product / service usage lines
     const productIds = [
@@ -572,29 +609,39 @@ export async function amendCompletedSale(
     if (adjustment.additionalDue > 0 && payload.additionalPayment) {
       const payAmt = roundMoney(payload.additionalPayment.amount);
       if (payAmt > 0) {
-        const { error: payErr } = await supabase.from("payments").insert({
-          organization_id: org.organizationId,
-          sale_id: sale.id,
-          amount: payAmt,
-          method: payload.additionalPayment.method,
-          reference: "SALE_AMEND_ADDITIONAL",
-          created_by: userId,
-        });
-        if (payErr) throw new Error(payErr.message);
+        const { data: payRow, error: payErr } = await supabase
+          .from("payments")
+          .insert({
+            organization_id: org.organizationId,
+            sale_id: sale.id,
+            amount: payAmt,
+            method: payload.additionalPayment.method,
+            reference: "SALE_AMEND_ADDITIONAL",
+            created_by: userId,
+          })
+          .select("id")
+          .single();
+        if (payErr || !payRow) throw new Error(payErr?.message ?? "Additional payment failed");
+        amendPaymentId = payRow.id;
       }
     }
 
     if (adjustment.refundDue > 0 && payload.refundPayment) {
-      const { error: refundErr } = await supabase.from("sale_refunds").insert({
-        organization_id: org.organizationId,
-        sale_id: sale.id,
-        amount: adjustment.refundDue,
-        method: payload.refundPayment.method,
-        reason: reason,
-        reference: "SALE_AMEND_REFUND",
-        created_by: userId,
-      });
-      if (refundErr) throw new Error(refundErr.message);
+      const { data: refundRow, error: refundErr } = await supabase
+        .from("sale_refunds")
+        .insert({
+          organization_id: org.organizationId,
+          sale_id: sale.id,
+          amount: adjustment.refundDue,
+          method: payload.refundPayment.method,
+          reason: reason,
+          reference: "SALE_AMEND_REFUND",
+          created_by: userId,
+        })
+        .select("id")
+        .single();
+      if (refundErr || !refundRow) throw new Error(refundErr?.message ?? "Amend refund failed");
+      amendRefundId = refundRow.id;
 
       // Cash leaving is tracked on sale_refunds. Ticket total already drops on amend,
       // so an expenses row would double-count against net profit.
@@ -707,10 +754,17 @@ export async function amendCompletedSale(
             const applyAmt = roundMoney(Math.min(remaining, depAmt));
             if (applyAmt <= 0) continue;
             if (applyAmt < depAmt) {
-              await supabase
+              const { data: shrunk, error: shrinkErr } = await supabase
                 .from("appointment_deposits")
                 .update({ amount: applyAmt, applied_to_sale_id: sale.id })
-                .eq("id", dep.id);
+                .eq("id", dep.id)
+                .eq("organization_id", org.organizationId)
+                .is("applied_to_sale_id", null)
+                .select("id");
+              if (shrinkErr) throw new Error(shrinkErr.message);
+              if (!shrunk?.length) {
+                throw new Error("Deposit was already applied or could not be updated");
+              }
               const leftover = roundMoney(depAmt - applyAmt);
               if (leftover > 0) {
                 const { data: original } = await supabase
@@ -720,8 +774,14 @@ export async function amendCompletedSale(
                   )
                   .eq("id", dep.id)
                   .maybeSingle();
-                if (original) {
-                  await supabase.from("appointment_deposits").insert({
+                if (!original) {
+                  throw new Error(
+                    "Deposit partially applied but original row could not be re-read; leftover was not created"
+                  );
+                }
+                const { error: leftoverErr } = await supabase
+                  .from("appointment_deposits")
+                  .insert({
                     organization_id: org.organizationId,
                     appointment_id: original.appointment_id,
                     amount: leftover,
@@ -736,13 +796,20 @@ export async function amendCompletedSale(
                     paid_at: original.paid_at,
                     created_by: original.created_by,
                   });
-                }
+                if (leftoverErr) throw new Error(leftoverErr.message);
               }
             } else {
-              await supabase
+              const { data: applied, error: applyErr } = await supabase
                 .from("appointment_deposits")
                 .update({ applied_to_sale_id: sale.id })
-                .eq("id", dep.id);
+                .eq("id", dep.id)
+                .eq("organization_id", org.organizationId)
+                .is("applied_to_sale_id", null)
+                .select("id");
+              if (applyErr) throw new Error(applyErr.message);
+              if (!applied?.length) {
+                throw new Error("Deposit was already applied or could not be updated");
+              }
             }
             remaining = roundMoney(remaining - applyAmt);
           }
@@ -768,7 +835,7 @@ export async function amendCompletedSale(
       })
       .eq("id", sale.id)
       .eq("organization_id", org.organizationId)
-      .eq("current_version", currentVersion);
+      .eq("current_version", newVersion);
 
     if (updErr) throw new Error(updErr.message);
 
@@ -797,7 +864,41 @@ export async function amendCompletedSale(
     revalidateSalePaths(sale.id);
     return { success: true, saleId: sale.id, version: newVersion };
   } catch (e) {
-    // Best-effort compensation when inventory already moved (no multi-statement DB txn via client)
+    // Best-effort compensation (no multi-statement DB txn via client)
+    try {
+      if (amendRefundId) {
+        await supabase.from("sale_refunds").delete().eq("id", amendRefundId);
+      }
+      if (amendPaymentId) {
+        await supabase.from("payments").delete().eq("id", amendPaymentId);
+      }
+      if (itemsReplaced && oldItemRows.length) {
+        await supabase.from("sale_items").delete().eq("sale_id", sale.id);
+        await supabase.from("sale_items").insert(oldItemRows);
+      }
+      // Roll version claim back so the invoice can be amended again
+      await supabase
+        .from("sales")
+        .update({
+          current_version: currentVersion,
+          status: sale.status,
+          total: Number(sale.total),
+          subtotal: Number(sale.subtotal),
+          discount: Number(sale.discount),
+          tax: Number(sale.tax ?? 0),
+          deposit_applied: Number(sale.deposit_applied ?? 0),
+        })
+        .eq("id", sale.id)
+        .eq("organization_id", org.organizationId)
+        .eq("current_version", currentVersion + 1);
+      try {
+        await syncSalePaymentDenorm(org.organizationId, sale.id);
+      } catch {
+        /* ignore */
+      }
+    } catch {
+      /* surfaced via original error */
+    }
     if (usageDeltasApplied.length) {
       try {
         for (const { productId, delta } of usageDeltasApplied) {
@@ -866,15 +967,25 @@ export async function refundSale(input: {
     return { error: "Cannot refund this sale status" };
   }
 
-  const paymentsTotal = await sumRefundablePayments(sale.id, org.organizationId);
+  const cashPayments = await sumRefundablePayments(sale.id, org.organizationId);
+  const allPayments = await sumPayments(sale.id, org.organizationId);
   const refundsTotal = await sumRefunds(sale.id, org.organizationId);
-  const refundable = Math.round((paymentsTotal - refundsTotal) * 100) / 100;
+  const refundable = Math.round((cashPayments - refundsTotal) * 100) / 100;
   if (amount > refundable + 0.009) {
     return { error: `Refund exceeds refundable cash/card collected (max ${refundable})` };
   }
 
   const newRefunds = refundsTotal + amount;
-  const fullyRefunded = newRefunds >= paymentsTotal - 0.009;
+  // Due math must include deposit applications; cash cap uses cashPayments only.
+  const liveState = computeSalePaymentState({
+    total: Number(sale.total),
+    paymentsSum: allPayments,
+    refundsSum: refundsTotal,
+    saleStatus: sale.status,
+  });
+  // Only fully refund when all cash is returned AND nothing is still owed (live math).
+  const fullyRefunded =
+    newRefunds >= cashPayments - 0.009 && liveState.amountDue <= 0.009;
 
   // Full refund: restore retail stock BEFORE inserting the refund row so we never
   // leave money refunded with stock still out (or refund committed with no restore).
@@ -905,6 +1016,7 @@ export async function refundSale(input: {
       amount,
       method: input.method,
       reason,
+      reference: fullyRefunded ? "SALE_FULL_REFUND" : null,
       created_by: user?.id ?? null,
     })
     .select("id")

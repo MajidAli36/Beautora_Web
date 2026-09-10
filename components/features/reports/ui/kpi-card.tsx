@@ -47,7 +47,7 @@ export function KpiCard({
       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+      <p className="mt-2 break-words text-xl font-semibold tracking-tight text-foreground tabular-nums sm:text-2xl">
         {value}
       </p>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">

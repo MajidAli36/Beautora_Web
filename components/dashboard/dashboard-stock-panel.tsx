@@ -109,7 +109,7 @@ export function DashboardStockPanel({ stock }: DashboardStockPanelProps) {
             </>
           ) : (
             <div>
-              <p className="text-2xl font-bold text-muted-foreground">Rs 0</p>
+              <p className="text-2xl font-bold text-muted-foreground">{formatCurrency(0)}</p>
               <p className="mt-2 text-sm text-muted-foreground">
                 No products sold yet today. Add items from{" "}
                 <Link href="/pos" className="font-medium text-primary hover:underline">

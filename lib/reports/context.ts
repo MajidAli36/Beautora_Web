@@ -75,8 +75,7 @@ export async function fetchCompletedSales(
       "id, total, subtotal, discount, tax, deposit_applied, completed_at, customer_id, appointment_id, staff_id, created_by, status"
     )
     .eq("organization_id", ctx.organizationId)
-    .in("status", ["COMPLETED", "AMENDED"])
-    .is("deleted_at", null)
+    .in("status", ["COMPLETED", "AMENDED", "REFUNDED", "VOID"])
     .gte("completed_at", start.toISOString())
     .lte("completed_at", end.toISOString());
 

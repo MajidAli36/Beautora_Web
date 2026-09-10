@@ -79,10 +79,10 @@ export function AppointmentForm({ customers, staff, services }: Props) {
             />
           </div>
         ) : (
-          <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-3">
-            <p className="sm:col-span-3 text-xs text-muted-foreground">
-              If this person is not in your customer list yet, we create their profile automatically
-              (matched by phone when provided).
+          <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-2 lg:grid-cols-4">
+            <p className="sm:col-span-2 lg:col-span-4 text-xs text-muted-foreground">
+              Not in your list yet? We create their customer profile automatically with every detail
+              you enter (matched by phone or email if they already exist).
             </p>
             <div className="space-y-2">
               <Label htmlFor="first_name">First name *</Label>
@@ -95,6 +95,10 @@ export function AppointmentForm({ customers, staff, services }: Props) {
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
               <Input id="phone" name="phone" type="tel" placeholder="For matching / WhatsApp" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" placeholder="Optional" />
             </div>
           </div>
         )}
@@ -189,7 +193,7 @@ export function AppointmentForm({ customers, staff, services }: Props) {
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="advance_amount">Amount (Rs)</Label>
+            <Label htmlFor="advance_amount">Amount</Label>
             <Input id="advance_amount" name="advance_amount" type="number" min={0} step={1} placeholder="0" />
           </div>
           <div className="space-y-2">

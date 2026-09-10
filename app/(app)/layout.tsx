@@ -15,6 +15,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SYNCOPS } from "@/lib/print/syncops";
+import { currencyFromCountry } from "@/lib/currency/from-country";
+import { runWithCurrency } from "@/lib/currency/runtime.server";
 
 export const metadata: Metadata = {
   title: {
@@ -73,9 +75,10 @@ export default async function AppLayout({
     redirect(landingPath);
   }
 
-  return (
+  return runWithCurrency(currencyFromCountry(org.country), () => (
     <AppShell
       organizationName={org.organizationName || BRAND.name}
+      organizationCountry={org.country}
       userEmail={user.email}
       userRole={ROLE_LABELS[org.role]}
       memberRole={org.role}
@@ -93,5 +96,5 @@ export default async function AppLayout({
         )}
       {children}
     </AppShell>
-  );
+  ));
 }

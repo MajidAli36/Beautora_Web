@@ -10,19 +10,22 @@ import { Button } from "@/components/ui/button";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import {
   canCollectAdvance,
+  getAdvanceState,
   getApprovedDepositTotal,
   getPendingDepositTotal,
   sumServicePrices,
   type DepositLine,
 } from "@/lib/booking/pricing";
-import { formatCurrency, formatCustomerName, formatTime } from "@/lib/format";
+import { formatCurrency, formatCustomerName, formatDateTime, formatTime } from "@/lib/format";
 import { displayBookingNumber } from "@/lib/booking/booking-number";
 import { CancelOnlineButton } from "@/components/features/online-booking/cancel-online-button";
+import { MarkNoShowButton } from "@/components/features/online-booking/mark-no-show-button";
 
 export type AppointmentRow = {
   id: string;
   booking_number?: string | null;
   scheduled_at: string;
+  created_at?: string;
   status: string;
   source?: string;
   customer: {
@@ -39,6 +42,10 @@ export type AppointmentRow = {
 type Props = {
   appointments: AppointmentRow[];
   mode: "staff" | "online";
+  /** Show date + time (for open multi-day online lists). */
+  showDateTime?: boolean;
+  /** History list — hide open-only actions (cancel / no-show / check-in). */
+  historyMode?: boolean;
   advanceSettings?: {
     booking_advance_amount?: number | null;
     booking_advance_percent?: number | null;
@@ -51,10 +58,12 @@ type Props = {
     status: "APPROVED" | "REJECTED" | "REFUNDED"
   ) => void;
   onAppointmentCancelled?: (appointmentId: string) => void;
+  onAppointmentNoShow?: (appointmentId: string) => void;
   onAppointmentUpdated?: (appointmentId: string, patch: Partial<AppointmentRow>) => void;
   canReviewDeposits?: boolean;
   canRefundDeposits?: boolean;
   canCancelOnline?: boolean;
+  canMarkNoShow?: boolean;
   canCheckIn?: boolean;
   canCollectPayment?: boolean;
 };
@@ -62,14 +71,18 @@ type Props = {
 export function AppointmentsScheduleTable({
   appointments,
   mode,
+  showDateTime = false,
+  historyMode = false,
   advanceSettings,
   emptyMessage = "No appointments on this date.",
   emptyAction,
   onDepositResolved,
   onAppointmentCancelled,
+  onAppointmentNoShow,
   canReviewDeposits = true,
   canRefundDeposits = true,
   canCancelOnline = true,
+  canMarkNoShow = true,
   canCheckIn = true,
   canCollectPayment = true,
 }: Props) {
@@ -97,14 +110,30 @@ export function AppointmentsScheduleTable({
             const serviceTotal = sumServicePrices(services);
             const approvedAdvance = getApprovedDepositTotal(deposits);
             const pendingAdvance = getPendingDepositTotal(deposits);
-            const balanceDue = Math.max(0, serviceTotal - approvedAdvance);
-            const settings = mode === "online" ? advanceSettings : undefined;
+            const balanceDue = getAdvanceState(deposits, serviceTotal, advanceSettings)
+              .balanceDue;
+            const settings = advanceSettings;
+            const showOpenActions =
+              !historyMode && !["CANCELLED", "COMPLETED", "NO_SHOW"].includes(a.status);
+            const isOnline = (a.source ?? "").toUpperCase() === "ONLINE";
             const showManualPayment =
-              mode === "staff" &&
+              !isOnline &&
               canCollectPayment &&
-              canCollectAdvance(deposits, serviceTotal, settings) &&
-              !["CANCELLED", "COMPLETED", "NO_SHOW"].includes(a.status);
+              showOpenActions &&
+              canCollectAdvance(deposits, serviceTotal, settings);
             const bookingNo = displayBookingNumber(a.booking_number, a.id);
+            const sourceLabel =
+              (a.source ?? "").toUpperCase() === "ONLINE"
+                ? "Online"
+                : (a.source ?? "").toUpperCase() === "STAFF"
+                  ? "In-house"
+                  : (a.source ?? "").toUpperCase() === "PHONE"
+                    ? "Phone"
+                    : (a.source ?? "").toUpperCase() === "WALK_IN"
+                      ? "Walk-in"
+                      : a.source
+                        ? a.source
+                        : null;
 
             return (
               <div
@@ -118,10 +147,36 @@ export function AppointmentsScheduleTable({
                         {bookingNo}
                       </span>
                       <span className="text-lg font-semibold">
-                        {formatTime(a.scheduled_at)}
+                        {showDateTime
+                          ? formatDateTime(a.scheduled_at)
+                          : formatTime(a.scheduled_at)}
                       </span>
-                      <Badge variant="outline">{a.status}</Badge>
-                      {pendingAdvance > 0 && (
+                      {sourceLabel ? (
+                        <Badge variant="secondary" className="font-normal">
+                          {sourceLabel}
+                        </Badge>
+                      ) : null}
+                      <Badge
+                        variant="outline"
+                        className={
+                          a.status === "NO_SHOW"
+                            ? "border-amber-500 text-amber-700"
+                            : a.status === "COMPLETED"
+                              ? "border-primary/40 text-primary"
+                              : a.status === "CANCELLED"
+                                ? "border-destructive/40 text-destructive"
+                                : undefined
+                        }
+                      >
+                        {a.status === "NO_SHOW"
+                          ? "No-show"
+                          : a.status === "COMPLETED"
+                            ? "Completed"
+                            : a.status === "CANCELLED"
+                              ? "Cancelled"
+                              : a.status}
+                      </Badge>
+                      {pendingAdvance > 0 && showOpenActions && (
                         <Badge className="bg-amber-600">Advance pending</Badge>
                       )}
                     </div>
@@ -133,11 +188,17 @@ export function AppointmentsScheduleTable({
                       {customer.email ? ` · ${customer.email}` : ""}
                       {staffMember ? ` · ${staffMember.full_name}` : ""}
                     </p>
+                    {a.created_at ? (
+                      <p className="text-xs text-muted-foreground">
+                        Date added: {formatDateTime(a.created_at)}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {mode === "staff" &&
+                    {!isOnline &&
                       canCheckIn &&
+                      showOpenActions &&
                       ["SCHEDULED", "CONFIRMED"].includes(a.status) && (
                         <CheckInButton
                           appointmentId={a.id}
@@ -148,14 +209,23 @@ export function AppointmentsScheduleTable({
                           customerPhone={customer.phone}
                         />
                       )}
-                    {mode === "online" &&
-                      canCancelOnline &&
-                      !["CANCELLED", "COMPLETED", "NO_SHOW"].includes(a.status) && (
-                        <CancelOnlineButton
-                          appointmentId={a.id}
-                          onCancelled={onAppointmentCancelled}
-                        />
-                      )}
+                    {isOnline && canCancelOnline && showOpenActions && (
+                      <CancelOnlineButton
+                        appointmentId={a.id}
+                        onCancelled={onAppointmentCancelled}
+                      />
+                    )}
+                    {canMarkNoShow && showOpenActions && (
+                      <MarkNoShowButton
+                        appointmentId={a.id}
+                        onMarked={onAppointmentNoShow}
+                      />
+                    )}
+                    {showOpenActions && canCollectPayment && (
+                      <Button size="sm" variant="outline" render={<Link href="/pos" />}>
+                        Open POS
+                      </Button>
+                    )}
                   </div>
                 </div>
 

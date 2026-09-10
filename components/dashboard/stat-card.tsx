@@ -28,7 +28,7 @@ export function StatCard({
             {label}
           </p>
           <div>
-            <p className="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            <p className="break-words text-xl font-bold tracking-tight text-foreground tabular-nums sm:text-2xl">
               {value}
             </p>
             {(change || subtext) && (

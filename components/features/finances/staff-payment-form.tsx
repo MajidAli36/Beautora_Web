@@ -84,12 +84,12 @@ export function StaffPaymentForm({ staff, defaultDate, onRecorded }: StaffPaymen
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount paid (Rs) *</Label>
+              <Label htmlFor="amount">Amount paid *</Label>
               <Input id="amount" name="amount" type="number" min={1} step={1} required />
             </div>
             {paymentType === "PARTIAL" && (
               <div className="space-y-2">
-                <Label htmlFor="amount_due">Total salary due (Rs)</Label>
+                <Label htmlFor="amount_due">Total salary due</Label>
                 <Input id="amount_due" name="amount_due" type="number" min={1} step={1} placeholder="Full amount owed" />
               </div>
             )}

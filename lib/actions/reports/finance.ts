@@ -47,8 +47,12 @@ export async function getFinanceReport(from?: string, to?: string): Promise<Fina
 
   const totalCogs = roundMoney(cur.productCogs + cur.serviceUsageCogs);
   const prevTotalCogs = roundMoney(prev.productCogs + prev.serviceUsageCogs);
-  const grossProfit = roundMoney(cur.salesRevenue - totalCogs);
-  const prevGrossProfit = roundMoney(prev.salesRevenue - prevTotalCogs);
+  const grossProfit = roundMoney(
+    cur.salesRevenue - cur.fullTicketReversals - totalCogs
+  );
+  const prevGrossProfit = roundMoney(
+    prev.salesRevenue - prev.fullTicketReversals - prevTotalCogs
+  );
   const grossMargin = cur.salesRevenue > 0 ? (grossProfit / cur.salesRevenue) * 100 : 0;
   const prevGrossMargin = prev.salesRevenue > 0 ? (prevGrossProfit / prev.salesRevenue) * 100 : 0;
   const netMargin = cur.salesRevenue > 0 ? (cur.netProfit / cur.salesRevenue) * 100 : 0;
@@ -75,9 +79,11 @@ export async function getFinanceReport(from?: string, to?: string): Promise<Fina
       { label: "Discounts", value: -discounts },
       { label: "Tax", value: tax },
       { label: "Net ticket revenue", value: cur.salesRevenue },
+      { label: "Full void/refund reversals", value: -cur.fullTicketReversals },
       { label: "Product COGS", value: -cur.productCogs },
       { label: "In-house usage COGS", value: -cur.serviceUsageCogs },
       { label: "Gross profit", value: grossProfit },
+      { label: "Partial sale refunds", value: -cur.partialSaleRefunds },
       { label: "Operating expenses", value: -cur.totalExpenses },
       { label: "Staff payments", value: -cur.staffPayments },
       { label: "Net profit", value: cur.netProfit },
@@ -87,9 +93,10 @@ export async function getFinanceReport(from?: string, to?: string): Promise<Fina
       value: e.amount,
     })),
     notes: [
-      "Net ticket = subtotal − discounts + tax (matches completed/amended sale totals).",
-      "Net profit = ticket revenue − partial sale refunds − operating expenses − staff payments − product COGS − in-house usage COGS.",
-      "Full void/refund removes the ticket from revenue. Retail stock is restored; in-house cream/ml stays deducted (already used) and remains in usage COGS as write-off.",
+      "Net ticket = sale totals for tickets completed in the period (including later voided/refunded).",
+      "Full void/refund reversals hit the period of the void/refund date so prior months stay stable.",
+      "Net profit = ticket revenue − full reversals − partial sale refunds − operating expenses − staff payments − product COGS − in-house usage COGS.",
+      "Retail stock is restored on void/full refund; in-house cream/ml stays deducted (already used).",
       "Appointment advances are tracked separately and are not added on top of ticket revenue in net profit.",
       "Manage expense entry on the Finances page.",
     ],

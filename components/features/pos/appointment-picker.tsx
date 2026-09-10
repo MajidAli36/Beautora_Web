@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
-import { getLocalDateString } from "@/lib/dates/local";
+import { addLocalDays, getLocalDateString } from "@/lib/dates/local";
 import type { PosAppointment } from "@/lib/actions/appointments";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,13 +20,20 @@ type AppointmentPickerProps = {
   limit?: number;
 };
 
-function formatApptLabel(a: PosAppointment) {
-  const date = new Date(a.scheduledAt);
-  const isToday = getLocalDateString(date) === getLocalDateString();
-  const time = formatTime(date);
-  const day = isToday ? time : `${formatDate(date)} ${time}`;
+function dayLabel(scheduledAt: string) {
+  const day = getLocalDateString(new Date(scheduledAt));
+  const today = getLocalDateString();
+  if (day === today) return "Today";
+  if (day === addLocalDays(today, 1)) return "Tomorrow";
+  if (day === addLocalDays(today, -1)) return "Yesterday";
+  return formatDate(scheduledAt);
+}
+
+export function formatApptLabel(a: PosAppointment) {
+  const when = `${dayLabel(a.scheduledAt)} ${formatTime(a.scheduledAt)}`;
+  const added = a.createdAt ? ` · added ${formatDate(a.createdAt)}` : "";
   const advance = a.depositBalance > 0 ? ` · ${formatCurrency(a.depositBalance)} advance` : "";
-  return `${day} — ${a.customerName}${advance}`;
+  return `${when} — ${a.customerName}${added}${advance}`;
 }
 
 export function AppointmentPicker({
@@ -34,10 +41,10 @@ export function AppointmentPicker({
   value,
   onValueChange,
   id,
-  placeholder = "Search today’s appointments…",
+  placeholder = "Search by name, date, or time…",
   className,
   emptyLabel = "None — walk-in sale",
-  limit = 14,
+  limit = 40,
 }: AppointmentPickerProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -65,8 +72,13 @@ export function AppointmentPicker({
     return appointments
       .filter((a) => {
         const label = formatApptLabel(a).toLowerCase();
-        const phoneHint = a.customerName.toLowerCase();
-        return label.includes(q) || phoneHint.includes(q) || a.status.toLowerCase().includes(q);
+        const day = dayLabel(a.scheduledAt).toLowerCase();
+        return (
+          label.includes(q) ||
+          day.includes(q) ||
+          a.customerName.toLowerCase().includes(q) ||
+          a.status.toLowerCase().includes(q)
+        );
       })
       .slice(0, limit);
   }, [appointments, query, limit]);
@@ -98,7 +110,7 @@ export function AppointmentPicker({
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      const max = filtered.length; // + empty at 0
+      const max = filtered.length;
       setHighlight((h) => Math.min(h + 1, max));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -155,7 +167,7 @@ export function AppointmentPicker({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
           <li
             role="option"
@@ -173,10 +185,11 @@ export function AppointmentPicker({
             {emptyLabel}
           </li>
           {filtered.length === 0 ? (
-            <li className="px-2 py-1.5 text-sm text-muted-foreground">No matches today</li>
+            <li className="px-2 py-1.5 text-sm text-muted-foreground">No matching appointments</li>
           ) : (
             filtered.map((a, i) => {
               const idx = i + 1;
+              const day = dayLabel(a.scheduledAt);
               return (
                 <li
                   key={a.id}
@@ -192,7 +205,19 @@ export function AppointmentPicker({
                     selectAppointment(a);
                   }}
                 >
-                  <span className="min-w-0 truncate">{formatApptLabel(a)}</span>
+                  <span className="min-w-0 truncate">
+                    <span className="text-muted-foreground">
+                      {day} {formatTime(a.scheduledAt)}
+                    </span>
+                    {" — "}
+                    {a.customerName}
+                    {a.createdAt ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · added {formatDate(a.createdAt)}
+                      </span>
+                    ) : null}
+                  </span>
                   {a.depositBalance > 0 ? (
                     <Badge variant="secondary" className="shrink-0 text-primary">
                       {formatCurrency(a.depositBalance)}

@@ -44,7 +44,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: "Customers", href: "/customers", icon: Users, key: "customers" },
       { title: "Appointments", href: "/appointments", icon: Calendar, key: "appointments" },
-      { title: "Online booking", href: "/online-booking", icon: Globe, key: "online_booking" },
+      { title: "Online booking", href: "/appointments?tab=online", icon: Globe, key: "online_booking" },
       { title: "Queue", href: "/queue", icon: Ticket, key: "queue" },
       { title: "POS", href: "/pos", icon: ShoppingCart, key: "pos" },
       { title: "Sales", href: "/sales", icon: Receipt, key: "sales" },
@@ -98,7 +98,7 @@ export const pageTitles: Record<string, string> = {
   "/customers": "Customers",
   "/appointments": "Appointments",
   "/appointments/new": "Add appointment",
-  "/online-booking": "Online booking",
+  "/online-booking": "Appointments",
   "/queue": "Queue",
   "/pos": "Point of Sale",
   "/sales": "Sales",

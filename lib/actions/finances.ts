@@ -54,6 +54,10 @@ export type FinancialSummary = {
   totalOutflow: number;
   netProfit: number;
   netCashFlow: number;
+  /** Cash refunded on still-posted (COMPLETED/AMENDED) tickets. */
+  partialSaleRefunds: number;
+  /** Full ticket revenue reversed in this period (void / full refund by refund date). */
+  fullTicketReversals: number;
   unappliedDeposits: number;
   saleCount: number;
   expenseCount: number;
@@ -92,10 +96,9 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
   ] = await Promise.all([
     supabase
       .from("sales")
-      .select("id, total")
+      .select("id, total, status")
       .eq("organization_id", org.organizationId)
-      .in("status", ["COMPLETED", "AMENDED"])
-      .is("deleted_at", null)
+      .in("status", ["COMPLETED", "AMENDED", "REFUNDED", "VOID"])
       .gte("completed_at", start.toISOString())
       .lte("completed_at", end.toISOString()),
     // Include REFUNDED so historical inflow is not erased when an advance is later refunded
@@ -132,7 +135,7 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
         .lte("paid_at", end.toISOString()),
       supabase
         .from("sale_refunds")
-        .select("amount, sale_id")
+        .select("amount, sale_id, reference")
         .eq("organization_id", org.organizationId)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString()),
@@ -153,39 +156,76 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     (unapplied ?? []).reduce((sum, d) => sum + Number(d.amount), 0)
   );
 
-  // Exclude tender on voided/deleted sales from cash-from-sales
-  const paymentSaleIds = [...new Set((salePayments ?? []).map((p) => p.sale_id).filter(Boolean))];
-  const livePaymentSaleIds = new Set<string>();
-  if (paymentSaleIds.length) {
-    for (let i = 0; i < paymentSaleIds.length; i += 200) {
-      const chunk = paymentSaleIds.slice(i, i + 200);
-      const { data: paySales } = await supabase
-        .from("sales")
-        .select("id, status, deleted_at")
-        .eq("organization_id", org.organizationId)
-        .in("id", chunk);
-      for (const s of paySales ?? []) {
-        if (!s.deleted_at && s.status !== "VOID") livePaymentSaleIds.add(s.id);
-      }
-    }
-  }
-
+  // Keep historical cash tender even if the ticket was later voided/refunded.
+  // Period cash is dated by paid_at; reversals leave via sale_refunds outflow.
   const cashFromSales = roundMoney(
     (salePayments ?? []).reduce((sum, p) => {
       if (p.reference === "APPOINTMENT_DEPOSIT") return sum;
-      if (p.sale_id && !livePaymentSaleIds.has(p.sale_id)) return sum;
       return sum + Number(p.amount);
     }, 0)
   );
 
-  const postedSaleIds = new Set((sales ?? []).map((s) => s.id));
-  // Only refunds on still-posted tickets reduce P&L (partial refunds). Full void/refund
-  // already removed the ticket from salesRevenue — subtracting again would double-count.
+  // Partial refunds that reduce P&L: goodwill/manual refunds on still-posted tickets.
+  // Exclude SALE_AMEND_REFUND / SALE_VOID — amend already reduced sales.total;
+  // full voids/refunds are handled as fullTicketReversals by refund date.
+  const refundSaleIds = [
+    ...new Set((periodRefunds ?? []).map((r) => r.sale_id).filter(Boolean)),
+  ] as string[];
+  const refundSaleMeta = new Map<
+    string,
+    { status: string; total: number; deleted_at: string | null }
+  >();
+  if (refundSaleIds.length) {
+    for (let i = 0; i < refundSaleIds.length; i += 200) {
+      const chunk = refundSaleIds.slice(i, i + 200);
+      const { data: refSales } = await supabase
+        .from("sales")
+        .select("id, status, deleted_at, total")
+        .eq("organization_id", org.organizationId)
+        .in("id", chunk);
+      for (const s of refSales ?? []) {
+        refundSaleMeta.set(s.id, {
+          status: s.status,
+          total: Number(s.total) || 0,
+          deleted_at: s.deleted_at,
+        });
+      }
+    }
+  }
+
+  const postedRefundSaleIds = new Set<string>();
+  for (const [id, meta] of refundSaleMeta) {
+    if (
+      !meta.deleted_at &&
+      (meta.status === "COMPLETED" || meta.status === "AMENDED")
+    ) {
+      postedRefundSaleIds.add(id);
+    }
+  }
+
   const partialSaleRefunds = roundMoney(
-    (periodRefunds ?? [])
-      .filter((r) => postedSaleIds.has(r.sale_id))
-      .reduce((sum, r) => sum + Number(r.amount), 0)
+    (periodRefunds ?? []).reduce((sum, r) => {
+      if (!postedRefundSaleIds.has(r.sale_id)) return sum;
+      const ref = (r as { reference?: string | null }).reference ?? null;
+      if (ref === "SALE_AMEND_REFUND" || ref === "SALE_VOID") return sum;
+      return sum + Number(r.amount);
+    }, 0)
   );
+
+  // Full ticket reversals hit the period of the void/full-refund (not completed_at),
+  // so prior-period revenue stays intact when a later void/full refund happens.
+  const reversedSaleIds = new Set<string>();
+  let fullTicketReversals = 0;
+  for (const r of periodRefunds ?? []) {
+    const meta = refundSaleMeta.get(r.sale_id);
+    if (!meta) continue;
+    const ref = (r as { reference?: string | null }).reference ?? null;
+    if (ref !== "SALE_VOID" && ref !== "SALE_FULL_REFUND") continue;
+    if (reversedSaleIds.has(r.sale_id)) continue;
+    reversedSaleIds.add(r.sale_id);
+    fullTicketReversals = roundMoney(fullTicketReversals + meta.total);
+  }
+
   const allSaleRefundsCash = roundMoney(
     (periodRefunds ?? []).reduce((sum, r) => sum + Number(r.amount), 0)
   );
@@ -214,6 +254,7 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
   const totalOutflow = roundMoney(totalExpenses + staffPayments + allSaleRefundsCash);
   const netProfit = roundMoney(
     salesRevenue -
+      fullTicketReversals -
       partialSaleRefunds -
       totalExpenses -
       staffPayments -
@@ -248,6 +289,8 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     totalOutflow,
     netProfit,
     netCashFlow,
+    partialSaleRefunds,
+    fullTicketReversals,
     unappliedDeposits,
     saleCount: sales?.length ?? 0,
     expenseCount: operatingRows.length,

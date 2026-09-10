@@ -3,19 +3,8 @@
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatCustomerName, formatDateTime } from "@/lib/format";
-import { getLocalDateString, isoToLocalDateString } from "@/lib/dates/local";
 import { getOrgNavPermissions } from "@/lib/actions/role-permissions";
 import { canAccessPath } from "@/lib/permissions/nav";
-
-function safeVisitDay(iso: string | null | undefined): string {
-  if (!iso) return getLocalDateString();
-  try {
-    const day = isoToLocalDateString(iso);
-    return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : getLocalDateString();
-  } catch {
-    return getLocalDateString();
-  }
-}
 
 function safeVisitMeta(iso: string | null | undefined): string {
   if (!iso) return "Visit time unavailable";
@@ -161,15 +150,13 @@ export async function getAppNotifications(): Promise<AppNotificationsPayload> {
     const phone = customer?.phone ? ` · ${customer.phone}` : "";
     const stylist = staff?.full_name ? ` with ${staff.full_name}` : "";
 
-    const visitDay = safeVisitDay(appt.scheduled_at);
-
     pendingItems.push({
       id: `deposit-${row.id}`,
       kind: "pending_payment",
       title: "Payment proof waiting",
       body: `${customerName}${phone} sent ${formatCurrency(Number(row.amount))}${stylist}`,
       meta: safeVisitMeta(appt.scheduled_at),
-      href: `/online-booking?date=${visitDay}&focus=deposits`,
+      href: `/online-booking?focus=deposits`,
       createdAt: row.created_at,
       actionable: true,
     });
@@ -190,7 +177,6 @@ export async function getAppNotifications(): Promise<AppNotificationsPayload> {
     const servicesLabel =
       serviceNames.length > 0 ? serviceNames.slice(0, 2).join(", ") : "Online booking";
     const stylist = staff?.full_name ? ` · ${staff.full_name}` : "";
-    const visitDay = safeVisitDay(row.scheduled_at);
 
     bookingItems.push({
       id: `booking-${row.id}`,
@@ -198,7 +184,7 @@ export async function getAppNotifications(): Promise<AppNotificationsPayload> {
       title: "New online booking",
       body: `${customerName} · ${servicesLabel}${stylist}`,
       meta: safeVisitMeta(row.scheduled_at),
-      href: `/online-booking?date=${visitDay}`,
+      href: `/online-booking`,
       createdAt: row.created_at,
       actionable: false,
     });

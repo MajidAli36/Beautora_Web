@@ -17,13 +17,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatCustomerName, formatDate, formatTime } from "@/lib/format";
+import { formatCurrency, formatCustomerName, formatDate, formatDateTime, formatTime } from "@/lib/format";
 import { calculateInvoiceTotals, roundMoney } from "@/lib/sales/calculate";
 import { roundQty } from "@/lib/products/kinds";
 import type { CartItem, PaymentMethod } from "@/types/commerce";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { CustomerPicker } from "@/components/features/customers/customer-picker";
+import { MarkNoShowButton } from "@/components/features/online-booking/mark-no-show-button";
 import { AppointmentPicker } from "@/components/features/pos/appointment-picker";
 
 type CatalogService = { id: string; name: string; price: number; duration_minutes: number };
@@ -52,6 +53,7 @@ type PosTerminalProps = {
   staff: CatalogStaff[];
   appointments: PosAppointment[];
   canManage?: boolean;
+  canMarkNoShow?: boolean;
 };
 
 export function PosTerminal({
@@ -60,10 +62,12 @@ export function PosTerminal({
   packages,
   customers,
   staff,
-  appointments,
+  appointments: initialAppointments,
   canManage = false,
+  canMarkNoShow = false,
 }: PosTerminalProps) {
   const router = useRouter();
+  const [appointments, setAppointments] = useState(initialAppointments);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [appointmentId, setAppointmentId] = useState("");
@@ -84,6 +88,10 @@ export function PosTerminal({
   const [duesLoading, setDuesLoading] = useState(false);
   const [usageLines, setUsageLines] = useState<UsageLine[]>([]);
   const [usageLoading, setUsageLoading] = useState(false);
+
+  useEffect(() => {
+    setAppointments(initialAppointments);
+  }, [initialAppointments]);
 
   const selectedAppointment = useMemo(
     () => appointments.find((a) => a.id === appointmentId) ?? null,
@@ -299,10 +307,10 @@ export function PosTerminal({
       return;
     }
 
-    const todayAppt = customerAppts[0];
-    if (todayAppt && customerAppts.length === 1) {
-      setAppointmentId(todayAppt.id);
-      setDepositCredit(todayAppt.depositBalance);
+    const onlyAppt = customerAppts[0];
+    if (onlyAppt && customerAppts.length === 1) {
+      setAppointmentId(onlyAppt.id);
+      setDepositCredit(onlyAppt.depositBalance);
       return;
     }
 
@@ -482,16 +490,29 @@ export function PosTerminal({
       priorDuePayments: priorDuePayments.length ? priorDuePayments : undefined,
       usageOverrides: usageOverrides.length ? usageOverrides : undefined,
     });
-    if (result.error) {
+    if (result.error && !result.saleId) {
       if (result.error.toLowerCase().includes("past")) {
         await reloadDues();
       }
       return result;
     }
-    notify.success(
-      priorDuePayments.length ? "Sale completed · past dues paid." : "Sale completed."
-    );
+    if (result.warning) {
+      notify.warning(result.warning);
+    } else if (result.error && result.saleId) {
+      notify.warning(result.error);
+    } else {
+      notify.success(
+        priorDuePayments.length ? "Sale completed · past dues paid." : "Sale completed."
+      );
+    }
+    // Drop billed appointment from POS list immediately (before navigation).
+    if (appointmentId) {
+      setAppointments((prev) => prev.filter((a) => a.id !== appointmentId));
+      setAppointmentId("");
+      setDepositCredit(0);
+    }
     if (result.saleId) {
+      setCart([]);
       await printSaleReceipt(result.saleId);
       router.push(`/sales/${result.saleId}`);
       router.refresh();
@@ -632,26 +653,28 @@ export function PosTerminal({
           <div>
             <p className="text-sm font-medium">Appointment &amp; advance</p>
             <p className="text-xs text-muted-foreground">
-              Today&apos;s open appointments only. Search by name or time, then link to apply any
-              advance.
+              Open appointments from any date — past, today, or upcoming. Search by name, date, or
+              time, then link to apply any advance.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="appointment">Select appointment (today)</Label>
+            <Label htmlFor="appointment">Select appointment</Label>
             <AppointmentPicker
               id="appointment"
               appointments={customerId ? customerAppointments : appointments}
               value={appointmentId}
               onValueChange={(id) => loadAppointment(id)}
-              placeholder="Search today’s appointments…"
+              placeholder="Search by name, date, or time…"
             />
           </div>
 
           {appointmentsWithAdvance.length > 0 && !appointmentId && (
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Quick pick — has advance today</p>
-              {appointmentsWithAdvance.slice(0, 4).map((a) => (
+              <p className="text-xs font-medium text-muted-foreground">
+                Quick pick — has unapplied advance
+              </p>
+              {appointmentsWithAdvance.slice(0, 6).map((a) => (
                 <button
                   key={a.id}
                   type="button"
@@ -659,7 +682,11 @@ export function PosTerminal({
                   className="flex w-full items-center justify-between rounded-md border border-primary/20 bg-background px-2.5 py-2 text-left text-xs hover:bg-primary/10"
                 >
                   <span className="truncate pr-2">
-                    {formatTime(a.scheduledAt)} — {a.customerName}
+                    {formatDate(a.scheduledAt)} {formatTime(a.scheduledAt)} — {a.customerName}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · added {formatDate(a.createdAt)}
+                    </span>
                   </span>
                   <Badge variant="secondary" className="shrink-0 text-primary">
                     {formatCurrency(a.depositBalance)}
@@ -676,13 +703,41 @@ export function PosTerminal({
             </div>
           )}
 
+          {selectedAppointment && (
+            <div className="space-y-2 rounded-md border bg-background px-3 py-2 text-xs">
+              <p>
+                <span className="text-muted-foreground">Scheduled: </span>
+                {formatDate(selectedAppointment.scheduledAt)}{" "}
+                {formatTime(selectedAppointment.scheduledAt)}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Date added: </span>
+                {formatDateTime(selectedAppointment.createdAt)}
+              </p>
+              <p className="text-muted-foreground">
+                Checkout → Completed in History. Didn&apos;t come? Mark no-show.
+              </p>
+              {canMarkNoShow ? (
+                <MarkNoShowButton
+                  appointmentId={selectedAppointment.id}
+                  onMarked={(id) => {
+                    setAppointments((prev) => prev.filter((a) => a.id !== id));
+                    setAppointmentId("");
+                    setDepositCredit(0);
+                    router.refresh();
+                  }}
+                />
+              ) : null}
+            </div>
+          )}
+
           {customerLookupPending && (
             <p className="text-xs text-muted-foreground">Checking customer advances…</p>
           )}
 
           {appointments.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              No open appointments for today. Book one on the Appointments page first.
+              No open appointments. Book one on the Appointments page first.
             </p>
           )}
         </div>
@@ -923,7 +978,7 @@ export function PosTerminal({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="discount">Discount (Rs)</Label>
+            <Label htmlFor="discount">Discount</Label>
             <Input
               id="discount"
               type="number"
@@ -966,7 +1021,7 @@ export function PosTerminal({
           {applyTax && (
             <div className="space-y-1.5">
               <Label htmlFor="tax" className="text-xs text-muted-foreground">
-                Tax amount (Rs)
+                Tax amount
               </Label>
               <Input
                 id="tax"
@@ -1071,7 +1126,7 @@ export function PosTerminal({
               ) : null}
             </div>
             <div className="space-y-1">
-              <Label htmlFor="amount-received">Amount customer is paying now (Rs)</Label>
+              <Label htmlFor="amount-received">Amount customer is paying now</Label>
               <Input
                 id="amount-received"
                 type="number"

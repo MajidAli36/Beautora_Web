@@ -12,8 +12,8 @@ type StorePublicListingToggleProps = {
 };
 
 /**
- * Settings header control: show / hide this salon on the public marketing site
- * and /book/[slug].
+ * Settings header control: show / hide this salon on the public marketing site.
+ * Online booking is controlled separately under Online booking.
  */
 export function StorePublicListingToggle({
   enabled: initial,
@@ -67,7 +67,7 @@ export function StorePublicListingToggle({
           Show store publicly
         </span>
         <span id="public-listing-help" className="mt-0.5 block text-xs text-muted-foreground">
-          List on homepage, store directory, and online booking
+          List on homepage and store directory (booking is separate)
         </span>
       </span>
     </label>
