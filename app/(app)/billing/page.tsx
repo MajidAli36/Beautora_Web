@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 export const dynamic = "force-dynamic";
 
 function phaseBadge(phase: string) {
+  if (phase === "lifetime") return <Badge className="bg-violet-700">Lifetime access</Badge>;
   if (phase === "trial") return <Badge variant="secondary">Free trial</Badge>;
   if (phase === "active") return <Badge className="bg-emerald-600">Active</Badge>;
   if (phase === "grace") return <Badge className="bg-amber-500">Grace ({SUBSCRIPTION.graceDays}-day caution)</Badge>;
@@ -56,18 +57,37 @@ export default async function BillingPage() {
         </Card>
       )}
 
+      {snapshot.phase === "lifetime" && (
+        <Card className="border-emerald-600/30 bg-emerald-500/5">
+          <CardHeader>
+            <CardTitle>Lifetime access</CardTitle>
+            <CardDescription>
+              This store has complimentary / lifetime access. No monthly JazzCash subscription
+              is required. Beautora support can change this anytime.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
             <CardTitle>Plan status</CardTitle>
             <CardDescription>
-              1 month free trial → then {SUBSCRIPTION.currencyLabel}{" "}
-              {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month (JazzCash)
+              {snapshot.phase === "lifetime"
+                ? "Lifetime / complimentary — monthly fee waived"
+                : `1 month free trial → then ${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month (JazzCash)`}
             </CardDescription>
           </div>
           {phaseBadge(snapshot.phase)}
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {snapshot.phase === "lifetime" && (
+            <p>
+              Your salon stays fully operational without renewals. Contact support if you have
+              billing questions.
+            </p>
+          )}
           {snapshot.phase === "trial" && (
             <p>
               Trial ends in{" "}
@@ -98,13 +118,16 @@ export default async function BillingPage() {
               left. The salon still works; renew now to avoid lock.
             </p>
           )}
-          <p className="text-muted-foreground">
-            JazzCash: {SUBSCRIPTION.jazzcashDisplay} · Amount: {SUBSCRIPTION.currencyLabel}{" "}
-            {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}
-          </p>
+          {snapshot.phase !== "lifetime" && (
+            <p className="text-muted-foreground">
+              JazzCash: {SUBSCRIPTION.jazzcashDisplay} · Amount: {SUBSCRIPTION.currencyLabel}{" "}
+              {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}
+            </p>
+          )}
         </CardContent>
       </Card>
 
+      {snapshot.phase !== "lifetime" && (
       <Card>
         <CardHeader>
           <CardTitle>Submit JazzCash payment</CardTitle>
@@ -116,6 +139,7 @@ export default async function BillingPage() {
           <BillingPaymentForm />
         </CardContent>
       </Card>
+      )}
 
       <Card>
         <CardHeader>

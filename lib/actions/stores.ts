@@ -64,7 +64,7 @@ export async function listPublicStores(): Promise<PublicStore[]> {
   const { data: orgs, error } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, country, address, tagline, whatsapp_phone, logo_path, cover_path, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+      "id, name, slug, city, country, address, tagline, whatsapp_phone, logo_path, cover_path, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
     )
     .is("admin_disabled_at", null)
     .eq("public_listing_enabled", true)
@@ -146,7 +146,7 @@ export async function getPublicStoreBySlug(slug: string): Promise<PublicStoreDet
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, country, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at, public_listing_enabled, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, created_at"
+      "id, name, slug, city, country, address, tagline, phone, email, whatsapp_phone, logo_path, cover_path, booking_slot_minutes, booking_days_ahead, admin_disabled_at, public_listing_enabled, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, lifetime_access, created_at"
     )
     .eq("slug", slug)
     .maybeSingle();

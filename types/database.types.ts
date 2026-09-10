@@ -65,6 +65,9 @@ export type Database = {
           subscription_locked_at: string | null;
           subscription_status: string;
           admin_disabled_at: string | null;
+          lifetime_access: boolean;
+          lifetime_access_at: string | null;
+          lifetime_access_by: string | null;
           public_listing_enabled: boolean;
           referred_by_partner_id: string | null;
           referral_code_used: string | null;
@@ -99,6 +102,9 @@ export type Database = {
           subscription_locked_at?: string | null;
           subscription_status?: string;
           admin_disabled_at?: string | null;
+          lifetime_access?: boolean;
+          lifetime_access_at?: string | null;
+          lifetime_access_by?: string | null;
           public_listing_enabled?: boolean;
           referred_by_partner_id?: string | null;
           referral_code_used?: string | null;
@@ -133,6 +139,9 @@ export type Database = {
           subscription_locked_at?: string | null;
           subscription_status?: string;
           admin_disabled_at?: string | null;
+          lifetime_access?: boolean;
+          lifetime_access_at?: string | null;
+          lifetime_access_by?: string | null;
           public_listing_enabled?: boolean;
           referred_by_partner_id?: string | null;
           referral_code_used?: string | null;

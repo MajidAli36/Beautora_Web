@@ -718,7 +718,7 @@ export async function createOnlineBooking(input: {
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, booking_advance_amount, booking_advance_percent, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+      "id, booking_advance_amount, booking_advance_percent, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
     )
     .eq("slug", input.orgSlug)
     .single();

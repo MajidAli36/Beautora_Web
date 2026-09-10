@@ -17,7 +17,7 @@ export const SUBSCRIPTION = {
   currencyLabel: "Rs",
 } as const;
 
-export type SubscriptionPhase = "trial" | "active" | "grace" | "locked";
+export type SubscriptionPhase = "trial" | "active" | "grace" | "locked" | "lifetime";
 
 export type OrgSubscriptionFields = {
   trial_ends_at: string | null;
@@ -25,6 +25,7 @@ export type OrgSubscriptionFields = {
   subscription_locked_at: string | null;
   subscription_status?: string | null;
   admin_disabled_at?: string | null;
+  lifetime_access?: boolean | null;
   created_at?: string | null;
 };
 
@@ -37,6 +38,8 @@ export type SubscriptionSnapshot = {
   daysLeftInTrial: number | null;
   hoursLeftInGrace: number | null;
   isOperational: boolean;
+  /** True when SyncOps granted lifetime / complimentary access (no monthly fee). */
+  lifetimeAccess: boolean;
   amountPkr: number;
   jazzcashNumber: string;
   jazzcashDisplay: string;
@@ -75,9 +78,10 @@ export function resolveSubscription(
     amountPkr: SUBSCRIPTION.monthlyAmountPkr,
     jazzcashNumber: SUBSCRIPTION.jazzcashNumber,
     jazzcashDisplay: SUBSCRIPTION.jazzcashDisplay,
+    lifetimeAccess: Boolean(org.lifetime_access),
   };
 
-  // Platform admin force-disable — always locked
+  // Platform admin force-disable — always locked (even lifetime)
   if (org.admin_disabled_at) {
     return {
       ...base,
@@ -88,6 +92,20 @@ export function resolveSubscription(
       daysLeftInTrial: null,
       hoursLeftInGrace: 0,
       isOperational: false,
+    };
+  }
+
+  // Lifetime / complimentary — no monthly subscription required
+  if (org.lifetime_access) {
+    return {
+      ...base,
+      phase: "lifetime",
+      subscriptionEndsAt,
+      graceEndsAt: null,
+      lockedAt: null,
+      daysLeftInTrial: null,
+      hoursLeftInGrace: null,
+      isOperational: true,
     };
   }
 

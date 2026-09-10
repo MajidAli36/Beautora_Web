@@ -471,7 +471,7 @@ export async function getPublicStoreBookingProfile(slug: string) {
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, tagline, address, city, country, phone, email, whatsapp_phone, logo_path, cover_path, arrival_notes, business_hours, booking_slot_minutes, booking_days_ahead, booking_advance_amount, booking_advance_percent, booking_payment_instructions, admin_disabled_at, public_listing_enabled, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, created_at"
+      "id, name, slug, tagline, address, city, country, phone, email, whatsapp_phone, logo_path, cover_path, arrival_notes, business_hours, booking_slot_minutes, booking_days_ahead, booking_advance_amount, booking_advance_percent, booking_payment_instructions, admin_disabled_at, public_listing_enabled, public_booking_enabled, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, lifetime_access, created_at"
     )
     .eq("slug", slug)
     .maybeSingle();

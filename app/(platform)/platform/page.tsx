@@ -20,6 +20,7 @@ export default async function PlatformAdminPage() {
   const summary = {
     storeCount: stores.length,
     disabledCount: stores.filter((s) => s.adminDisabled || s.phase === "locked").length,
+    lifetimeCount: stores.filter((s) => s.lifetimeAccess && !s.adminDisabled).length,
     pendingInvoices: payments.filter((p) => p.status === "pending").length,
     pendingPartners: partners.filter((p) => p.status === "pending").length,
     monthlyFee: SUBSCRIPTION.monthlyAmountPkr,

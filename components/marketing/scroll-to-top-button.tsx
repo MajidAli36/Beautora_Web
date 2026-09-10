@@ -40,7 +40,7 @@ export function ScrollToTopButton({
       aria-label="Back to top"
       className={cn(
         "fixed z-50 inline-flex size-11 items-center justify-center rounded-full border border-[var(--m-line)] bg-[var(--m-ink)] text-[var(--m-paper)] shadow-lg transition-all duration-200",
-        "bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-[calc(1.25rem+env(safe-area-inset-right,0px))]",
+        "bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-[calc(5.75rem+env(safe-area-inset-right,0px))]",
         "hover:bg-[var(--m-ink-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-accent)] focus-visible:ring-offset-2",
         visible
           ? "pointer-events-auto translate-y-0 opacity-100"

@@ -65,7 +65,7 @@ export async function getOrganizationSubscription(): Promise<{
   const { data } = await admin
     .from("organizations")
     .select(
-      "id, name, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+      "id, name, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
     )
     .eq("id", org.organizationId)
     .single();
@@ -74,7 +74,17 @@ export async function getOrganizationSubscription(): Promise<{
 
   // Persist locked status when grace has ended
   const snapshot = resolveSubscription(data);
-  if (snapshot.phase === "locked" && !data.subscription_locked_at) {
+  if (snapshot.phase === "lifetime") {
+    if (data.subscription_status !== "lifetime" || data.subscription_locked_at) {
+      await admin
+        .from("organizations")
+        .update({
+          subscription_status: "lifetime",
+          subscription_locked_at: null,
+        })
+        .eq("id", data.id);
+    }
+  } else if (snapshot.phase === "locked" && !data.subscription_locked_at) {
     await admin
       .from("organizations")
       .update({
@@ -131,6 +141,22 @@ export async function submitSubscriptionPayment(input: {
   invoice: File;
 }): Promise<ActionResult> {
   const org = await requireAction("billing.manage");
+
+  {
+    const admin = createAdminClient();
+    const { data: orgRow } = await admin
+      .from("organizations")
+      .select("lifetime_access, admin_disabled_at")
+      .eq("id", org.organizationId)
+      .maybeSingle();
+    if (orgRow?.lifetime_access && !orgRow.admin_disabled_at) {
+      return {
+        error:
+          "This store has lifetime access — monthly JazzCash payment is not required.",
+      };
+    }
+  }
+
   const ref = input.transactionRef.trim();
   if (ref.length < 4) {
     return { error: "Enter your JazzCash transaction / reference ID" };

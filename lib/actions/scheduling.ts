@@ -146,7 +146,7 @@ export async function getPublicAvailableSlots(
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at, public_booking_enabled"
+      "id, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at, public_booking_enabled"
     )
     .eq("slug", orgSlug)
     .single();

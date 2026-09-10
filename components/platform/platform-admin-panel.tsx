@@ -7,6 +7,7 @@ import { notify } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import {
   setPlatformStoreEnabled,
+  setPlatformStoreLifetimeAccess,
   type PlatformStoreRow,
 } from "@/lib/actions/platform-admin";
 import {
@@ -21,8 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-function phaseBadge(phase: string, adminDisabled: boolean) {
+function phaseBadge(phase: string, adminDisabled: boolean, lifetimeAccess: boolean) {
   if (adminDisabled) return <Badge variant="destructive">Disabled</Badge>;
+  if (lifetimeAccess || phase === "lifetime") {
+    return <Badge className="bg-violet-700">Lifetime</Badge>;
+  }
   if (phase === "trial") return <Badge variant="secondary">Trial</Badge>;
   if (phase === "active") return <Badge className="bg-emerald-600">Active</Badge>;
   if (phase === "grace") return <Badge className="bg-amber-500">Grace</Badge>;
@@ -31,6 +35,9 @@ function phaseBadge(phase: string, adminDisabled: boolean) {
 
 function storeStatusLine(store: PlatformStoreRow): string {
   if (store.adminDisabled) return "Force-disabled by platform admin";
+  if (store.lifetimeAccess || store.phase === "lifetime") {
+    return "Lifetime access — no monthly subscription";
+  }
   if (store.phase === "trial" && store.daysLeftInTrial != null) {
     return `Trial · ${store.daysLeftInTrial} day${store.daysLeftInTrial === 1 ? "" : "s"} left`;
   }
@@ -57,6 +64,7 @@ export function PlatformAdminPanel({
   summary: {
     storeCount: number;
     disabledCount: number;
+    lifetimeCount: number;
     pendingInvoices: number;
     pendingPartners: number;
     monthlyFee: number;
@@ -91,6 +99,25 @@ export function PlatformAdminPanel({
       return;
     }
     notify.success(enabled ? `${store.name} enabled (+30 days)` : `${store.name} disabled`);
+    router.refresh();
+  }
+
+  async function toggleLifetime(store: PlatformStoreRow, enabled: boolean) {
+    setBusyStore(store.id);
+    const result = await setPlatformStoreLifetimeAccess({
+      organizationId: store.id,
+      enabled,
+    });
+    setBusyStore(null);
+    if (result.error) {
+      notify.error(result.error);
+      return;
+    }
+    notify.success(
+      enabled
+        ? `${store.name} — lifetime access ON (no monthly fee)`
+        : `${store.name} — lifetime access OFF`
+    );
     router.refresh();
   }
 
@@ -138,8 +165,9 @@ export function PlatformAdminPanel({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Stores" value={String(summary.storeCount)} />
+        <Stat label="Lifetime" value={String(summary.lifetimeCount)} />
         <Stat label="Disabled / locked" value={String(summary.disabledCount)} />
         <Stat label="Pending invoices" value={String(summary.pendingInvoices)} />
         <Stat label="Pending partners" value={String(summary.pendingPartners)} />
@@ -148,8 +176,9 @@ export function PlatformAdminPanel({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Stores</h2>
         <p className="text-sm text-muted-foreground">
-          Enable unlocks for 30 days. Disable locks the salon until you enable again or approve
-          an invoice.
+          <strong>Lifetime</strong> = no monthly JazzCash (store paid once / complimentary). Toggle
+          off anytime to return to normal billing. <strong>Enable</strong> unlocks +30 days.{" "}
+          <strong>Disable</strong> force-locks the salon.
         </p>
         <ul className="divide-y rounded-lg border">
           {stores.length === 0 ? (
@@ -165,7 +194,7 @@ export function PlatformAdminPanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">{store.name}</p>
-                      {phaseBadge(store.phase, store.adminDisabled)}
+                      {phaseBadge(store.phase, store.adminDisabled, store.lifetimeAccess)}
                       {store.pendingPayments > 0 && (
                         <Badge variant="outline">
                           {store.pendingPayments} invoice pending
@@ -194,12 +223,31 @@ export function PlatformAdminPanel({
                       </p>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {store.lifetimeAccess ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyStore === store.id}
+                        onClick={() => void toggleLifetime(store, false)}
+                      >
+                        Remove lifetime
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyStore === store.id}
+                        onClick={() => void toggleLifetime(store, true)}
+                      >
+                        Grant lifetime
+                      </Button>
+                    )}
                     {isOff ? (
                       <Button
                         size="sm"
                         disabled={busyStore === store.id}
-                        onClick={() => toggleStore(store, true)}
+                        onClick={() => void toggleStore(store, true)}
                       >
                         Enable
                       </Button>
@@ -208,7 +256,7 @@ export function PlatformAdminPanel({
                         size="sm"
                         variant="destructive"
                         disabled={busyStore === store.id}
-                        onClick={() => toggleStore(store, false)}
+                        onClick={() => void toggleStore(store, false)}
                       >
                         Disable
                       </Button>

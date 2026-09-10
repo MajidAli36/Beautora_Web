@@ -30,6 +30,7 @@ export type PlatformStoreRow = {
   city: string | null;
   phase: SubscriptionPhase;
   adminDisabled: boolean;
+  lifetimeAccess: boolean;
   trialEndsAt: string | null;
   subscriptionEndsAt: string | null;
   pendingPayments: number;
@@ -52,7 +53,7 @@ export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
   const { data: orgs } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+      "id, name, slug, city, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
     )
     .order("name");
 
@@ -103,6 +104,7 @@ export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
       city: org.city,
       phase: snapshot.phase,
       adminDisabled: Boolean(org.admin_disabled_at),
+      lifetimeAccess: Boolean(org.lifetime_access),
       trialEndsAt: org.trial_ends_at,
       subscriptionEndsAt: org.subscription_ends_at,
       pendingPayments: pendingByOrg.get(org.id) ?? 0,
@@ -183,6 +185,69 @@ export async function setPlatformStoreEnabled(input: {
   revalidatePath("/platform");
   revalidatePath("/billing");
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/**
+ * Grant or revoke lifetime / complimentary access for a store.
+ * When enabled: no monthly JazzCash subscription is required.
+ * When disabled: store returns to normal trial/paid/grace/locked rules.
+ * Force-disable (admin_disabled_at) still locks the store even with lifetime.
+ */
+export async function setPlatformStoreLifetimeAccess(input: {
+  organizationId: string;
+  enabled: boolean;
+}): Promise<ActionResult> {
+  const user = await requirePlatformAdmin();
+  const admin = createAdminClient();
+
+  if (input.enabled) {
+    const { error } = await admin
+      .from("organizations")
+      .update({
+        lifetime_access: true,
+        lifetime_access_at: new Date().toISOString(),
+        lifetime_access_by: user.id,
+        admin_disabled_at: null,
+        subscription_locked_at: null,
+        subscription_status: "lifetime",
+      })
+      .eq("id", input.organizationId);
+    if (error) return { error: error.message };
+  } else {
+    const { data: org } = await admin
+      .from("organizations")
+      .select(
+        "trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+      )
+      .eq("id", input.organizationId)
+      .maybeSingle();
+
+    const nextPhase = org
+      ? resolveSubscription({ ...org, lifetime_access: false }).phase
+      : "locked";
+
+    const { error } = await admin
+      .from("organizations")
+      .update({
+        lifetime_access: false,
+        lifetime_access_at: null,
+        lifetime_access_by: null,
+        subscription_status:
+          nextPhase === "lifetime" ? "active" : nextPhase,
+        subscription_locked_at:
+          nextPhase === "locked"
+            ? new Date().toISOString()
+            : null,
+      })
+      .eq("id", input.organizationId);
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/platform");
+  revalidatePath("/billing");
+  revalidatePath("/dashboard");
+  revalidatePath("/stores");
   return { success: true };
 }
 

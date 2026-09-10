@@ -19,9 +19,14 @@ export function SubscriptionCautionModal({
 }: SubscriptionCautionModalProps) {
   const isLocked = snapshot.phase === "locked";
   const isGrace = snapshot.phase === "grace";
-  const [open, setOpen] = useState(isLocked);
+  const isLifetime = snapshot.phase === "lifetime" || snapshot.lifetimeAccess;
+  const [open, setOpen] = useState(isLocked && !isLifetime);
 
   useEffect(() => {
+    if (isLifetime) {
+      setOpen(false);
+      return;
+    }
     if (isLocked) {
       setOpen(true);
       return;
@@ -45,9 +50,9 @@ export function SubscriptionCautionModal({
     maybeShow();
     const id = window.setInterval(maybeShow, SUBSCRIPTION.cautionPopupIntervalMs);
     return () => window.clearInterval(id);
-  }, [isLocked, isGrace]);
+  }, [isLocked, isGrace, isLifetime]);
 
-  if (!open || (!isGrace && !isLocked)) return null;
+  if (isLifetime || !open || (!isGrace && !isLocked)) return null;
 
   const hours = snapshot.hoursLeftInGrace ?? 0;
 

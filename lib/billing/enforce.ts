@@ -15,6 +15,7 @@ type OrgBillingRow = {
   subscription_locked_at: string | null;
   subscription_status: string | null;
   admin_disabled_at: string | null;
+  lifetime_access: boolean | null;
   created_at: string | null;
 };
 
@@ -25,7 +26,7 @@ export const getOrgSubscriptionSnapshot = cache(
     const { data } = await admin
       .from("organizations")
       .select(
-        "id, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, created_at"
+        "id, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
       )
       .eq("id", organizationId)
       .maybeSingle();
@@ -34,8 +35,18 @@ export const getOrgSubscriptionSnapshot = cache(
 
     const snapshot = resolveSubscription(data as OrgBillingRow);
 
-    // Persist locked/grace status so partner dashboards & listings stay accurate
-    if (snapshot.phase === "locked") {
+    // Persist locked/grace/lifetime/active status so listings stay accurate
+    if (snapshot.phase === "lifetime") {
+      if (data.subscription_status !== "lifetime" || data.subscription_locked_at) {
+        await admin
+          .from("organizations")
+          .update({
+            subscription_status: "lifetime",
+            subscription_locked_at: null,
+          })
+          .eq("id", organizationId);
+      }
+    } else if (snapshot.phase === "locked") {
       if (
         data.subscription_status !== "locked" ||
         !data.subscription_locked_at

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Outfit } from "next/font/google";
 import { MarketingScrollManager } from "@/components/marketing/marketing-scroll-manager";
+import { HelpChatbot } from "@/components/marketing/help-chatbot";
 import { ScrollToTopButton } from "@/components/marketing/scroll-to-top-button";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
@@ -60,6 +61,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <main className="flex-1">{children}</main>
       <SiteFooter />
       <ScrollToTopButton />
+      <HelpChatbot />
     </div>
   );
 }
