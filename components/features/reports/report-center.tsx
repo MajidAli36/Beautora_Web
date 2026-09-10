@@ -2,8 +2,23 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Printer, RefreshCw, Download } from "lucide-react";
+import { Printer, RefreshCw, Download, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  EXPORT_FORMAT_OPTIONS,
+  downloadExportDocument,
+  type ExportFormat,
+} from "@/lib/reports/export-formats";
+import { buildReportExportDocument } from "@/lib/reports/build-report-export";
 import {
   getOverallReport,
   getSalesReport,
@@ -40,11 +55,11 @@ import {
 import { getLocalDateString } from "@/lib/dates/local";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ReportError, ReportLoading } from "@/components/features/reports/ui/report-states";
-import { OverallTab, exportOverallCsv } from "@/components/features/reports/tabs/overall-tab";
+import { OverallTab } from "@/components/features/reports/tabs/overall-tab";
 import { SalesTab } from "@/components/features/reports/tabs/sales-tab";
 import { ServicesTab } from "@/components/features/reports/tabs/services-tab";
 import { CustomersTab } from "@/components/features/reports/tabs/customers-tab";
@@ -164,11 +179,22 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
     pushState({ from: nextFrom, to: nextTo });
   }
 
-  function handleExport() {
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport(format: ExportFormat) {
     const data = cache[tab];
-    if (!data) return;
-    if (tab === "overall") exportOverallCsv(data as OverallReport);
-    else window.print();
+    if (!data || exporting) return;
+    setExporting(true);
+    try {
+      const doc = buildReportExportDocument(tab, data);
+      await downloadExportDocument(doc, format);
+      toast.success(`Downloaded ${format.toUpperCase()} export`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Export failed";
+      toast.error(message);
+    } finally {
+      setExporting(false);
+    }
   }
 
   const today = getLocalDateString();
@@ -189,10 +215,29 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
               <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
               Refresh
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={handleExport} disabled={!cache[tab]}>
-              <Download className="size-3.5" />
-              Export
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={!cache[tab] || exporting}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              >
+                <Download className="size-3.5" />
+                {exporting ? "Exporting…" : "Export"}
+                <ChevronDown className="size-3.5 opacity-70" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuLabel>Download as</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {EXPORT_FORMAT_OPTIONS.map((opt) => (
+                  <DropdownMenuItem
+                    key={opt.id}
+                    disabled={exporting}
+                    onClick={() => void handleExport(opt.id)}
+                  >
+                    {opt.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button type="button" size="sm" variant="outline" onClick={() => window.print()}>
               <Printer className="size-3.5" />
               Print

@@ -1,7 +1,8 @@
 "use client";
 
 import { formatCurrency, formatDateTime } from "@/lib/format";
-import { downloadCsv } from "@/lib/reports/export-csv";
+import { downloadExportDocument } from "@/lib/reports/export-formats";
+import { buildReportExportDocument } from "@/lib/reports/build-report-export";
 import type { OverallReport } from "@/lib/actions/reports";
 import { KpiCard } from "@/components/features/reports/ui/kpi-card";
 import { ReportSection } from "@/components/features/reports/ui/report-section";
@@ -93,18 +94,6 @@ function TopTable({
   );
 }
 
-export function exportOverallCsv(data: OverallReport) {
-  downloadCsv(
-    `overall-report-${data.from}-${data.to}.csv`,
-    ["Metric", "Value"],
-    [
-      ["Total revenue", data.kpis.totalRevenue.current],
-      ["Sales", data.kpis.saleCount.current],
-      ["Service revenue (line)", data.kpis.serviceRevenue.current],
-      ["Product revenue (line)", data.kpis.productRevenue.current],
-      ["Package revenue (line)", data.kpis.packageRevenue.current],
-      ["Discounts", data.kpis.discounts.current],
-      ["Product gross profit", data.kpis.productGrossProfit.current],
-    ]
-  );
+export async function exportOverallCsv(data: OverallReport) {
+  await downloadExportDocument(buildReportExportDocument("overall", data), "csv");
 }
