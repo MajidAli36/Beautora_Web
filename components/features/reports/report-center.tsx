@@ -8,9 +8,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -225,17 +225,18 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
                 <ChevronDown className="size-3.5 opacity-70" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-44">
-                <DropdownMenuLabel>Download as</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {EXPORT_FORMAT_OPTIONS.map((opt) => (
-                  <DropdownMenuItem
-                    key={opt.id}
-                    disabled={exporting}
-                    onClick={() => void handleExport(opt.id)}
-                  >
-                    {opt.label}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Download as</DropdownMenuLabel>
+                  {EXPORT_FORMAT_OPTIONS.map((opt) => (
+                    <DropdownMenuItem
+                      key={opt.id}
+                      disabled={exporting}
+                      onClick={() => void handleExport(opt.id)}
+                    >
+                      {opt.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button type="button" size="sm" variant="outline" onClick={() => window.print()}>
