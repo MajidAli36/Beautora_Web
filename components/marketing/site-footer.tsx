@@ -33,7 +33,7 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
-              <Link href="/platform" className="transition-colors hover:text-white">
+              <Link href="/salon-platform" className="transition-colors hover:text-white">
                 Platform
               </Link>
             </li>

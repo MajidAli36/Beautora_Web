@@ -11,7 +11,7 @@ export const revalidate = 3600;
 export const metadata: Metadata = buildPageMetadata({
   title: "Salon Platform — Booking, POS & Team",
   description: `Beautora is the best salon management platform for Pakistan and global beauty businesses — online booking, POS, staff, queue, WhatsApp, inventory, and reports by ${SYNCOPS.builder.name}.`,
-  path: "/platform",
+  path: "/salon-platform",
   keywords: [
     "salon platform",
     "best salon software Pakistan",
@@ -22,7 +22,7 @@ export const metadata: Metadata = buildPageMetadata({
   ],
 });
 
-export default function PlatformPage() {
+export default function SalonPlatformPage() {
   return (
     <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">

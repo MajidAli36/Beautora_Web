@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 /** Every item is a real indexable page — no hash-only destinations. */
 const PRIMARY_NAV = [
   { label: "Features", href: "/features" },
-  { label: "Platform", href: "/platform" },
+  { label: "Platform", href: "/salon-platform" },
   { label: "Pricing", href: "/pricing" },
   { label: "Stores", href: "/stores" },
 ] as const;

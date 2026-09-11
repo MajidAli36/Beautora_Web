@@ -20,7 +20,7 @@ const WELCOME: ChatMessage = {
   role: "assistant",
   text: "Hi — I’m the Beautora assistant. Ask anything about the platform: pricing, booking, POS, sales, staff, inventory, reports, finances, WhatsApp, billing, and more.",
   links: [
-    { label: "All features", href: "/platform" },
+    { label: "All features", href: "/salon-platform" },
     { label: "Pricing", href: "/pricing" },
     { label: "Start free", href: "/signup" },
   ],

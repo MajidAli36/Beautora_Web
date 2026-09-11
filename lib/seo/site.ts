@@ -357,7 +357,7 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         ],
         sameAs: [
           absoluteUrl("/salon-software"),
-          absoluteUrl("/platform"),
+          absoluteUrl("/salon-platform"),
           absoluteUrl("/features"),
           absoluteUrl("/stores"),
         ],

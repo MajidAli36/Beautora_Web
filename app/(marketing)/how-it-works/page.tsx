@@ -44,7 +44,7 @@ export default function HowItWorksPage() {
               Start free trial
             </Link>
             <Link
-              href="/platform"
+              href="/salon-platform"
               className="inline-flex h-11 items-center justify-center border border-[var(--m-line)] px-5 text-sm font-semibold text-[var(--m-ink)]"
             >
               Explore platform
