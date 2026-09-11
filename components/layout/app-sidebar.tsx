@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Scissors, Wallet } from "lucide-react";
+import { ChevronDown, Scissors, UserRound, Wallet } from "lucide-react";
 import { filterNavGroupsForRole, type NavPermissionsConfig } from "@/lib/permissions/nav";
 import type { MemberRole } from "@/types";
 import { getInitials } from "@/lib/format";
@@ -35,6 +35,7 @@ type AppSidebarProps = {
   organizationName?: string;
   userEmail?: string;
   userRole?: string;
+  myStaffHref?: string | null;
   showPlatformBilling?: boolean;
 };
 
@@ -44,6 +45,7 @@ export function AppSidebar({
   organizationName = BRAND.name,
   userEmail,
   userRole = "Owner",
+  myStaffHref = null,
   showPlatformBilling = false,
 }: AppSidebarProps) {
   const pathname = usePathname();
@@ -53,6 +55,9 @@ export function AppSidebar({
   );
   const showSettingsLink = navGroups.some((g) =>
     g.items.some((item) => item.href === "/settings")
+  );
+  const myWorkActive = Boolean(
+    myStaffHref && (pathname === myStaffHref || pathname.startsWith(`${myStaffHref}/`))
   );
 
   return (
@@ -83,6 +88,28 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-3">
+        {myStaffHref ? (
+          <SidebarGroup>
+            <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+              Me
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={myWorkActive}
+                    tooltip="My work"
+                    className="h-10 rounded-lg px-2.5 transition-colors duration-150 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:[&_svg]:text-sidebar-accent-foreground"
+                    render={<Link href={myStaffHref} />}
+                  >
+                    <UserRound className="size-[18px] shrink-0" />
+                    <span className="text-[13px]">My work</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
         {navGroups.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">

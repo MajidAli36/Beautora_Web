@@ -2,39 +2,60 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X } from "lucide-react";
-import { useEffect, useState, type MouseEvent } from "react";
+import { ChevronDown, Menu, X } from "lucide-react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { scrollMarketingToTop } from "@/components/marketing/marketing-scroll-manager";
 import { SiteTopBar } from "@/components/marketing/site-top-bar";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { cn } from "@/lib/utils";
 
-const NAV = [
-  { label: "How it works", href: "/#how-it-works", hash: "how-it-works" },
-  { label: "Platform", href: "/#platform", hash: "platform" },
+/** Every item is a real indexable page — no hash-only destinations. */
+const PRIMARY_NAV = [
   { label: "Features", href: "/features" },
+  { label: "Platform", href: "/platform" },
   { label: "Pricing", href: "/pricing" },
   { label: "Stores", href: "/stores" },
-  { label: "Apps", href: "/apps" },
+] as const;
+
+const MORE_NAV = [
+  { label: "How it works", href: "/how-it-works" },
+  { label: "Salon software", href: "/salon-software" },
   { label: "About", href: "/about" },
+  { label: "Apps", href: "/apps", badge: "Soon" },
   { label: "Partner", href: "/partner" },
 ] as const;
 
-function scrollToHash(hash: string) {
-  const el = document.getElementById(hash);
-  if (!el) return;
-  el.scrollIntoView({ block: "start", behavior: "smooth" });
-}
+const MOBILE_SECTIONS = [
+  {
+    group: "Product",
+    items: [
+      ...PRIMARY_NAV,
+      { label: "How it works", href: "/how-it-works" },
+      { label: "Salon software", href: "/salon-software" },
+      { label: "Apps", href: "/apps", badge: "Soon" },
+    ],
+  },
+  {
+    group: "Company",
+    items: [
+      { label: "About", href: "/about" },
+      { label: "Partner", href: "/partner" },
+      { label: "Contact", href: "/contact" },
+    ],
+  },
+] as const;
 
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   const isHome = pathname === "/";
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    const onScroll = () => setScrolled(window.scrollY > 16);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -42,11 +63,28 @@ export function SiteHeader() {
 
   useEffect(() => {
     setOpen(false);
+    setMoreOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    function onPointerDown(e: PointerEvent) {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMoreOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   function goHome(e: MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
     setOpen(false);
+    setMoreOpen(false);
     if (pathname === "/") {
       if (window.location.hash) {
         window.history.replaceState(null, "", "/");
@@ -55,7 +93,6 @@ export function SiteHeader() {
       return;
     }
     router.push("/");
-    // Fight App Router scroll restoration after navigation
     requestAnimationFrame(() => {
       scrollMarketingToTop();
       window.setTimeout(scrollMarketingToTop, 0);
@@ -64,91 +101,122 @@ export function SiteHeader() {
     });
   }
 
-  function goHash(e: MouseEvent<HTMLAnchorElement>, hash: string) {
-    e.preventDefault();
-    setOpen(false);
-    if (pathname === "/") {
-      window.history.pushState(null, "", `/#${hash}`);
-      scrollToHash(hash);
-      return;
-    }
-    router.push(`/#${hash}`);
-  }
-
-  const solid = !isHome || scrolled || open;
+  const elevated = !isHome || scrolled || open;
 
   return (
     <div className="fixed inset-x-0 top-0 z-50">
       <SiteTopBar />
       <header
         className={cn(
-          "transition-[background-color,border-color,height] duration-200 ease-out",
-          solid
-            ? "border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 backdrop-blur-md"
-            : "border-b border-transparent bg-transparent"
+          "border-b transition-[background-color,border-color,box-shadow] duration-200 ease-out",
+          elevated
+            ? "border-[var(--m-line)] bg-[var(--m-paper)]/95 shadow-[0_8px_24px_-18px_rgba(6,33,29,0.45)] backdrop-blur-md"
+            : "border-white/15 bg-[var(--m-ink)]/55 backdrop-blur-md"
         )}
       >
-        <div
-          className={cn(
-            "mx-auto flex max-w-6xl items-center justify-between px-6 transition-[height] duration-200",
-            scrolled ? "h-12 lg:h-14" : "h-14 lg:h-16"
-          )}
-        >
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:h-16 lg:gap-6">
           <Link
-            href="/#top"
+            href="/"
             onClick={goHome}
             className={cn(
-              "flex flex-col leading-none transition-colors",
-              solid ? "text-[var(--m-ink)]" : "text-white"
+              "shrink-0 font-display text-xl font-semibold tracking-tight transition-colors sm:text-2xl",
+              elevated ? "text-[var(--m-ink)]" : "text-white"
             )}
           >
-            <span className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
-              {SYNCOPS.name}
-            </span>
-            <span
-              className={cn(
-                "mt-0.5 text-[10px] font-medium uppercase tracking-[0.16em]",
-                solid ? "text-[var(--m-muted)]" : "text-white/55"
-              )}
-            >
-              {SYNCOPS.builder.short}
-            </span>
+            {SYNCOPS.name}
           </Link>
 
-          <nav className="hidden items-center gap-7 lg:flex lg:gap-9" aria-label="Primary">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={"hash" in item && item.hash ? (e) => goHash(e, item.hash) : undefined}
-                className={cn(
-                  "inline-flex items-center gap-1.5 text-sm font-medium tracking-wide transition-opacity duration-150 hover:opacity-70",
-                  solid ? "text-[var(--m-ink-soft)]" : "text-white/90"
-                )}
-              >
-                {item.label}
-                {item.href === "/apps" ? (
-                  <span
+          <nav
+            className="ml-2 hidden min-w-0 flex-1 items-center justify-center xl:flex"
+            aria-label="Primary"
+          >
+            <div
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-1.5 py-1",
+                elevated ? "bg-[var(--m-mist)]/80" : "bg-white/10"
+              )}
+            >
+              {PRIMARY_NAV.map((item) => {
+                const active =
+                  pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
                     className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                      solid
-                        ? "bg-[var(--m-accent)]/12 text-[var(--m-accent)]"
-                        : "bg-white/15 text-white/90"
+                      "rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-colors",
+                      elevated
+                        ? active
+                          ? "bg-white text-[var(--m-ink)] shadow-sm"
+                          : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
+                        : active
+                          ? "bg-white/20 text-white"
+                          : "text-white/85 hover:bg-white/10 hover:text-white"
                     )}
                   >
-                    Soon
-                  </span>
+                    {item.label}
+                  </Link>
+                );
+              })}
+
+              <div className="relative" ref={moreRef}>
+                <button
+                  type="button"
+                  aria-expanded={moreOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setMoreOpen((v) => !v)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-colors",
+                    elevated
+                      ? moreOpen
+                        ? "bg-white text-[var(--m-ink)] shadow-sm"
+                        : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
+                      : moreOpen
+                        ? "bg-white/20 text-white"
+                        : "text-white/85 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  More
+                  <ChevronDown
+                    className={cn(
+                      "size-3.5 transition-transform duration-150",
+                      moreOpen && "rotate-180"
+                    )}
+                  />
+                </button>
+                {moreOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute top-[calc(100%+0.5rem)] left-1/2 z-50 w-56 -translate-x-1/2 overflow-hidden rounded-xl border border-[var(--m-line)] bg-[var(--m-paper)] py-1.5 shadow-[0_16px_40px_-20px_rgba(6,33,29,0.55)]"
+                  >
+                    {MORE_NAV.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        role="menuitem"
+                        onClick={() => setMoreOpen(false)}
+                        className="flex items-center justify-between px-3.5 py-2.5 text-sm text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
+                      >
+                        <span>{item.label}</span>
+                        {"badge" in item && item.badge ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--m-accent)]">
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </Link>
+                    ))}
+                  </div>
                 ) : null}
-              </Link>
-            ))}
+              </div>
+            </div>
           </nav>
 
-          <div className="hidden items-center gap-5 md:flex lg:gap-6">
+          <div className="ml-auto hidden items-center gap-3 sm:flex xl:ml-0">
             <Link
               href="/login"
               className={cn(
-                "text-sm font-medium transition-opacity duration-150 hover:opacity-70",
-                solid ? "text-[var(--m-muted)]" : "text-white/75"
+                "px-2 text-sm font-medium transition-opacity hover:opacity-75",
+                elevated ? "text-[var(--m-muted)]" : "text-white/80"
               )}
             >
               Login
@@ -156,8 +224,8 @@ export function SiteHeader() {
             <Link
               href="/signup"
               className={cn(
-                "inline-flex h-10 items-center px-5 text-sm font-semibold tracking-wide transition-all duration-150",
-                solid
+                "inline-flex h-10 items-center rounded-full px-5 text-sm font-semibold tracking-wide transition-colors",
+                elevated
                   ? "bg-[var(--m-ink)] text-[var(--m-paper)] hover:bg-[var(--m-ink-soft)]"
                   : "bg-white text-[var(--m-ink)] hover:bg-white/90"
               )}
@@ -169,8 +237,10 @@ export function SiteHeader() {
           <button
             type="button"
             className={cn(
-              "inline-flex size-11 items-center justify-center md:hidden",
-              solid ? "text-[var(--m-ink)]" : "text-white"
+              "ml-auto inline-flex size-11 items-center justify-center rounded-full xl:hidden",
+              elevated
+                ? "bg-[var(--m-mist)] text-[var(--m-ink)]"
+                : "bg-white/15 text-white"
             )}
             onClick={() => setOpen(!open)}
             aria-expanded={open}
@@ -181,50 +251,56 @@ export function SiteHeader() {
           </button>
         </div>
 
-        {open && (
+        {open ? (
           <div
             id="mobile-nav"
-            className="border-t border-[var(--m-line)] bg-[var(--m-paper)] px-6 py-5 md:hidden"
+            className="max-h-[min(80vh,32rem)] overflow-y-auto border-t border-[var(--m-line)] bg-[var(--m-paper)] px-4 py-5 sm:px-6 xl:hidden"
           >
-            <nav className="flex flex-col gap-1" aria-label="Mobile">
-              {NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={(e) => {
-                    if ("hash" in item && item.hash) {
-                      goHash(e, item.hash);
-                    } else {
-                      setOpen(false);
-                    }
-                  }}
-                  className="flex min-h-11 items-center justify-between px-1 text-base font-medium text-[var(--m-ink)]"
-                >
-                  {item.label}
-                  {item.href === "/apps" ? (
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--m-accent)]">
-                      Coming soon
-                    </span>
-                  ) : null}
-                </Link>
+            <nav className="mx-auto flex max-w-7xl flex-col gap-6" aria-label="Mobile">
+              {MOBILE_SECTIONS.map((section) => (
+                <div key={section.group}>
+                  <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--m-muted)]">
+                    {section.group}
+                  </p>
+                  <div className="flex flex-col gap-0.5">
+                    {section.items.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setOpen(false)}
+                        className="flex min-h-12 items-center justify-between rounded-lg px-3 text-base font-medium text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
+                      >
+                        <span>{item.label}</span>
+                        {"badge" in item && item.badge ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--m-accent)]">
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               ))}
-              <Link
-                href="/login"
-                onClick={() => setOpen(false)}
-                className="min-h-11 px-1 py-3 text-base text-[var(--m-muted)]"
-              >
-                Login
-              </Link>
-              <Link
-                href="/signup"
-                onClick={() => setOpen(false)}
-                className="mt-2 inline-flex h-11 w-full items-center justify-center bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
-              >
-                Start free
-              </Link>
+
+              <div className="grid gap-2 border-t border-[var(--m-line)] pt-4 sm:hidden">
+                <Link
+                  href="/login"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--m-line)] text-sm font-medium text-[var(--m-ink)]"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
+                >
+                  Start free
+                </Link>
+              </div>
             </nav>
           </div>
-        )}
+        ) : null}
       </header>
     </div>
   );

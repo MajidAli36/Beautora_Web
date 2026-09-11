@@ -7,11 +7,19 @@ import Link from "next/link";
 export const revalidate = 300;
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Stores",
+  title: "Stores — Book Salons Online",
   description:
-    "Browse live salons on Beautora by SyncOps — search by name or city, view services, and book online.",
+    "Find the best salons in Pakistan and book online with Beautora by SyncOps. Browse live stores by city, view services, and schedule appointments.",
   path: "/stores",
-  keywords: ["Beautora stores", "SyncOps salon directory", "book salon online Pakistan"],
+  keywords: [
+    "best salon in Pakistan",
+    "book salon online Pakistan",
+    "Beautora stores",
+    "SyncOps salon directory",
+    "beauty salon near me Pakistan",
+    "best beauty salon Pakistan",
+    "online salon booking",
+  ],
 });
 
 export default async function StoresPage() {

@@ -242,7 +242,7 @@ export function AppsComingSoonSection({
               Start on web now
             </Link>
             <Link
-              href="/#platform"
+              href="/platform"
               className="inline-flex h-12 items-center border border-[var(--m-ink)] px-8 text-sm font-medium tracking-wide text-[var(--m-ink)] transition-colors hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
             >
               See platform features

@@ -6,10 +6,15 @@ import { ROLE_LABELS } from "@/lib/permissions/roles";
 import { getOrgNavPermissions } from "@/lib/actions/role-permissions";
 import { getOrganizationSubscription, getPlatformAdminFlag } from "@/lib/actions/billing";
 import {
+  canAccessNavKey,
   canAccessPath,
   getDefaultLandingPath,
   type NavPermissionsConfig,
 } from "@/lib/permissions/nav";
+import {
+  getLinkedStaffProfile,
+  isOwnStaffDashboardPath,
+} from "@/lib/staff/linked-profile";
 import { BRAND } from "@/lib/marketing/brand";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -36,9 +41,12 @@ export default async function AppLayout({
   if (!org) {
     redirect("/onboarding");
   }
-  const overrides = await getOrgNavPermissions();
-  const billing = await getOrganizationSubscription();
-  const isPlatformAdmin = await getPlatformAdminFlag();
+  const [overrides, billing, isPlatformAdmin, linkedStaff] = await Promise.all([
+    getOrgNavPermissions(),
+    getOrganizationSubscription(),
+    getPlatformAdminFlag(),
+    getLinkedStaffProfile().catch(() => null),
+  ]);
   const locked = billing?.snapshot.phase === "locked";
 
   // When locked, every role must reach /billing (avoid redirect loops)
@@ -52,14 +60,23 @@ export default async function AppLayout({
       }
     : overrides;
 
-  const landingPath = locked
+  const myStaffHref = linkedStaff ? `/staff/${linkedStaff.id}` : null;
+  const staffNavAllowed = canAccessNavKey(org.role, "staff", effectiveOverrides);
+
+  let landingPath = locked
     ? "/billing"
     : getDefaultLandingPath(org.role, effectiveOverrides);
+
+  // Staff login with a linked salon profile lands on their own dashboard.
+  if (!locked && myStaffHref && (org.role === "STAFF" || !staffNavAllowed)) {
+    landingPath = myStaffHref;
+  }
 
   const headerList = await headers();
   const pathname = headerList.get("x-pathname") ?? "";
   const onBilling =
     pathname.startsWith("/billing") || pathname.startsWith("/platform");
+  const onOwnStaffDashboard = isOwnStaffDashboardPath(pathname, linkedStaff?.id);
 
   if (locked && !onBilling) {
     redirect("/billing");
@@ -70,9 +87,15 @@ export default async function AppLayout({
     pathname &&
     !locked &&
     !onBilling &&
+    !onOwnStaffDashboard &&
     !canAccessPath(org.role, pathname, effectiveOverrides)
   ) {
     redirect(landingPath);
+  }
+
+  // /staff directory without staff nav → own dashboard if linked
+  if (pathname === "/staff" && !locked && !staffNavAllowed && myStaffHref) {
+    redirect(myStaffHref);
   }
 
   return runWithCurrency(currencyFromCountry(org.country), () => (
@@ -84,6 +107,7 @@ export default async function AppLayout({
       memberRole={org.role}
       navOverrides={effectiveOverrides}
       landingPath={landingPath}
+      myStaffHref={myStaffHref}
       showPlatformBilling={isPlatformAdmin}
       subscriptionLocked={Boolean(locked)}
     >

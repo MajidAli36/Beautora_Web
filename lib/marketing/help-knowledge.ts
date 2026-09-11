@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Beautora marketing help knowledge base — full platform coverage.
  * Keep answers factual; the site assistant must not invent features.
  */
@@ -44,8 +44,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer: `${SYNCOPS.name} is the salon operating system from ${SYNCOPS.builder.name}. One login for the whole store: online booking, appointments, walk-in queue, POS & sales, services/products/chairs, staff & attendance, customers, WhatsApp, feedback, inventory (retail + in-house), reports, finances, billing, and settings. It replaces juggling WhatsApp, notebooks, spreadsheets, and a separate POS.`,
     links: [
-      { label: "Platform", href: "/#platform" },
-      { label: "How it works", href: "/#how-it-works" },
+      { label: "Platform", href: "/platform" },
+      { label: "How it works", href: "/how-it-works" },
     ],
   },
   {
@@ -68,7 +68,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer: `Beautora includes: Dashboard · Customers · Appointments (in-house + online + deposit approvals) · Queue (walk-in tokens) · POS · Sales (amend / void / refund / dues) · Services & packages · Products (retail) · In-house stock (cream/ml recipes) · Chairs · Staff & roles · Attendance (fingerprint kiosk) · Devices (printer, drawer, token, attendance) · Reports · Finances (expenses, staff pay, COGS, advances) · WhatsApp templates · Feedback ratings · Billing (trial / JazzCash) · Settings (hours, payment accounts, public listing, audit). Guests book on your public store page. Native mobile/desktop apps are Coming Soon — the web app is live today.`,
     links: [
-      { label: "Platform modules", href: "/#platform" },
+      { label: "Platform modules", href: "/platform" },
       { label: "Pricing", href: "/pricing" },
       { label: "Start free", href: "/signup" },
     ],
@@ -143,7 +143,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     answer: `1) Sign up and create your salon (name, city, country). 2) Use the in-app Getting Started guide: Services → Products → Customers → Queue → POS → WhatsApp & feedback → Appointments & online booking → Reports. 3) Invite your team with roles. You get ${SUBSCRIPTION.trialDays} days free on the full platform.`,
     links: [
       { label: "Start 30 days free", href: "/signup" },
-      { label: "How it works", href: "/#how-it-works" },
+      { label: "How it works", href: "/how-it-works" },
     ],
   },
   {
@@ -152,7 +152,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["dashboard", "home", "today sales", "overview", "kpi"],
     answer:
       "The Dashboard shows today’s sales vs yesterday, appointments (completed/upcoming), customers, stock sold or inventory value, revenue charts, service performance, stock alerts, and quick actions so owners see the day at a glance.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "customers",
@@ -169,7 +169,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Customers stores profiles (name, phone, tags like VIP/new), visit and sales history, outstanding dues, and a printable customer statement. You can create customers in the Customers module or automatically when booking / checking out at POS. Account payments can settle past dues.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "appointments",
@@ -188,8 +188,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
     answer:
       "Appointments is one hub: In-house (staff bookings), Online (confirmed web bookings), Incoming (pending advances to approve), History, and Setup (public booking, advances, staff online flags, weekly schedules). Reception can check-in, mark no-show, collect advance, open POS, or cancel.",
     links: [
-      { label: "How it works", href: "/#how-it-works" },
-      { label: "Platform", href: "/#platform" },
+      { label: "How it works", href: "/how-it-works" },
+      { label: "Platform", href: "/platform" },
     ],
   },
   {
@@ -212,7 +212,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Guests book on your public page (/book/your-slug): services → stylist → date/time. Availability follows staff schedules and service duration. You can require an advance (fixed Rs amount or % of services — fixed wins if both set), show JazzCash/bank accounts from Settings, and collect a payment screenshot. Staff approve or reject pending advances under Incoming. Public listing on /stores is a separate Settings toggle from online booking itself.",
     links: [
       { label: "Browse stores", href: "/stores" },
-      { label: "Platform", href: "/#platform" },
+      { label: "Platform", href: "/platform" },
     ],
   },
   {
@@ -244,7 +244,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Queue issues walk-in tokens with customer (or walk-in name), optional staff and chair, and token time. Update serving/waiting status, print thermal tokens, and keep the floor ordered without paper tickets. Chairs from Catalog appear here for assignment.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "pos",
@@ -263,7 +263,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "POS builds a cart of services, retail products, and packages; attributes multi-staff; links an open appointment; applies deposit credit; supports discount/tax; takes cash/card/other (including partial pay and unpaid dues with permission); can collect prior due invoices in the same flow; previews in-house usage (cream/ml) before deducting stock; prints receipts; opens the cash drawer; or marks no-show without billing.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "sales",
@@ -283,7 +283,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Sales lists invoices. You can print receipts, receive payment on dues, amend a completed ticket (lines, inventory, and money reconciled), void an invoice (retail stock restored; appointment can be rebilled), or refund partially/fully. Full refund restores retail stock; in-house cream/ml already used stays deducted. Soft-deleted invoices leave revenue reports.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "services",
@@ -300,7 +300,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Services have name, price, and duration for booking and POS. Organize with categories. Packages bundle services at a package price for POS. You can link in-house stock recipes so cream/ml auto-deducts when the service is sold while the guest pays the service price.",
-    links: [{ label: "How it works", href: "/#how-it-works" }],
+    links: [{ label: "How it works", href: "/how-it-works" }],
   },
   {
     id: "products",
@@ -318,7 +318,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Products can be RETAIL (sold at POS), IN_HOUSE (back-bar only), or BOTH. Retail tracks stock quantity, retail price, and cost for COGS. Stock-in and inventory summaries are available; low stock appears on the Dashboard.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "in-house",
@@ -335,7 +335,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "In-house tracks back-bar cream, wax, spray, etc. Link recipes to services so usage deducts automatically at checkout. View remaining stock and full movement history. On void/full refund, retail is restored but in-house usage stays written off (product already used on the client).",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "chairs",
@@ -343,7 +343,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["chair", "chairs", "station", "stations", "seat"],
     answer:
       "Chairs are floor stations you add under Catalog. They show on the Queue so walk-ins and tokens can be assigned to a chair.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "staff",
@@ -365,7 +365,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Staff covers salon roster (profiles, job title, PIN, thumb enrollment, online-booking flag) and app logins. Roles: Owner, Admin, Manager, Cashier, Receptionist, Staff — with sidebar visibility and granular actions (create, void, approve deposits, etc.). Weekly schedules drive booking availability.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "attendance",
@@ -382,7 +382,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Attendance supports fingerprint/thumb enrollment and an entrance kiosk, plus manual check-in. Review hours by date range. Method labels show thumb vs manual.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "devices",
@@ -400,7 +400,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Devices registers attendance terminals, cash drawers, receipt printers, and token kiosks — manually with an API key or via auto-register. A small agent on the POS PC (`npm run device:agent`) drives printer and drawer commands from Beautora.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "reports",
@@ -417,7 +417,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Reports covers Overall, Sales, Services, Customers, Appointments, Staff, Inventory, In-house, Products, Finance, Payments, and Customer dues. Use date presets (today, week, month, year, custom) and export CSV from Overall.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "finances",
@@ -438,7 +438,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Finances shows ticket revenue, advances, product COGS, in-house usage COGS, operating expenses, staff payments (salary, advance, bonus), net profit, and net cash flow for a chosen period. Record expenses (rent, utilities, supplies, marketing, etc.) and staff payouts. Inventory panels show stock value.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "whatsapp",
@@ -453,7 +453,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "WhatsApp in Beautora manages templates with placeholders (name, salon, phone, address). Pick a customer, render the message, and open WhatsApp with the text ready — you send from WhatsApp. Useful after sales or feedback.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "feedback",
@@ -468,7 +468,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Feedback collects multi-dimension ratings (overall, behaviour, expertise, service quality, cleanliness, value, wait time) for registered customers or walk-ins, with optional stylist credit. Browse averages, low scores, and recent reviews.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "settings",
@@ -487,7 +487,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Settings covers store profile (name, slug, contact, country — country drives currency display), business hours (reception + online slots), payment accounts for advance instructions, public listing toggle, booking URL, integrations, audit log, and a deleted-records restore panel. Staff permissions are managed under Staff.",
-    links: [{ label: "Platform", href: "/#platform" }],
+    links: [{ label: "Platform", href: "/platform" }],
   },
   {
     id: "roles-security",

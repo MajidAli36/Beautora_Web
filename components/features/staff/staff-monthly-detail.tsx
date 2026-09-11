@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useState } from "react";
-import type { StaffMonthlyDetail } from "@/lib/actions/reports";
+import type { StaffAppointmentItem, StaffMonthlyDetail } from "@/lib/actions/reports";
 import { createStaffNote, deleteStaffNote } from "@/lib/actions/staff-notes";
 import { useActionToast } from "@/hooks/use-action-toast";
 import type { ActionResult } from "@/types/commerce";
-import { formatCurrency, formatDate, formatDateTime, formatDuration } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime, formatDuration, formatTime } from "@/lib/format";
 import { getLocalDateString } from "@/lib/dates/local";
 import { attendanceMethodLabel } from "@/lib/attendance/labels";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ExternalLink } from "lucide-react";
+import { CalendarClock, ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function shiftMonth(yearMonth: string, delta: number): string {
   const [y, m] = yearMonth.split("-").map(Number);
@@ -60,6 +61,213 @@ function noteBadgeVariant(
   if (type === "WARNING") return "outline";
   if (type === "PRAISE") return "default";
   return "secondary";
+}
+
+const APPT_STATUS_STYLE: Record<string, { label: string; className: string }> = {
+  SCHEDULED: { label: "Scheduled", className: "bg-muted text-muted-foreground" },
+  CONFIRMED: { label: "Confirmed", className: "bg-accent text-accent-foreground" },
+  CHECKED_IN: { label: "Checked in", className: "bg-primary/10 text-primary" },
+  IN_PROGRESS: { label: "In progress", className: "bg-primary/10 text-primary" },
+  COMPLETED: { label: "Done", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
+  CANCELLED: { label: "Cancelled", className: "bg-destructive/10 text-destructive" },
+  NO_SHOW: { label: "No show", className: "bg-destructive/10 text-destructive" },
+};
+
+function sourceLabel(source: string) {
+  switch (source) {
+    case "ONLINE":
+      return "Online";
+    case "PHONE":
+      return "Phone";
+    case "WALK_IN":
+      return "Walk-in";
+    case "STAFF":
+      return "In-house";
+    default:
+      return source;
+  }
+}
+
+function AppointmentRows({
+  items,
+  empty,
+  showDate = false,
+}: {
+  items: StaffAppointmentItem[];
+  empty: string;
+  showDate?: boolean;
+}) {
+  if (!items.length) {
+    return <p className="text-sm text-muted-foreground">{empty}</p>;
+  }
+
+  return (
+    <ul className="divide-y rounded-lg border">
+      {items.map((item) => {
+        const status = APPT_STATUS_STYLE[item.status] ?? APPT_STATUS_STYLE.SCHEDULED;
+        return (
+          <li
+            key={item.id}
+            className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-sm font-medium">{item.customerName}</p>
+                <Badge variant="secondary" className={cn("text-[10px]", status.className)}>
+                  {status.label}
+                </Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  {sourceLabel(item.source)}
+                </Badge>
+              </div>
+              <p className="truncate text-xs text-muted-foreground">{item.serviceSummary}</p>
+              {item.customerPhone ? (
+                <p className="text-xs text-muted-foreground">{item.customerPhone}</p>
+              ) : null}
+            </div>
+            <div className="shrink-0 text-left sm:text-right">
+              <p className="text-sm font-medium">
+                {showDate ? `${formatDate(item.scheduledAt)} · ` : ""}
+                {formatTime(item.scheduledAt)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {item.durationMinutes > 0 ? formatDuration(item.durationMinutes) : "—"}
+                {" · "}
+                {formatCurrency(item.priceTotal)}
+              </p>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function StaffAppointmentsPanel({ data }: { data: StaffMonthlyDetail }) {
+  const board = data.appointmentBoard;
+  const [monthTab, setMonthTab] = useState<"open" | "done" | "other">("open");
+  const monthItems =
+    monthTab === "open"
+      ? board.monthOpen
+      : monthTab === "done"
+        ? board.monthDone
+        : board.monthClosedOther;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <CalendarClock className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <CardTitle>Appointments</CardTitle>
+            <CardDescription>
+              {data.isSelfView
+                ? "Your live schedule plus this month’s history — today, tomorrow, upcoming, and completed."
+                : "Live schedule for this stylist plus this month’s history."}
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-8">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border px-3 py-2">
+            <p className="text-muted-foreground text-sm">Today</p>
+            <p className="text-lg font-semibold">{board.today.length}</p>
+          </div>
+          <div className="rounded-lg border px-3 py-2">
+            <p className="text-muted-foreground text-sm">Tomorrow</p>
+            <p className="text-lg font-semibold">{board.tomorrow.length}</p>
+          </div>
+          <div className="rounded-lg border px-3 py-2">
+            <p className="text-muted-foreground text-sm">Upcoming</p>
+            <p className="text-lg font-semibold">{board.upcoming.length}</p>
+          </div>
+        </div>
+
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">Today</h3>
+            <p className="text-xs text-muted-foreground">{formatDate(getLocalDateString())}</p>
+          </div>
+          <AppointmentRows
+            items={board.today}
+            empty="No appointments scheduled for today."
+          />
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">Tomorrow</h3>
+            <p className="text-xs text-muted-foreground">Open bookings for the next day</p>
+          </div>
+          <AppointmentRows
+            items={board.tomorrow}
+            empty="Nothing booked for tomorrow yet."
+            showDate
+          />
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">Upcoming</h3>
+            <p className="text-xs text-muted-foreground">
+              Open appointments after tomorrow (next 45 days)
+            </p>
+          </div>
+          <AppointmentRows
+            items={board.upcoming}
+            empty="No further upcoming appointments."
+            showDate
+          />
+        </section>
+
+        <section className="space-y-3 border-t pt-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">This month</h3>
+              <p className="text-xs text-muted-foreground">
+                {monthLabel(data.yearMonth)} · {data.completed} done / {data.appointments} total
+                {(data.cancelled > 0 || data.noShow > 0) &&
+                  ` · ${data.cancelled} cancelled · ${data.noShow} no-show`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  ["open", "Open", board.monthOpen.length],
+                  ["done", "Done", board.monthDone.length],
+                  ["other", "Cancelled / no-show", board.monthClosedOther.length],
+                ] as const
+              ).map(([key, label, count]) => (
+                <Button
+                  key={key}
+                  type="button"
+                  size="sm"
+                  variant={monthTab === key ? "default" : "outline"}
+                  onClick={() => setMonthTab(key)}
+                >
+                  {label} ({count})
+                </Button>
+              ))}
+            </div>
+          </div>
+          <AppointmentRows
+            items={monthItems}
+            empty={
+              monthTab === "open"
+                ? "No open appointments left this month."
+                : monthTab === "done"
+                  ? "No completed appointments this month."
+                  : "No cancelled or no-show appointments this month."
+            }
+            showDate
+          />
+        </section>
+      </CardContent>
+    </Card>
+  );
 }
 
 function AddConductForm({
@@ -142,9 +350,12 @@ function AddConductForm({
 export function StaffMonthlyDetailView({
   data,
   canManage = false,
+  canBrowseStaff = true,
 }: {
   data: StaffMonthlyDetail;
   canManage?: boolean;
+  /** False for self-service staff who cannot open the full staff directory. */
+  canBrowseStaff?: boolean;
 }) {
   const router = useRouter();
   const prev = shiftMonth(data.yearMonth, -1);
@@ -169,14 +380,25 @@ export function StaffMonthlyDetailView({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            <Link href="/staff" className="hover:underline">
-              Staff
-            </Link>
-            {" / "}
-            Monthly detail
+            {data.isSelfView ? (
+              "My dashboard"
+            ) : canBrowseStaff ? (
+              <>
+                <Link href="/staff" className="hover:underline">
+                  Staff
+                </Link>
+                {" / "}
+                Monthly detail
+              </>
+            ) : (
+              "Staff detail"
+            )}
           </p>
           <h1 className="text-2xl font-bold tracking-tight">{data.name}</h1>
-          <p className="text-muted-foreground">{monthLabel(data.yearMonth)}</p>
+          <p className="text-muted-foreground">
+            {data.jobTitle ? `${data.jobTitle} · ` : ""}
+            {monthLabel(data.yearMonth)}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -225,7 +447,7 @@ export function StaffMonthlyDetailView({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Done / booked · {data.completionRate.toFixed(0)}% completion
+            Done / total this month · {data.completionRate.toFixed(0)}% completion
             {(data.cancelled > 0 || data.noShow > 0) && (
               <span>
                 {" "}
@@ -282,6 +504,8 @@ export function StaffMonthlyDetailView({
           </CardContent>
         </Card>
       </div>
+
+      <StaffAppointmentsPanel data={data} />
 
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

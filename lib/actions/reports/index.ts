@@ -3,7 +3,7 @@ export { getSalesReport, type SalesReport, type SalesLedgerRow } from "./sales";
 export { getServicesReport, type ServicesReport } from "./services";
 export { getCustomersReport, type CustomersReport } from "./customers";
 export { getAppointmentsReport, type AppointmentsReport } from "./appointments";
-export { getStaffReport, getStaffMonthlyDetail, type StaffReport, type StaffMonthlyDetail } from "./staff";
+export { getStaffReport, getStaffMonthlyDetail, type StaffReport, type StaffMonthlyDetail, type StaffAppointmentItem, type StaffAppointmentBoard } from "./staff";
 export { getInventoryReport, type InventoryReport } from "./inventory";
 export { getInHouseUsageReport, type InHouseUsageReport } from "./in-house";
 export { getProductsReport, type ProductsReport } from "./products";

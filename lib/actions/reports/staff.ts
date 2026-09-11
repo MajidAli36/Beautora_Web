@@ -16,6 +16,8 @@ import {
   startOfLocalDay,
 } from "@/lib/dates/local";
 import { requireOrganization } from "@/lib/auth/organization";
+import { canAccessFeature } from "@/lib/auth/permissions";
+import { getLinkedStaffProfile } from "@/lib/staff/linked-profile";
 import type { StaffNoteType } from "@/lib/actions/staff-notes";
 import { roundMoney, splitEqually } from "@/lib/sales/calculate";
 
@@ -245,12 +247,44 @@ export async function getStaffReport(from?: string, to?: string): Promise<StaffR
   };
 }
 
+const OPEN_APPOINTMENT_STATUSES = new Set([
+  "SCHEDULED",
+  "CONFIRMED",
+  "CHECKED_IN",
+  "IN_PROGRESS",
+]);
+
+export type StaffAppointmentItem = {
+  id: string;
+  scheduledAt: string;
+  localDate: string;
+  status: string;
+  source: string;
+  customerName: string;
+  customerPhone: string | null;
+  serviceSummary: string;
+  durationMinutes: number;
+  priceTotal: number;
+};
+
+export type StaffAppointmentBoard = {
+  today: StaffAppointmentItem[];
+  tomorrow: StaffAppointmentItem[];
+  upcoming: StaffAppointmentItem[];
+  monthOpen: StaffAppointmentItem[];
+  monthDone: StaffAppointmentItem[];
+  monthClosedOther: StaffAppointmentItem[];
+};
+
 export type StaffMonthlyDetail = {
   staffId: string;
   name: string;
+  jobTitle: string | null;
   yearMonth: string;
   from: string;
   to: string;
+  /** True when the signed-in user is this staff profile. */
+  isSelfView: boolean;
   revenue: number;
   salesCount: number;
   customersServed: number;
@@ -259,6 +293,7 @@ export type StaffMonthlyDetail = {
   cancelled: number;
   noShow: number;
   completionRate: number;
+  appointmentBoard: StaffAppointmentBoard;
   payments: {
     id: string;
     amount: number;
@@ -303,6 +338,59 @@ export type StaffMonthlyDetail = {
     }[];
   };
 };
+
+function customerDisplayName(
+  customer: {
+    first_name?: string | null;
+    last_name?: string | null;
+  } | null
+): string {
+  if (!customer) return "Walk-in guest";
+  const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ").trim();
+  return name || "Walk-in guest";
+}
+
+function mapStaffAppointment(row: {
+  id: string;
+  scheduled_at: string;
+  status: string;
+  source: string;
+  customer: {
+    first_name: string | null;
+    last_name: string | null;
+    phone: string | null;
+  } | null;
+  services: { service_name: string; price: number; duration_minutes: number }[] | null;
+}): StaffAppointmentItem {
+  const services = row.services ?? [];
+  const durationMinutes = services.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+  const priceTotal = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+  const serviceSummary =
+    services.map((s) => s.service_name).filter(Boolean).join(" · ") || "Service";
+  return {
+    id: row.id,
+    scheduledAt: row.scheduled_at,
+    localDate: isoToLocalDateString(row.scheduled_at),
+    status: row.status,
+    source: row.source,
+    customerName: customerDisplayName(row.customer),
+    customerPhone: row.customer?.phone ?? null,
+    serviceSummary,
+    durationMinutes,
+    priceTotal: roundMoney(priceTotal),
+  };
+}
+
+function emptyAppointmentBoard(): StaffAppointmentBoard {
+  return {
+    today: [],
+    tomorrow: [],
+    upcoming: [],
+    monthOpen: [],
+    monthDone: [],
+    monthClosedOther: [],
+  };
+}
 
 function sessionDurationMinutes(checkIn: string, checkOut: string | null) {
   if (!checkOut) return null;
@@ -352,30 +440,67 @@ export async function getStaffMonthlyDetail(
   yearMonth?: string
 ): Promise<StaffMonthlyDetail | null> {
   const org = await requireOrganization();
+  const canBrowseStaff = await canAccessFeature("staff");
+  if (!canBrowseStaff) {
+    const linked = await getLinkedStaffProfile();
+    if (!linked || linked.id !== staffId) return null;
+  }
+
   const supabase = await getSupabase();
   const ym = yearMonth && /^\d{4}-\d{2}$/.test(yearMonth)
     ? yearMonth
     : getLocalDateString().slice(0, 7);
   const { from, to, start, end } = monthRange(ym);
+  const today = getLocalDateString();
+  const tomorrow = addLocalDays(today, 1);
+  const upcomingHorizon = addLocalDays(today, 45);
+  const boardEnd = endOfLocalDay(
+    to > upcomingHorizon ? to : upcomingHorizon
+  );
 
   const { data: staffRow } = await supabase
     .from("staff")
-    .select("id, full_name")
+    .select("id, full_name, job_title, email, member_id")
     .eq("organization_id", org.organizationId)
     .eq("id", staffId)
     .maybeSingle();
 
   if (!staffRow) return null;
 
-  const [{ data: appts }, { data: saleStaffRows }, { data: payments }, { data: attendanceRows }, { data: noteRows }] =
-    await Promise.all([
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userEmail = user?.email?.trim().toLowerCase() ?? "";
+  const isSelfView = Boolean(
+    user &&
+      ((staffRow.member_id && staffRow.member_id === user.id) ||
+        (staffRow.email &&
+          userEmail &&
+          staffRow.email.trim().toLowerCase() === userEmail))
+  );
+
+  const [
+    { data: apptRows },
+    { data: saleStaffRows },
+    { data: payments },
+    { data: attendanceRows },
+    { data: noteRows },
+  ] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, status")
+        .select(
+          `
+          id, status, source, scheduled_at,
+          customer:customers(first_name, last_name, phone),
+          services:appointment_services(service_name, price, duration_minutes)
+        `
+        )
         .eq("organization_id", org.organizationId)
         .eq("staff_id", staffId)
+        .is("deleted_at", null)
         .gte("scheduled_at", start.toISOString())
-        .lte("scheduled_at", end.toISOString()),
+        .lte("scheduled_at", boardEnd.toISOString())
+        .order("scheduled_at", { ascending: true }),
       supabase
         .from("sale_staff")
         .select("sale_id")
@@ -407,10 +532,67 @@ export async function getStaffMonthlyDetail(
         .order("occurred_on", { ascending: false }),
     ]);
 
-  const appointments = appts ?? [];
+  const mappedAppointments = (apptRows ?? []).map((raw) => {
+    const row = raw as unknown as {
+      id: string;
+      scheduled_at: string;
+      status: string;
+      source: string;
+      customer:
+        | {
+            first_name: string | null;
+            last_name: string | null;
+            phone: string | null;
+          }
+        | {
+            first_name: string | null;
+            last_name: string | null;
+            phone: string | null;
+          }[]
+        | null;
+      services:
+        | { service_name: string; price: number; duration_minutes: number }[]
+        | null;
+    };
+    const customer = Array.isArray(row.customer) ? row.customer[0] ?? null : row.customer;
+    return mapStaffAppointment({
+      id: row.id,
+      scheduled_at: row.scheduled_at,
+      status: row.status,
+      source: row.source,
+      customer,
+      services: row.services,
+    });
+  });
+
+  const monthAppointments = mappedAppointments.filter(
+    (a) => a.localDate >= from && a.localDate <= to
+  );
+  const appointments = monthAppointments;
   const completed = appointments.filter((a) => a.status === "COMPLETED").length;
   const cancelled = appointments.filter((a) => a.status === "CANCELLED").length;
   const noShow = appointments.filter((a) => a.status === "NO_SHOW").length;
+
+  const appointmentBoard: StaffAppointmentBoard = emptyAppointmentBoard();
+  for (const item of mappedAppointments) {
+    const open = OPEN_APPOINTMENT_STATUSES.has(item.status);
+    if (item.localDate === today) {
+      appointmentBoard.today.push(item);
+    } else if (item.localDate === tomorrow && open) {
+      appointmentBoard.tomorrow.push(item);
+    } else if (item.localDate > tomorrow && open) {
+      appointmentBoard.upcoming.push(item);
+    }
+
+    if (item.localDate >= from && item.localDate <= to) {
+      if (item.status === "COMPLETED") appointmentBoard.monthDone.push(item);
+      else if (item.status === "CANCELLED" || item.status === "NO_SHOW") {
+        appointmentBoard.monthClosedOther.push(item);
+      } else if (open) {
+        appointmentBoard.monthOpen.push(item);
+      }
+    }
+  }
 
   const multiSaleIds = [...new Set((saleStaffRows ?? []).map((r) => r.sale_id))];
 
@@ -596,9 +778,11 @@ export async function getStaffMonthlyDetail(
   return {
     staffId: staffRow.id,
     name: staffRow.full_name,
+    jobTitle: staffRow.job_title,
     yearMonth: ym,
     from,
     to,
+    isSelfView,
     revenue,
     salesCount: saleMap.size,
     customersServed: customers.size,
@@ -607,6 +791,7 @@ export async function getStaffMonthlyDetail(
     cancelled,
     noShow,
     completionRate: appointments.length ? (completed / appointments.length) * 100 : 0,
+    appointmentBoard,
     payments: paymentRows,
     paymentsTotal: paymentRows.reduce((sum, p) => sum + p.amount, 0),
     attendance: {

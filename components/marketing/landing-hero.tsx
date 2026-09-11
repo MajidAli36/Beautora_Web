@@ -46,7 +46,7 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
               Start 30 days free
             </Link>
             <Link
-              href="/#how-it-works"
+              href="/how-it-works"
               className="inline-flex h-12 items-center justify-center border border-white/35 px-7 text-sm font-medium tracking-wide text-white transition-all duration-150 hover:border-white hover:bg-white/10"
             >
               See how it works

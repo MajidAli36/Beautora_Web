@@ -18,6 +18,8 @@ type AppShellProps = {
   memberRole: MemberRole;
   navOverrides: NavPermissionsConfig;
   landingPath: string;
+  /** Linked salon staff profile dashboard for the signed-in user. */
+  myStaffHref?: string | null;
   showPlatformBilling?: boolean;
   subscriptionLocked?: boolean;
 };
@@ -31,6 +33,7 @@ export function AppShell({
   memberRole,
   navOverrides,
   landingPath,
+  myStaffHref = null,
   showPlatformBilling = false,
   subscriptionLocked = false,
 }: AppShellProps) {
@@ -43,6 +46,7 @@ export function AppShell({
           organizationName={organizationName}
           userEmail={userEmail}
           userRole={userRole}
+          myStaffHref={myStaffHref}
           showPlatformBilling={showPlatformBilling}
         />
         <SidebarInset className="flex min-h-svh flex-col bg-background">
@@ -55,6 +59,7 @@ export function AppShell({
             role={memberRole}
             overrides={navOverrides}
             landingPath={landingPath}
+            myStaffHref={myStaffHref}
             subscriptionLocked={subscriptionLocked}
           >
             <div className="app-main relative flex-1 overflow-x-hidden overscroll-x-contain p-4 sm:p-6 lg:p-8">

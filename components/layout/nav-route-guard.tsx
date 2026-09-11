@@ -10,6 +10,7 @@ type NavRouteGuardProps = {
   role: MemberRole;
   overrides: NavPermissionsConfig;
   landingPath: string;
+  myStaffHref?: string | null;
   subscriptionLocked?: boolean;
   children: React.ReactNode;
 };
@@ -18,14 +19,19 @@ export function NavRouteGuard({
   role,
   overrides,
   landingPath,
+  myStaffHref = null,
   subscriptionLocked = false,
   children,
 }: NavRouteGuardProps) {
   const pathname = usePathname();
   const router = useRouter();
   const onBilling = pathname.startsWith("/billing");
+  const onOwnStaffDashboard = Boolean(
+    myStaffHref && (pathname === myStaffHref || pathname.startsWith(`${myStaffHref}/`))
+  );
   const allowed =
     (subscriptionLocked && onBilling) ||
+    onOwnStaffDashboard ||
     canAccessPath(role, pathname, overrides);
 
   useEffect(() => {

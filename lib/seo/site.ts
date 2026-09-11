@@ -18,19 +18,26 @@ export const SITE_SEO = {
   product: SYNCOPS.name,
   builder: SYNCOPS.builder.name,
   tagline: "The operating system for modern salons",
-  titleDefault: `${SYNCOPS.name} | Salon Management Software`,
+  titleDefault: `${SYNCOPS.name} | Best Salon Software in Pakistan & Worldwide`,
   titleTemplate: `%s | ${SYNCOPS.name}`,
-  description: `Discover ${SYNCOPS.name} — salon management software by ${SYNCOPS.builder.name} for online booking, POS, staff, queue, WhatsApp, and reports. ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month per store.`,
-  shortDescription: `${SYNCOPS.name} — bookings, POS, staff & reports for modern salons. Built by ${SYNCOPS.builder.name}.`,
+  description: `${SYNCOPS.name} is salon management software by ${SYNCOPS.builder.name} for beauty businesses in Pakistan and worldwide — online booking, POS, staff, queue, WhatsApp, and reports. ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month per store. Discover and book live salons online.`,
+  shortDescription: `${SYNCOPS.name} — best salon software for booking, POS, staff & reports in Pakistan and worldwide. Built by ${SYNCOPS.builder.name}.`,
   keywords: [
     SYNCOPS.name,
     SYNCOPS.builder.name,
+    "best salon software Pakistan",
+    "best salon software",
+    "best salon management software",
     "salon software Pakistan",
     "salon POS Pakistan",
     "salon management system",
-    "online salon booking",
+    "online salon booking Pakistan",
     "beauty salon software",
+    "best beauty salon software",
     "barbershop POS",
+    "book salon online Pakistan",
+    "best salon in Pakistan",
+    "salon software worldwide",
     "JazzCash salon subscription",
   ],
   locale: "en_PK",
@@ -40,7 +47,11 @@ export const SITE_SEO = {
 export const SITE_FAQ = [
   {
     question: "What is Beautora?",
-    answer: `Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — a product of SyncOps (${SYNCOPS.builder.domain}).`,
+    answer: `Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — a product of SyncOps (${SYNCOPS.builder.domain}). It helps salons in Pakistan and worldwide run modern beauty businesses.`,
+  },
+  {
+    question: "Is Beautora good for salons in Pakistan?",
+    answer: `Yes. Beautora is Pakistan-ready with JazzCash billing, Pakistan timezone booking, PKR pricing, and a public stores directory so guests can find and book salons online.`,
   },
   {
     question: "Who builds Beautora?",
@@ -57,7 +68,11 @@ export const SITE_FAQ = [
   {
     question: "Can customers book online?",
     answer:
-      "Yes. Each store gets a public booking page and optional public store listing so guests can book services and stylists online.",
+      "Yes. Each store gets a public booking page and optional public store listing so guests searching for salons in Pakistan or elsewhere can book services and stylists online.",
+  },
+  {
+    question: "Where can I find salons on Beautora?",
+    answer: `Browse live salons on beautora.app/stores, filter by city, open a store page, and book online.`,
   },
 ] as const;
 
@@ -300,6 +315,9 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         alternateName: [
           `${SYNCOPS.name} by ${SYNCOPS.builder.name}`,
           `${SYNCOPS.name} Salon Platform`,
+          "Best salon software Pakistan",
+          "Salon management software",
+          "Beauty salon POS software",
         ],
         applicationCategory: "BusinessApplication",
         applicationSubCategory: "Salon management · POS · Online booking",
@@ -312,6 +330,13 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         publisher: { "@id": syncOpsOrgId },
         creator: { "@id": syncOpsOrgId },
         brand: { "@id": beautoraOrgId },
+        audience: {
+          "@type": "Audience",
+          geographicArea: [
+            { "@type": "Country", name: "Pakistan" },
+            { "@type": "AdministrativeArea", name: "Worldwide" },
+          ],
+        },
         offers: {
           "@type": "Offer",
           url: absoluteUrl("/pricing"),
@@ -322,12 +347,19 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
           seller: { "@id": syncOpsOrgId },
         },
         featureList: [
-          "Online booking",
-          "POS & sales",
-          "Staff & attendance",
+          "Online salon booking",
+          "Salon POS and sales",
+          "Staff and attendance",
           "Queue management",
           "WhatsApp updates",
-          "Reports & inventory",
+          "Inventory and reports",
+          "Public store directory",
+        ],
+        sameAs: [
+          absoluteUrl("/salon-software"),
+          absoluteUrl("/platform"),
+          absoluteUrl("/features"),
+          absoluteUrl("/stores"),
         ],
       },
       {

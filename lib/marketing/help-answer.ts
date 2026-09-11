@@ -143,7 +143,7 @@ const FALLBACK: HelpChatReply = {
   articleId: null,
   title: null,
   links: [
-    { label: "All features", href: "/#platform" },
+    { label: "All features", href: "/platform" },
     { label: "Pricing", href: "/pricing" },
     { label: "Start free", href: "/signup" },
     { label: "Contact", href: "/contact" },

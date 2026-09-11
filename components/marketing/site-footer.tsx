@@ -33,6 +33,21 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
+              <Link href="/platform" className="transition-colors hover:text-white">
+                Platform
+              </Link>
+            </li>
+            <li>
+              <Link href="/how-it-works" className="transition-colors hover:text-white">
+                How it works
+              </Link>
+            </li>
+            <li>
+              <Link href="/salon-software" className="transition-colors hover:text-white">
+                Salon software
+              </Link>
+            </li>
+            <li>
               <Link href="/pricing" className="transition-colors hover:text-white">
                 Pricing
               </Link>

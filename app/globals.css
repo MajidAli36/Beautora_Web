@@ -191,6 +191,12 @@
     }
   }
 
+  @media (min-width: 1280px) {
+    .marketing-site {
+      --m-header: 4rem;
+    }
+  }
+
   @keyframes m-topbar-fade {
     from {
       opacity: 0;

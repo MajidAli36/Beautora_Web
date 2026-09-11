@@ -10,14 +10,15 @@ import { SYNCOPS } from "@/lib/print/syncops";
 export const revalidate = 3600;
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Features",
-  description: `${SYNCOPS.name} features: online booking, POS, staff & attendance, queue, WhatsApp, inventory, reports, and finances — salon software by ${SYNCOPS.builder.name}.`,
+  title: "Salon Software Features",
+  description: `${SYNCOPS.name} features for the best salon software experience: online booking, POS, staff & attendance, queue, WhatsApp, inventory, and reports — for salons in Pakistan and worldwide.`,
   path: "/features",
   keywords: [
     "Beautora features",
     "salon POS features",
     "online salon booking software",
     "salon management features",
+    "best salon software features",
   ],
 });
 
