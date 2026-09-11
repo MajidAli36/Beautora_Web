@@ -69,7 +69,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     answer: `Beautora includes: Dashboard · Customers · Appointments (in-house + online + deposit approvals) · Queue (walk-in tokens) · POS · Sales (amend / void / refund / dues) · Services & packages · Products (retail) · In-house stock (cream/ml recipes) · Chairs · Staff & roles · Attendance (fingerprint kiosk) · Devices (printer, drawer, token, attendance) · Reports · Finances (expenses, staff pay, COGS, advances) · WhatsApp templates · Feedback ratings · Billing (trial / JazzCash) · Settings (hours, payment accounts, public listing, audit). Guests book on your public store page. Native mobile/desktop apps are Coming Soon — the web app is live today.`,
     links: [
       { label: "Platform modules", href: "/#platform" },
-      { label: "Pricing", href: "/#pricing" },
+      { label: "Pricing", href: "/pricing" },
       { label: "Start free", href: "/signup" },
     ],
   },
@@ -119,7 +119,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer: `New stores get ${SUBSCRIPTION.trialDays} days free — no card required. Then ${CURRENCY} ${PRICE} per store / month via JazzCash (${SUBSCRIPTION.jazzcashDisplay}). SyncOps can also grant lifetime access to specific stores (no monthly fee) from Platform admin — and can remove it anytime. After a normal paid period ends there is a short ${SUBSCRIPTION.graceDays}-day grace before lock.`,
     links: [
-      { label: "Pricing", href: "/#pricing" },
+      { label: "Pricing", href: "/pricing" },
       { label: "Start free", href: "/signup" },
     ],
   },
@@ -228,7 +228,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     answer:
       "Advances can be taken at online booking (with proof) or at reception (cash/card/other). Pending proofs await approval. Approved advances apply as credit at POS checkout. You can refund/revert advances when needed; cash advances can open the cash drawer.",
-    links: [{ label: "Pricing", href: "/#pricing" }],
+    links: [{ label: "Pricing", href: "/pricing" }],
   },
   {
     id: "queue",
@@ -614,7 +614,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "another salon",
     ],
     answer: `Beautora bills ${CURRENCY} ${PRICE} per store / month after trial. Each salon organization has its own catalog, team, bookings, and finances. Open another store as a separate Beautora organization if you run multiple locations.`,
-    links: [{ label: "Pricing", href: "/#pricing" }],
+    links: [{ label: "Pricing", href: "/pricing" }],
   },
   {
     id: "languages-currency",

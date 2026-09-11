@@ -25,30 +25,64 @@ export const SITE_SEO = {
   keywords: [
     SYNCOPS.name,
     SYNCOPS.builder.name,
-    SYNCOPS.domain,
-    SYNCOPS.builder.domain,
-    "Beautora by SyncOps",
-    "SyncOps Beautora",
-    "salon software",
-    "salon POS",
+    "salon software Pakistan",
     "salon POS Pakistan",
     "salon management system",
     "online salon booking",
     "beauty salon software",
     "barbershop POS",
-    "salon WhatsApp booking",
-    "multi store salon software",
     "JazzCash salon subscription",
-    "Majid Ali SyncOps",
-    "SyncOps tech",
   ],
   locale: "en_PK",
+  htmlLang: "en-PK",
 } as const;
+
+export const SITE_FAQ = [
+  {
+    question: "What is Beautora?",
+    answer: `Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — a product of SyncOps (${SYNCOPS.builder.domain}).`,
+  },
+  {
+    question: "Who builds Beautora?",
+    answer: `Beautora is built by SyncOps (${SYNCOPS.builder.domain}), founded by ${SYNCOPS.ceo.name}. Official studio: ${SYNCOPS.builder.url}.`,
+  },
+  {
+    question: "What is SyncOps?",
+    answer: SYNCOPS.builder.seoDescription,
+  },
+  {
+    question: "How much does Beautora cost?",
+    answer: `First ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month via JazzCash per store.`,
+  },
+  {
+    question: "Can customers book online?",
+    answer:
+      "Yes. Each store gets a public booking page and optional public store listing so guests can book services and stylists online.",
+  },
+] as const;
 
 export function absoluteUrl(path = "/"): string {
   const base = getSiteUrl();
   if (!path || path === "/") return base;
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export function cityToSlug(city: string): string {
+  return city
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function slugToCityLabel(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function buildPageMetadata(input: {
@@ -57,10 +91,16 @@ export function buildPageMetadata(input: {
   path: string;
   keywords?: string[];
   noIndex?: boolean;
+  image?: string | null;
 }): Metadata {
   const url = absoluteUrl(input.path);
   const title = input.title;
   const description = input.description;
+  const image = input.image
+    ? input.image.startsWith("http")
+      ? input.image
+      : absoluteUrl(input.image)
+    : absoluteUrl("/opengraph-image");
 
   return {
     title,
@@ -76,11 +116,13 @@ export function buildPageMetadata(input: {
       siteName: `${SITE_SEO.product} · ${SITE_SEO.builder}`,
       title,
       description,
+      images: [{ url: image }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [image],
     },
     robots: input.noIndex
       ? { index: false, follow: false }
@@ -100,6 +142,7 @@ export function buildPageMetadata(input: {
 
 export function buildRootMetadata(): Metadata {
   const siteUrl = getSiteUrl();
+  const verificationToken = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim();
 
   return {
     metadataBase: new URL(siteUrl),
@@ -133,11 +176,13 @@ export function buildRootMetadata(): Metadata {
       siteName: `${SITE_SEO.product} · ${SITE_SEO.builder}`,
       title: SITE_SEO.titleDefault,
       description: SITE_SEO.description,
+      images: [{ url: absoluteUrl("/opengraph-image") }],
     },
     twitter: {
       card: "summary_large_image",
       title: SITE_SEO.titleDefault,
       description: SITE_SEO.description,
+      images: [absoluteUrl("/opengraph-image")],
     },
     robots: {
       index: true,
@@ -150,6 +195,11 @@ export function buildRootMetadata(): Metadata {
         "max-video-preview": -1,
       },
     },
+    verification: verificationToken
+      ? {
+          google: verificationToken,
+        }
+      : undefined,
     other: {
       "application-name": `${SITE_SEO.product} by ${SITE_SEO.builder}`,
       "msapplication-TileColor": "#0f172a",
@@ -161,13 +211,14 @@ export function buildRootMetadata(): Metadata {
   };
 }
 
-/** JSON-LD graph: Beautora product + SyncOps organization (SEO for both brands). */
+/** Core site graph — FAQ is intentionally separate (only on FAQ-visible pages). */
 export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
   const syncOpsOrgId = `${SYNCOPS.builder.url}/#organization`;
   const beautoraOrgId = `${siteUrl}/#organization`;
   const softwareId = `${siteUrl}/#software`;
   const websiteId = `${siteUrl}/#website`;
   const ceoId = `${siteUrl}/ceo#person`;
+  const ogImage = absoluteUrl("/opengraph-image");
 
   return {
     "@context": "https://schema.org",
@@ -186,7 +237,12 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         publisher: { "@id": syncOpsOrgId },
         creator: { "@id": syncOpsOrgId },
         about: { "@id": beautoraOrgId },
-        inLanguage: "en-PK",
+        inLanguage: SITE_SEO.htmlLang,
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${siteUrl}/stores?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
       },
       {
         "@type": "Organization",
@@ -224,6 +280,7 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         telephone: SYNCOPS.phone,
         description: SYNCOPS.seoDescription,
         parentOrganization: { "@id": syncOpsOrgId },
+        logo: ogImage,
         sameAs: [
           SYNCOPS.url,
           absoluteUrl("/syncops"),
@@ -248,7 +305,7 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         applicationSubCategory: "Salon management · POS · Online booking",
         operatingSystem: "Web",
         url: siteUrl,
-        image: absoluteUrl(SYNCOPS.ceo.photo),
+        image: ogImage,
         description: SITE_SEO.description,
         author: { "@id": syncOpsOrgId },
         provider: { "@id": syncOpsOrgId },
@@ -257,11 +314,11 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         brand: { "@id": beautoraOrgId },
         offers: {
           "@type": "Offer",
-          url: absoluteUrl("/#pricing"),
+          url: absoluteUrl("/pricing"),
           priceCurrency: "PKR",
           price: String(SUBSCRIPTION.monthlyAmountPkr),
           availability: "https://schema.org/InStock",
-          description: `1 month free trial, then Rs ${PRICE}/month via JazzCash`,
+          description: `${SUBSCRIPTION.trialDays} days free trial, then Rs ${PRICE}/month via JazzCash`,
           seller: { "@id": syncOpsOrgId },
         },
         featureList: [
@@ -293,44 +350,25 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         worksFor: { "@id": syncOpsOrgId },
         description: `${SYNCOPS.ceo.name}, ${SYNCOPS.ceo.role} of ${SYNCOPS.builder.name} — makers of ${SYNCOPS.name}.`,
       },
-      {
-        "@type": "FAQPage",
-        "@id": `${siteUrl}/#faq`,
-        mainEntity: [
-          {
-            "@type": "Question",
-            name: "What is Beautora?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: `Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — a product of SyncOps (${SYNCOPS.builder.domain}).`,
-            },
-          },
-          {
-            "@type": "Question",
-            name: "Who builds Beautora?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: `Beautora is built by SyncOps (${SYNCOPS.builder.domain}), founded by ${SYNCOPS.ceo.name}. Official studio: ${SYNCOPS.builder.url}.`,
-            },
-          },
-          {
-            "@type": "Question",
-            name: "What is SyncOps?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: SYNCOPS.builder.seoDescription,
-            },
-          },
-          {
-            "@type": "Question",
-            name: "How much does Beautora cost?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: `First month free, then Rs ${PRICE}/month via JazzCash per store.`,
-            },
-          },
-        ],
-      },
     ],
+  };
+}
+
+export function buildFaqJsonLd(
+  faqs: readonly { question: string; answer: string }[] = SITE_FAQ,
+  pagePath = "/"
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "@id": `${absoluteUrl(pagePath)}#faq`,
+    mainEntity: faqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
   };
 }

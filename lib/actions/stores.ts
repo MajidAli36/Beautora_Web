@@ -139,6 +139,23 @@ export async function listPublicStoreCities(): Promise<string[]> {
   return [...set].sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
 }
 
+/** Stores in a city, matching either display name or URL slug. */
+export async function listPublicStoresByCitySlug(citySlug: string): Promise<{
+  cityLabel: string;
+  stores: PublicStore[];
+} | null> {
+  const { cityToSlug } = await import("@/lib/seo/site");
+  const stores = await listPublicStores();
+  const matched = stores.filter((s) => {
+    const city = s.city?.trim();
+    if (!city) return false;
+    return cityToSlug(city) === citySlug;
+  });
+  if (!matched.length) return null;
+  const cityLabel = matched[0].city!.trim();
+  return { cityLabel, stores: matched };
+}
+
 export async function getPublicStoreBySlug(slug: string): Promise<PublicStoreDetail | null> {
   const admin = tryCreateAdminClient();
   if (!admin) return null;

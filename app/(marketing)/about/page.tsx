@@ -123,7 +123,7 @@ export default function AboutPage() {
           <p>
             Start with {SUBSCRIPTION.trialDays} days free, then {PRICE} per store per month via
             JazzCash. See current pricing on the{" "}
-            <Link href="/#pricing">homepage pricing section</Link>.
+            <Link href="/pricing">pricing page</Link>.
           </p>
         </section>
 

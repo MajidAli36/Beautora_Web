@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
-import { listPublicStores } from "@/lib/actions/stores";
-import { absoluteUrl, getSiteUrl } from "@/lib/seo/site";
+import { listPublicStores, listPublicStoreCities } from "@/lib/actions/stores";
+import { absoluteUrl, cityToSlug, getSiteUrl } from "@/lib/seo/site";
 
 /** Indexable public URLs only — no auth, dashboard, or noindex pages. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -14,6 +14,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "daily",
       priority: 0.9,
+    },
+    {
+      url: absoluteUrl("/pricing"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: absoluteUrl("/features"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.85,
     },
     {
       url: absoluteUrl("/book"),
@@ -78,8 +90,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   let storeRoutes: MetadataRoute.Sitemap = [];
+  let cityRoutes: MetadataRoute.Sitemap = [];
   try {
-    const stores = await listPublicStores();
+    const [stores, cities] = await Promise.all([
+      listPublicStores(),
+      listPublicStoreCities(),
+    ]);
     storeRoutes = stores.flatMap((store) => [
       {
         url: absoluteUrl(`/stores/${store.slug}`),
@@ -94,9 +110,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.75,
       },
     ]);
+    cityRoutes = cities.map((city) => ({
+      url: absoluteUrl(`/stores/in/${cityToSlug(city)}`),
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    }));
   } catch {
     // Sitemap still ships static routes if store listing fails
   }
 
-  return [...staticRoutes, ...storeRoutes];
+  return [...staticRoutes, ...cityRoutes, ...storeRoutes];
 }

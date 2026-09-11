@@ -1,20 +1,21 @@
-import { listPublicStores } from "@/lib/actions/stores";
+import { listPublicStores, listPublicStoreCities } from "@/lib/actions/stores";
 import { StoresDirectory } from "@/components/marketing/stores-directory";
-import { buildPageMetadata } from "@/lib/seo/site";
+import { buildPageMetadata, cityToSlug } from "@/lib/seo/site";
 import type { Metadata } from "next";
+import Link from "next/link";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Stores",
   description:
     "Browse live salons on Beautora by SyncOps — search by name or city, view services, and book online.",
   path: "/stores",
-  keywords: ["Beautora stores", "SyncOps salon directory"],
+  keywords: ["Beautora stores", "SyncOps salon directory", "book salon online Pakistan"],
 });
 
 export default async function StoresPage() {
-  const stores = await listPublicStores();
+  const [stores, cities] = await Promise.all([listPublicStores(), listPublicStoreCities()]);
 
   return (
     <div className="pt-[var(--m-chrome)]">
@@ -30,6 +31,19 @@ export default async function StoresPage() {
             Search live salons by name or city. Open a store for the full menu, team, and
             booking.
           </p>
+          {cities.length > 0 ? (
+            <div className="mt-8 flex flex-wrap gap-2">
+              {cities.map((city) => (
+                <Link
+                  key={city}
+                  href={`/stores/in/${cityToSlug(city)}`}
+                  className="border border-[var(--m-line)] bg-white px-3 py-1.5 text-sm text-[var(--m-ink)] transition-colors hover:border-[var(--m-ink)]"
+                >
+                  {city}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 

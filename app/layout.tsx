@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { SiteJsonLd } from "@/components/seo/site-json-ld";
+import { AnalyticsScripts } from "@/components/seo/analytics";
 import { AppToaster } from "@/components/ui/app-toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { buildRootMetadata } from "@/lib/seo/site";
+import { buildRootMetadata, SITE_SEO } from "@/lib/seo/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -26,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang={SITE_SEO.htmlLang}
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
@@ -41,6 +42,7 @@ export default function RootLayout({
           {children}
           <AppToaster />
         </TooltipProvider>
+        <AnalyticsScripts />
       </body>
     </html>
   );

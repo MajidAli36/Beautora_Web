@@ -6,9 +6,11 @@ import { getPublicStoreBySlug } from "@/lib/actions/stores";
 import { formatCurrency, formatDuration } from "@/lib/format";
 import { resolveStorePublicContact } from "@/lib/marketing/store-contact";
 import { buildPageMetadata } from "@/lib/seo/site";
+import { localBusinessFromDetail } from "@/lib/seo/local-business";
+import { JsonLd } from "@/components/seo/json-ld";
 import { SYNCOPS } from "@/lib/print/syncops";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type StoreDetailPageProps = { params: Promise<{ slug: string }> };
 
@@ -29,19 +31,20 @@ export async function generateMetadata({
     store.highlightServices.length > 0
       ? store.highlightServices.join(" · ")
       : `Book online at ${store.name}`;
+  const cityBit = store.city?.trim() ? ` in ${store.city.trim()}` : "";
   const ogImage = store.coverUrl ?? store.visual.coverImage;
-  const base = buildPageMetadata({
-    title: store.name,
-    description: `${blurb}. Book on ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
+  return buildPageMetadata({
+    title: store.city?.trim() ? `${store.name} · ${store.city.trim()}` : store.name,
+    description: `${blurb}. Book ${store.name}${cityBit} on ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
     path: `/stores/${slug}`,
+    keywords: [
+      store.name,
+      store.city?.trim() || "",
+      "salon booking",
+      "book salon online",
+    ].filter(Boolean),
+    image: ogImage,
   });
-  return {
-    ...base,
-    openGraph: {
-      ...base.openGraph,
-      images: [{ url: ogImage }],
-    },
-  };
 }
 
 export default async function StoreDetailPage({ params }: StoreDetailPageProps) {
@@ -59,6 +62,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
   return (
     <div className="bg-[var(--m-paper)]">
+      <JsonLd data={localBusinessFromDetail(store)} />
       <section className="relative min-h-[58vh] overflow-hidden bg-[var(--m-ink)] text-white sm:min-h-[68vh]">
         {store.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

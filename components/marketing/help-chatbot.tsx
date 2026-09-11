@@ -21,7 +21,7 @@ const WELCOME: ChatMessage = {
   text: "Hi — I’m the Beautora assistant. Ask anything about the platform: pricing, booking, POS, sales, staff, inventory, reports, finances, WhatsApp, billing, and more.",
   links: [
     { label: "All features", href: "/#platform" },
-    { label: "Pricing", href: "/#pricing" },
+    { label: "Pricing", href: "/pricing" },
     { label: "Start free", href: "/signup" },
   ],
 };

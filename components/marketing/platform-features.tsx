@@ -104,7 +104,7 @@ export function PlatformFeatures() {
             Start 30 days free
           </Link>
           <Link
-            href="/#pricing"
+            href="/pricing"
             className="inline-flex h-12 items-center border border-[var(--m-ink)] px-7 text-sm font-medium tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
           >
             View pricing

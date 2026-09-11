@@ -28,12 +28,12 @@ export function SiteFooter() {
           </p>
           <ul className="mt-4 space-y-2.5 text-sm text-white/70">
             <li>
-              <Link href="/#platform" className="transition-colors hover:text-white">
-                Platform
+              <Link href="/features" className="transition-colors hover:text-white">
+                Features
               </Link>
             </li>
             <li>
-              <Link href="/#pricing" className="transition-colors hover:text-white">
+              <Link href="/pricing" className="transition-colors hover:text-white">
                 Pricing
               </Link>
             </li>

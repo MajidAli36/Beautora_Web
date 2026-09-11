@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { label: "How it works", href: "/#how-it-works", hash: "how-it-works" },
   { label: "Platform", href: "/#platform", hash: "platform" },
-  { label: "Pricing", href: "/#pricing", hash: "pricing" },
+  { label: "Features", href: "/features" },
+  { label: "Pricing", href: "/pricing" },
   { label: "Stores", href: "/stores" },
   { label: "Apps", href: "/apps" },
   { label: "About", href: "/about" },
