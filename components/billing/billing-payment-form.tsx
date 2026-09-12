@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check, Copy } from "lucide-react";
 import { notify } from "@/lib/toast";
 import { submitSubscriptionPayment } from "@/lib/actions/billing";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
+import {
+  formatPlanAmount,
+  type BillingPlan,
+} from "@/lib/billing/subscription";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,18 +16,33 @@ import { Textarea } from "@/components/ui/textarea";
 
 const MAX_INVOICE_BYTES = 5 * 1024 * 1024;
 
-export function BillingPaymentForm() {
+export function BillingPaymentForm({ plan }: { plan: BillingPlan }) {
   const router = useRouter();
   const [transactionRef, setTransactionRef] = useState("");
   const [payerName, setPayerName] = useState("");
   const [notes, setNotes] = useState("");
   const [invoice, setInvoice] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const amountLabel = formatPlanAmount(plan);
+  const isUsdt = plan.method === "usdt_bep20";
+
+  async function copyDestination() {
+    try {
+      await navigator.clipboard.writeText(plan.destination);
+      setCopied(true);
+      notify.success(isUsdt ? "USDT wallet copied" : "JazzCash number copied");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      notify.error("Could not copy — select and copy manually");
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!invoice) {
-      notify.error("Upload your JazzCash invoice / payment screenshot");
+      notify.error("Upload your payment screenshot / proof");
       return;
     }
     if (invoice.size > MAX_INVOICE_BYTES) {
@@ -56,31 +75,46 @@ export function BillingPaymentForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-lg border bg-muted/30 p-4 text-sm">
         <p className="font-semibold">
-          Send {SUBSCRIPTION.currencyLabel}{" "}
-          {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")} via JazzCash
+          Send {amountLabel} via {isUsdt ? "USDT" : "JazzCash"}
         </p>
-        <p className="mt-1 text-muted-foreground">
-          Number:{" "}
-          <a
-            href={`tel:${SUBSCRIPTION.jazzcashNumber}`}
-            className="font-semibold text-foreground underline-offset-2 hover:underline"
+        {plan.networkLabel ? (
+          <p className="mt-1 text-xs font-medium text-muted-foreground">{plan.networkLabel}</p>
+        ) : null}
+        <div className="mt-2 flex flex-wrap items-start gap-2">
+          <p className="min-w-0 flex-1 break-all text-muted-foreground">
+            {isUsdt ? "Wallet" : "Number"}:{" "}
+            <span className="font-semibold text-foreground">{plan.destinationDisplay}</span>
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => void copyDestination()}
           >
-            {SUBSCRIPTION.jazzcashDisplay}
-          </a>
-        </p>
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+        {isUsdt ? (
+          <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
+            Send only USDT on BNB Smart Chain (BEP-20). Wrong network can lose funds.
+          </p>
+        ) : null}
         <p className="mt-2 text-xs text-muted-foreground">
-          After sending, enter the JazzCash transaction ID and upload the receipt screenshot
-          below. A Beautora admin will approve and unlock your store for 30 days.
+          After sending, enter the {isUsdt ? "transaction hash" : "JazzCash transaction ID"} and
+          upload the receipt screenshot below. A Beautora admin will approve and unlock your store
+          for 30 days.
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="txn">JazzCash transaction / reference ID</Label>
+        <Label htmlFor="txn">{plan.refLabel}</Label>
         <Input
           id="txn"
           value={transactionRef}
           onChange={(e) => setTransactionRef(e.target.value)}
-          placeholder="e.g. 1234567890"
+          placeholder={plan.refPlaceholder}
           required
         />
       </div>
@@ -109,9 +143,7 @@ export function BillingPaymentForm() {
           }}
           className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
         />
-        <p className="text-xs text-muted-foreground">
-          JPG, PNG, WebP, or PDF · max 5 MB. Screenshot of JazzCash confirmation preferred.
-        </p>
+        <p className="text-xs text-muted-foreground">{plan.proofHint}</p>
       </div>
 
       <div className="space-y-2">
@@ -120,7 +152,7 @@ export function BillingPaymentForm() {
           id="payer"
           value={payerName}
           onChange={(e) => setPayerName(e.target.value)}
-          placeholder="Name on JazzCash"
+          placeholder={isUsdt ? "Name or wallet label" : "Name on JazzCash"}
         />
       </div>
       <div className="space-y-2">

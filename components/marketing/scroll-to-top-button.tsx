@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUp } from "lucide-react";
 import { scrollMarketingToTop } from "@/components/marketing/marketing-scroll-manager";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +10,27 @@ type ScrollToTopButtonProps = {
   threshold?: number;
 };
 
+/** Reliable up-chevron — avoids Lucide icon glitches on the marketing chrome. */
+function UpArrowIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <path
+        d="M12 19V5M12 5l-6 6M12 5l6 6"
+        stroke="currentColor"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ScrollToTopButton({
   className,
   threshold = 280,
@@ -19,7 +39,12 @@ export function ScrollToTopButton({
 
   useEffect(() => {
     function onScroll() {
-      setVisible(window.scrollY > threshold);
+      const y =
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+      setVisible(y > threshold);
     }
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -38,17 +63,20 @@ export function ScrollToTopButton({
       type="button"
       onClick={scrollTop}
       aria-label="Back to top"
+      title="Back to top"
       className={cn(
-        "fixed z-50 inline-flex size-11 items-center justify-center rounded-full border border-[var(--m-line)] bg-[var(--m-ink)] text-[var(--m-paper)] shadow-lg transition-all duration-200",
-        "bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-[calc(5.75rem+env(safe-area-inset-right,0px))]",
-        "hover:bg-[var(--m-ink-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-accent)] focus-visible:ring-offset-2",
+        "fixed z-[60] inline-flex size-12 items-center justify-center rounded-full",
+        "border border-white/20 bg-[var(--m-ink)] text-white shadow-[0_10px_30px_rgba(6,33,29,0.35)]",
+        "bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-[calc(6.5rem+env(safe-area-inset-right,0px))]",
+        "transition-all duration-200 hover:bg-[var(--m-ink-soft)] hover:scale-105",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-accent)] focus-visible:ring-offset-2",
         visible
           ? "pointer-events-auto translate-y-0 opacity-100"
-          : "pointer-events-none translate-y-2 opacity-0",
+          : "pointer-events-none translate-y-3 opacity-0",
         className
       )}
     >
-      <ArrowUp className="size-5" aria-hidden />
+      <UpArrowIcon className="size-5 shrink-0" />
     </button>
   );
 }

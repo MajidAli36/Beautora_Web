@@ -6,6 +6,7 @@ export const EmailType = {
   PasswordReset: "password_reset",
   SubscriptionActivated: "subscription_activated",
   SubscriptionDeactivated: "subscription_deactivated",
+  PlatformPaymentSubmitted: "platform_payment_submitted",
   TeamInvite: "team_invite",
 } as const;
 

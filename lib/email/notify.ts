@@ -5,6 +5,7 @@ import {
   partnerStatusEmail,
   partnerWelcomeVerifyEmail,
   passwordResetEmail,
+  platformPaymentSubmittedEmail,
   salonWelcomeVerifyEmail,
   subscriptionActivatedEmail,
   subscriptionDeactivatedEmail,
@@ -12,7 +13,13 @@ import {
 } from "@/lib/email/templates";
 import { EmailType } from "@/lib/email/types";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
+import {
+  formatPlanAmount,
+  type BillingPlan,
+  SUBSCRIPTION,
+} from "@/lib/billing/subscription";
+import { PLATFORM_HARDCODED_ADMIN } from "@/lib/platform/admin";
+import { isPlatformAdminEmail } from "@/lib/billing/subscription";
 
 /** Fire-and-forget safe: never throws. */
 export async function sendSalonSignupVerificationEmail(input: {
@@ -177,6 +184,7 @@ export async function sendSubscriptionActivatedEmail(input: {
   organizationId: string;
   paymentId: string;
   amount: number;
+  amountLabel?: string;
   renewsAt: string;
 }) {
   const owner = await getOrganizationOwnerContact(input.organizationId);
@@ -187,7 +195,9 @@ export async function sendSubscriptionActivatedEmail(input: {
     return { ok: false as const, error: "No owner email", skipped: true };
   }
 
-  const amountLabel = `${SUBSCRIPTION.currencyLabel} ${Number(input.amount).toLocaleString("en-PK")}`;
+  const amountLabel =
+    input.amountLabel ??
+    `${SUBSCRIPTION.currencyLabel} ${Number(input.amount).toLocaleString("en-PK")}`;
   const content = subscriptionActivatedEmail({
     name: owner.name,
     storeName: owner.storeName,
@@ -247,6 +257,61 @@ export async function sendSubscriptionDeactivatedEmail(input: {
     type: EmailType.SubscriptionDeactivated,
     idempotencyKey: `sub-deactivated:${input.eventKey}`,
   });
+}
+
+function platformAdminNotifyEmails(): string[] {
+  const set = new Set<string>();
+  set.add(PLATFORM_HARDCODED_ADMIN.email.toLowerCase());
+  const raw = process.env.BEAUTORA_PLATFORM_ADMIN_EMAILS ?? "";
+  for (const e of raw.split(",")) {
+    const n = e.trim().toLowerCase();
+    if (n && isPlatformAdminEmail(n)) set.add(n);
+  }
+  return [...set];
+}
+
+/** Email SyncOps when a store submits JazzCash or USDT payment proof. */
+export async function sendPlatformPaymentSubmittedEmail(input: {
+  organizationId: string;
+  storeName: string;
+  paymentId: string;
+  plan: BillingPlan;
+  transactionRef: string;
+}) {
+  const recipients = platformAdminNotifyEmails();
+  if (recipients.length === 0) {
+    return { ok: false as const, error: "No platform admin email", skipped: true };
+  }
+
+  const methodLabel =
+    input.plan.method === "usdt_bep20"
+      ? "USDT (BEP-20)"
+      : "JazzCash";
+  const content = platformPaymentSubmittedEmail({
+    storeName: input.storeName,
+    amountLabel: formatPlanAmount(input.plan),
+    methodLabel,
+    destination: input.plan.destinationDisplay,
+    transactionRef: input.transactionRef,
+    platformUrl: `${getEmailLinkBaseUrl()}/platform`,
+  });
+
+  const results = await Promise.all(
+    recipients.map((to) =>
+      sendTransactionalEmail({
+        to,
+        subject: content.subject,
+        html: content.html,
+        text: content.text,
+        type: EmailType.PlatformPaymentSubmitted,
+        idempotencyKey: `platform-payment:${input.paymentId}:${to}`,
+      })
+    )
+  );
+
+  const failed = results.find((r) => !r.ok);
+  if (failed && !failed.ok) return failed;
+  return { ok: true as const };
 }
 
 async function getOrganizationOwnerContact(organizationId: string): Promise<{

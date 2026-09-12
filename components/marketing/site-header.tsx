@@ -5,21 +5,25 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { scrollMarketingToTop } from "@/components/marketing/marketing-scroll-manager";
+import { BeautoraWordmark } from "@/components/brand/beautora-logo";
 import { SiteTopBar } from "@/components/marketing/site-top-bar";
-import { SYNCOPS } from "@/lib/print/syncops";
 import { cn } from "@/lib/utils";
 
 /** Every item is a real indexable page — no hash-only destinations. */
 const PRIMARY_NAV = [
+  { label: "Product", href: "/salon-management-software" },
   { label: "Features", href: "/features" },
-  { label: "Platform", href: "/salon-platform" },
   { label: "Pricing", href: "/pricing" },
   { label: "Stores", href: "/stores" },
 ] as const;
 
 const MORE_NAV = [
+  { label: "Booking", href: "/salon-booking-software" },
+  { label: "POS", href: "/salon-pos" },
+  { label: "CRM", href: "/salon-crm" },
   { label: "How it works", href: "/how-it-works" },
-  { label: "Salon software", href: "/salon-software" },
+  { label: "Blog", href: "/blog" },
+  { label: "Tools", href: "/tools" },
   { label: "About", href: "/about" },
   { label: "Apps", href: "/apps", badge: "Soon" },
   { label: "Partner", href: "/partner" },
@@ -30,14 +34,18 @@ const MOBILE_SECTIONS = [
     group: "Product",
     items: [
       ...PRIMARY_NAV,
+      { label: "Booking", href: "/salon-booking-software" },
+      { label: "POS", href: "/salon-pos" },
+      { label: "CRM", href: "/salon-crm" },
       { label: "How it works", href: "/how-it-works" },
-      { label: "Salon software", href: "/salon-software" },
       { label: "Apps", href: "/apps", badge: "Soon" },
     ],
   },
   {
-    group: "Company",
+    group: "Learn",
     items: [
+      { label: "Blog", href: "/blog" },
+      { label: "Tools", href: "/tools" },
       { label: "About", href: "/about" },
       { label: "Partner", href: "/partner" },
       { label: "Contact", href: "/contact" },
@@ -50,16 +58,7 @@ export function SiteHeader() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
-  const isHome = pathname === "/";
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 16);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     setOpen(false);
@@ -101,41 +100,25 @@ export function SiteHeader() {
     });
   }
 
-  const elevated = !isHome || scrolled || open;
-
   return (
     <div className="fixed inset-x-0 top-0 z-50">
       <SiteTopBar />
-      <header
-        className={cn(
-          "border-b transition-[background-color,border-color,box-shadow] duration-200 ease-out",
-          elevated
-            ? "border-[var(--m-line)] bg-[var(--m-paper)]/95 shadow-[0_8px_24px_-18px_rgba(6,33,29,0.45)] backdrop-blur-md"
-            : "border-white/15 bg-[var(--m-ink)]/55 backdrop-blur-md"
-        )}
-      >
+      <header className="border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 shadow-[0_8px_24px_-18px_rgba(6,33,29,0.45)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:h-16 lg:gap-6">
           <Link
             href="/"
             onClick={goHome}
-            className={cn(
-              "shrink-0 font-display text-xl font-semibold tracking-tight transition-colors sm:text-2xl",
-              elevated ? "text-[var(--m-ink)]" : "text-white"
-            )}
+            className="shrink-0 transition-opacity hover:opacity-90"
+            aria-label="Beautora home"
           >
-            {SYNCOPS.name}
+            <BeautoraWordmark size="sm" priority textClassName="text-[var(--m-ink)]" />
           </Link>
 
           <nav
             className="ml-2 hidden min-w-0 flex-1 items-center justify-center xl:flex"
             aria-label="Primary"
           >
-            <div
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-1.5 py-1",
-                elevated ? "bg-[var(--m-mist)]/80" : "bg-white/10"
-              )}
-            >
+            <div className="inline-flex items-center gap-1 rounded-full bg-[var(--m-mist)]/80 px-1.5 py-1">
               {PRIMARY_NAV.map((item) => {
                 const active =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -145,13 +128,9 @@ export function SiteHeader() {
                     href={item.href}
                     className={cn(
                       "rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-colors",
-                      elevated
-                        ? active
-                          ? "bg-white text-[var(--m-ink)] shadow-sm"
-                          : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
-                        : active
-                          ? "bg-white/20 text-white"
-                          : "text-white/85 hover:bg-white/10 hover:text-white"
+                      active
+                        ? "bg-white text-[var(--m-ink)] shadow-sm"
+                        : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
                     )}
                   >
                     {item.label}
@@ -167,13 +146,9 @@ export function SiteHeader() {
                   onClick={() => setMoreOpen((v) => !v)}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-colors",
-                    elevated
-                      ? moreOpen
-                        ? "bg-white text-[var(--m-ink)] shadow-sm"
-                        : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
-                      : moreOpen
-                        ? "bg-white/20 text-white"
-                        : "text-white/85 hover:bg-white/10 hover:text-white"
+                    moreOpen
+                      ? "bg-white text-[var(--m-ink)] shadow-sm"
+                      : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
                   )}
                 >
                   More
@@ -214,21 +189,13 @@ export function SiteHeader() {
           <div className="ml-auto hidden items-center gap-3 sm:flex xl:ml-0">
             <Link
               href="/login"
-              className={cn(
-                "px-2 text-sm font-medium transition-opacity hover:opacity-75",
-                elevated ? "text-[var(--m-muted)]" : "text-white/80"
-              )}
+              className="px-2 text-sm font-medium text-[var(--m-muted)] transition-opacity hover:opacity-75"
             >
               Login
             </Link>
             <Link
               href="/signup"
-              className={cn(
-                "inline-flex h-10 items-center rounded-full px-5 text-sm font-semibold tracking-wide transition-colors",
-                elevated
-                  ? "bg-[var(--m-ink)] text-[var(--m-paper)] hover:bg-[var(--m-ink-soft)]"
-                  : "bg-white text-[var(--m-ink)] hover:bg-white/90"
-              )}
+              className="inline-flex h-10 items-center rounded-full bg-[var(--m-ink)] px-5 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]"
             >
               Start free
             </Link>
@@ -236,12 +203,7 @@ export function SiteHeader() {
 
           <button
             type="button"
-            className={cn(
-              "ml-auto inline-flex size-11 items-center justify-center rounded-full xl:hidden",
-              elevated
-                ? "bg-[var(--m-mist)] text-[var(--m-ink)]"
-                : "bg-white/15 text-white"
-            )}
+            className="ml-auto inline-flex size-11 items-center justify-center rounded-full bg-[var(--m-mist)] text-[var(--m-ink)] xl:hidden"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             aria-controls="mobile-nav"

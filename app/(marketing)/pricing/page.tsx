@@ -2,31 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PricingSection } from "@/components/marketing/pricing-section";
 import { LandingFinalCta } from "@/components/marketing/landing-final-cta";
-import { FaqJsonLd } from "@/components/seo/json-ld";
+import { FaqSection } from "@/components/seo/faq-section";
 import { buildPageMetadata, SITE_FAQ, SITE_SEO } from "@/lib/seo/site";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
+import { resolveVisitorBillingPlan } from "@/lib/billing/visitor-plan";
 import { SYNCOPS } from "@/lib/print/syncops";
 
-export const revalidate = 3600;
-
-const PRICE = SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK");
+export const revalidate = 0;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Pricing",
-  description: `${SYNCOPS.name} pricing: ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month per store via JazzCash. Salon POS, online booking, staff, and reports by ${SYNCOPS.builder.name}.`,
+  description: `${SYNCOPS.name} pricing for salon management software worldwide — ${SUBSCRIPTION.trialDays} days free trial, then Rs 3,000/month (Pakistan · JazzCash) or $15/month USDT BEP-20 (international).`,
   path: "/pricing",
-  keywords: [
-    "Beautora pricing",
-    "salon software price Pakistan",
-    "salon POS subscription",
-    "JazzCash salon software",
-  ],
+  keywords: ["Beautora pricing", "salon software pricing", "salon POS subscription"],
 });
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const visitor = await resolveVisitorBillingPlan();
+
   return (
     <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
-      <FaqJsonLd path="/pricing" faqs={SITE_FAQ} />
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
@@ -37,18 +32,25 @@ export default function PricingPage() {
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
             {SITE_SEO.product} gives every salon a full operating system — booking, POS,
-            staff, queue, WhatsApp, and reports — with a clear monthly plan.
+            staff, queue, WhatsApp tools, and reports — with regional payment options.
           </p>
           <p className="mt-6 text-sm text-[var(--m-muted)]">
             Looking for features first?{" "}
-            <Link href="/features" className="font-medium text-[var(--m-ink)] underline-offset-4 hover:underline">
+            <Link
+              href="/features"
+              className="font-medium text-[var(--m-ink)] underline-offset-4 hover:underline"
+            >
               See the platform
             </Link>
             .
           </p>
         </div>
       </div>
-      <PricingSection />
+      <PricingSection
+        highlightPlan={visitor.plan}
+        detectedCountry={visitor.detected ? visitor.countryCode : null}
+      />
+      <FaqSection path="/pricing" faqs={SITE_FAQ} />
       <LandingFinalCta />
     </div>
   );

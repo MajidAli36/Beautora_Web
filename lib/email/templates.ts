@@ -214,10 +214,40 @@ export function subscriptionDeactivatedEmail(input: {
       bodyHtml: `
         <p style="margin:0 0 12px;">Hi ${escapeHtml(input.name)},</p>
         <p style="margin:0 0 12px;">Access for <strong>${escapeHtml(input.storeName)}</strong> is now <strong>${escapeHtml(label)}</strong> (effective ${escapeHtml(input.effectiveAt)}).</p>
-        <p style="margin:0 0 12px;">You can renew from Billing whenever you’re ready — upload your JazzCash payment for review.</p>
+        <p style="margin:0 0 12px;">You can renew from Billing whenever you’re ready — upload your JazzCash or USDT payment proof for review.</p>
       `,
       ctaLabel: "Go to billing",
       ctaUrl: input.billingUrl,
+    }),
+  };
+}
+
+export function platformPaymentSubmittedEmail(input: {
+  storeName: string;
+  amountLabel: string;
+  methodLabel: string;
+  destination: string;
+  transactionRef: string;
+  platformUrl: string;
+}) {
+  return {
+    subject: `[Beautora] Payment proof — ${input.storeName}`,
+    ...renderEmailLayout({
+      preheader: `${input.storeName} submitted ${input.amountLabel} via ${input.methodLabel}.`,
+      title: "New subscription payment proof",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">A salon submitted payment proof for review.</p>
+        <ul style="margin:0 0 12px;padding-left:18px;">
+          <li>Store: <strong>${escapeHtml(input.storeName)}</strong></li>
+          <li>Method: ${escapeHtml(input.methodLabel)}</li>
+          <li>Amount: ${escapeHtml(input.amountLabel)}</li>
+          <li>Destination: ${escapeHtml(input.destination)}</li>
+          <li>Reference: ${escapeHtml(input.transactionRef)}</li>
+        </ul>
+        <p style="margin:0;">Open Platform admin to approve or reject and unlock the store.</p>
+      `,
+      ctaLabel: "Review in Platform admin",
+      ctaUrl: input.platformUrl,
     }),
   };
 }

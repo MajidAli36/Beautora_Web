@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Send, X } from "lucide-react";
+import { Send, X } from "lucide-react";
+import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { HELP_SUGGESTIONS } from "@/lib/marketing/help-knowledge";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,7 @@ const WELCOME: ChatMessage = {
   role: "assistant",
   text: "Hi — I’m the Beautora assistant. Ask anything about the platform: pricing, booking, POS, sales, staff, inventory, reports, finances, WhatsApp, billing, and more.",
   links: [
-    { label: "All features", href: "/salon-platform" },
+    { label: "All features", href: "/salon-management-software" },
     { label: "Pricing", href: "/pricing" },
     { label: "Start free", href: "/signup" },
   ],
@@ -103,13 +104,16 @@ export function HelpChatbot() {
           style={{ maxHeight: "min(32rem, calc(100vh - 6.5rem))" }}
         >
           <div className="flex items-start justify-between gap-3 bg-[var(--m-ink)] px-4 py-3 text-[var(--m-paper)]">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-accent-soft)]">
-                Beautora
-              </p>
-              <p className="mt-1 font-display text-lg font-medium leading-tight">
-                Ask about the platform
-              </p>
+            <div className="flex min-w-0 items-start gap-3">
+              <BeautoraLogo size="sm" className="mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-accent-soft)]">
+                  Beautora
+                </p>
+                <p className="mt-1 font-display text-lg font-medium leading-tight">
+                  Ask about the platform
+                </p>
+              </div>
             </div>
             <button
               type="button"
@@ -227,7 +231,11 @@ export function HelpChatbot() {
           "hover:bg-[var(--m-ink-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-accent)] focus-visible:ring-offset-2"
         )}
       >
-        {open ? <X className="size-4" /> : <MessageCircle className="size-4" />}
+        {open ? (
+          <X className="size-4" />
+        ) : (
+          <BeautoraLogo size="xs" className="size-5 brightness-110" />
+        )}
         {open ? "Close" : "Ask Beautora"}
       </button>
     </div>

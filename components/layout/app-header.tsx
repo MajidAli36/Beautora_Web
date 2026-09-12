@@ -11,14 +11,22 @@ import { Input } from "@/components/ui/input";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
 import { GettingStartedGuide } from "@/components/guide/getting-started-guide";
+import { SalonCheatsheet } from "@/components/guide/salon-cheatsheet";
 
 type AppHeaderProps = {
   userEmail?: string;
   userRole?: string;
   organizationName?: string;
+  /** Lifetime / complimentary store — cheatsheet must not show pay instructions. */
+  hasLifetimeAccess?: boolean;
 };
 
-export function AppHeader({ userEmail, userRole, organizationName }: AppHeaderProps) {
+export function AppHeader({
+  userEmail,
+  userRole,
+  organizationName,
+  hasLifetimeAccess = false,
+}: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const pageTitle = getPageTitle(pathname);
@@ -46,6 +54,7 @@ export function AppHeader({ userEmail, userRole, organizationName }: AppHeaderPr
 
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:justify-center sm:gap-3">
         <GettingStartedGuide className="shrink-0" />
+        <SalonCheatsheet className="shrink-0" hasLifetimeAccess={hasLifetimeAccess} />
 
         <form
           onSubmit={handleSearch}

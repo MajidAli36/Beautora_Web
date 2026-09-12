@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/types/commerce";
 
 export type { ActionResult };
@@ -19,11 +20,30 @@ const customerSchema = z.object({
   tags: z.string().optional(),
 });
 
+async function requireCustomerAction(action: "customers.create" | "customers.edit" | "customers.delete") {
+  try {
+    return await requireAction(action);
+  } catch {
+    const label =
+      action === "customers.create"
+        ? "create customers"
+        : action === "customers.edit"
+          ? "edit customers"
+          : "delete customers";
+    return {
+      error: `You don’t have permission to ${label}. Ask an admin to enable this under Staff → Features & actions for your role.`,
+    } as const;
+  }
+}
+
 export async function createCustomer(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireAction("customers.create");
+  const orgOrErr = await requireCustomerAction("customers.create");
+  if ("error" in orgOrErr) return { error: orgOrErr.error };
+  const org = orgOrErr;
+
   const parsed = customerSchema.safeParse({
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name") || undefined,
@@ -41,8 +61,9 @@ export async function createCustomer(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // App permission already checked — use admin client so RLS role lists cannot block reception.
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("customers")
     .insert({
       organization_id: org.organizationId,
@@ -67,7 +88,10 @@ export async function createCustomerInline(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult & { customerId?: string }> {
-  const org = await requireAction("customers.create");
+  const orgOrErr = await requireCustomerAction("customers.create");
+  if ("error" in orgOrErr) return { error: orgOrErr.error };
+  const org = orgOrErr;
+
   const parsed = customerSchema.safeParse({
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name") || undefined,
@@ -85,8 +109,8 @@ export async function createCustomerInline(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("customers")
     .insert({
       organization_id: org.organizationId,
@@ -101,6 +125,7 @@ export async function createCustomerInline(
     .single();
 
   if (error) return { error: error.message };
+  if (!data?.id) return { error: "Could not create customer" };
 
   revalidatePath("/customers");
   return { success: true, customerId: data.id };
@@ -193,7 +218,10 @@ export async function updateCustomer(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireAction("customers.edit");
+  const orgOrErr = await requireCustomerAction("customers.edit");
+  if ("error" in orgOrErr) return { error: orgOrErr.error };
+  const org = orgOrErr;
+
   const parsed = customerSchema.safeParse({
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name") || undefined,
@@ -211,8 +239,8 @@ export async function updateCustomer(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("customers")
     .update({
       first_name: parsed.data.first_name,
@@ -233,7 +261,9 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(id: string): Promise<ActionResult> {
-  const org = await requireAction("customers.delete");
+  const orgOrErr = await requireCustomerAction("customers.delete");
+  if ("error" in orgOrErr) return { error: orgOrErr.error };
+  const org = orgOrErr;
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")
@@ -267,7 +297,9 @@ export async function deleteCustomer(id: string): Promise<ActionResult> {
 
 /** Soft-delete without redirect — for list UIs that refresh in place. */
 export async function deleteCustomerInline(id: string): Promise<ActionResult> {
-  const org = await requireAction("customers.delete");
+  const orgOrErr = await requireCustomerAction("customers.delete");
+  if ("error" in orgOrErr) return { error: orgOrErr.error };
+  const org = orgOrErr;
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")

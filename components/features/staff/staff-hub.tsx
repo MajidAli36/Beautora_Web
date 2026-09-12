@@ -106,7 +106,7 @@ export function StaffHub({
                     </Button>
                   }
                 />
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add staff member</DialogTitle>
                     <DialogDescription>

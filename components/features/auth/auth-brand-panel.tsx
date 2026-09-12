@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Users,
 } from "lucide-react";
+import { BeautoraWordmark } from "@/components/brand/beautora-logo";
 import { CEO_PAGE } from "@/lib/marketing/ceo-page";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { cn } from "@/lib/utils";
@@ -156,8 +157,8 @@ export function AuthBrandPanel(_props: AuthBrandPanelProps = {}) {
           <ArrowLeft className="size-4" />
           Back
         </Link>
-        <Link href="/" className="font-display text-xl font-semibold tracking-tight text-white sm:text-2xl">
-          {SYNCOPS.name}
+        <Link href="/" className="transition-opacity hover:opacity-90" aria-label="Beautora home">
+          <BeautoraWordmark size="sm" textClassName="text-white" />
         </Link>
       </div>
 

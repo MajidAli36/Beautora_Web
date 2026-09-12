@@ -52,7 +52,7 @@ export function LinkProductToServiceButton({
         Link to service
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Link to service</DialogTitle>
             <DialogDescription>

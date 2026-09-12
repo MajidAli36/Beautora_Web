@@ -67,7 +67,7 @@ export function AccountReceivePaymentDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Receive account payment</DialogTitle>
         </DialogHeader>

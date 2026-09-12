@@ -260,7 +260,7 @@ export async function listPlatformPayments(status?: "pending" | "all"): Promise<
   let query = admin
     .from("subscription_payments")
     .select(
-      "id, organization_id, amount, transaction_ref, payer_name, notes, status, jazzcash_number, created_at, reviewed_at, review_notes, invoice_path, invoice_mime, organization:organizations(name, slug, city)"
+      "id, organization_id, amount, currency, payment_method, transaction_ref, payer_name, notes, status, jazzcash_number, created_at, reviewed_at, review_notes, invoice_path, invoice_mime, organization:organizations(name, slug, city, country)"
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -272,10 +272,19 @@ export async function listPlatformPayments(status?: "pending" | "all"): Promise<
   const { data } = await query;
 
   return (data ?? []).map((row) => {
-    const org = row.organization as { name?: string; slug?: string; city?: string | null } | null;
+    const org = row.organization as {
+      name?: string;
+      slug?: string;
+      city?: string | null;
+      country?: string | null;
+    } | null;
+    const method =
+      row.payment_method === "usdt_bep20" ? ("usdt_bep20" as const) : ("jazzcash" as const);
     return {
       id: row.id,
       amount: Number(row.amount),
+      currency: String(row.currency ?? (method === "usdt_bep20" ? "USD" : "PKR")).toUpperCase(),
+      payment_method: method,
       transaction_ref: row.transaction_ref,
       payer_name: row.payer_name,
       notes: row.notes,
@@ -290,6 +299,7 @@ export async function listPlatformPayments(status?: "pending" | "all"): Promise<
       organization_name: org?.name ?? "Store",
       organization_slug: org?.slug,
       organization_city: org?.city ?? null,
+      organization_country: org?.country ?? null,
     };
   });
 }

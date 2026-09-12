@@ -1,21 +1,43 @@
-/** Beautora store subscription — trial, grace, JazzCash renewals */
+/** Beautora store subscription — trial, grace, regional renewals (JazzCash / USDT) */
 
 import { isHardcodedPlatformAdminEmail } from "@/lib/platform/admin";
+import {
+  INTERNATIONAL_PLAN,
+  PAKISTAN_PLAN,
+  formatPlanAmount,
+  resolveBillingPlanFromCountry,
+  type BillingPlan,
+} from "@/lib/billing/plans";
 
 export const SUBSCRIPTION = {
-  monthlyAmountPkr: 3000,
+  /** @deprecated Prefer resolveBillingPlanFromCountry — kept for legacy PKR displays */
+  monthlyAmountPkr: PAKISTAN_PLAN.amount,
   /** Free trial length after salon creation */
   trialDays: 30,
-  /** Paid access length after each approved JazzCash payment */
+  /** Paid access length after each approved payment */
   periodDays: 30,
   /** Soft window after trial/period ends before hard lock (still operational) */
   graceDays: 3,
   /** Caution popup interval during grace (ms) */
   cautionPopupIntervalMs: 60 * 60 * 1000,
-  jazzcashNumber: "03226400409",
-  jazzcashDisplay: "0322 6400409",
-  currencyLabel: "Rs",
+  jazzcashNumber: PAKISTAN_PLAN.destination,
+  jazzcashDisplay: PAKISTAN_PLAN.destinationDisplay,
+  currencyLabel: PAKISTAN_PLAN.currencyLabel,
+  /** International plan constants */
+  usdtAmountUsd: INTERNATIONAL_PLAN.amount,
+  usdtWallet: INTERNATIONAL_PLAN.destination,
+  usdtNetwork: INTERNATIONAL_PLAN.networkLabel!,
 } as const;
+
+export type { BillingPlan, BillingMethod } from "@/lib/billing/plans";
+export {
+  PAKISTAN_PLAN,
+  INTERNATIONAL_PLAN,
+  resolveBillingPlanFromCountry,
+  formatPlanAmount,
+  formatStoredPaymentAmount,
+  isPakistanCountry,
+} from "@/lib/billing/plans";
 
 export type SubscriptionPhase = "trial" | "active" | "grace" | "locked" | "lifetime";
 
@@ -27,6 +49,7 @@ export type OrgSubscriptionFields = {
   admin_disabled_at?: string | null;
   lifetime_access?: boolean | null;
   created_at?: string | null;
+  country?: string | null;
 };
 
 export type SubscriptionSnapshot = {
@@ -40,6 +63,9 @@ export type SubscriptionSnapshot = {
   isOperational: boolean;
   /** True when SyncOps granted lifetime / complimentary access (no monthly fee). */
   lifetimeAccess: boolean;
+  /** Regional payment plan for this store */
+  plan: BillingPlan;
+  /** Legacy PKR fields (JazzCash) — prefer `plan` */
   amountPkr: number;
   jazzcashNumber: string;
   jazzcashDisplay: string;
@@ -63,6 +89,7 @@ export function resolveSubscription(
   org: OrgSubscriptionFields,
   now = new Date()
 ): SubscriptionSnapshot {
+  const plan = resolveBillingPlanFromCountry(org.country);
   const trialEndsAt = org.trial_ends_at
     ? new Date(org.trial_ends_at)
     : org.created_at
@@ -75,17 +102,17 @@ export function resolveSubscription(
 
   const base = {
     trialEndsAt,
-    amountPkr: SUBSCRIPTION.monthlyAmountPkr,
-    jazzcashNumber: SUBSCRIPTION.jazzcashNumber,
-    jazzcashDisplay: SUBSCRIPTION.jazzcashDisplay,
+    plan,
+    amountPkr: PAKISTAN_PLAN.amount,
+    jazzcashNumber: PAKISTAN_PLAN.destination,
+    jazzcashDisplay: PAKISTAN_PLAN.destinationDisplay,
     lifetimeAccess: Boolean(org.lifetime_access),
   };
 
-  // Platform admin force-disable — always locked (even lifetime)
   if (org.admin_disabled_at) {
     return {
       ...base,
-      phase: "locked",
+      phase: "locked" as const,
       subscriptionEndsAt,
       graceEndsAt: null,
       lockedAt: new Date(org.admin_disabled_at),
@@ -95,11 +122,10 @@ export function resolveSubscription(
     };
   }
 
-  // Lifetime / complimentary — no monthly subscription required
   if (org.lifetime_access) {
     return {
       ...base,
-      phase: "lifetime",
+      phase: "lifetime" as const,
       subscriptionEndsAt,
       graceEndsAt: null,
       lockedAt: null,
@@ -115,7 +141,7 @@ export function resolveSubscription(
   if (paidUntil) {
     return {
       ...base,
-      phase: "active",
+      phase: "active" as const,
       subscriptionEndsAt: paidUntil,
       graceEndsAt: null,
       lockedAt: null,
@@ -128,7 +154,7 @@ export function resolveSubscription(
   if (trialEndsAt && now < trialEndsAt) {
     return {
       ...base,
-      phase: "trial",
+      phase: "trial" as const,
       subscriptionEndsAt,
       graceEndsAt: addDays(trialEndsAt, SUBSCRIPTION.graceDays),
       lockedAt: null,
@@ -138,7 +164,6 @@ export function resolveSubscription(
     };
   }
 
-  // Grace starts when trial (or last paid period) ends
   const graceStart =
     subscriptionEndsAt && trialEndsAt && subscriptionEndsAt > trialEndsAt
       ? subscriptionEndsAt
@@ -148,7 +173,7 @@ export function resolveSubscription(
   if (now < graceEndsAt) {
     return {
       ...base,
-      phase: "grace",
+      phase: "grace" as const,
       subscriptionEndsAt,
       graceEndsAt,
       lockedAt: null,
@@ -160,7 +185,7 @@ export function resolveSubscription(
 
   return {
     ...base,
-    phase: "locked",
+    phase: "locked" as const,
     subscriptionEndsAt,
     graceEndsAt,
     lockedAt: org.subscription_locked_at
@@ -175,7 +200,6 @@ export function resolveSubscription(
 export function isPlatformAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  // Only SyncOps hardcoded admin + optional env list — never treat store owners as admin
   if (isHardcodedPlatformAdminEmail(normalized)) return true;
 
   const raw = process.env.BEAUTORA_PLATFORM_ADMIN_EMAILS ?? "";

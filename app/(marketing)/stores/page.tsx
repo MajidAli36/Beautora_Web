@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { listPublicStores, listPublicStoreCities } from "@/lib/actions/stores";
 import { StoresDirectory } from "@/components/marketing/stores-directory";
 import { buildPageMetadata, cityToSlug } from "@/lib/seo/site";
@@ -7,17 +8,15 @@ import Link from "next/link";
 export const revalidate = 300;
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Stores — Book Salons Online",
+  title: "Find & Book Salons Online",
   description:
-    "Find the best salons in Pakistan and book online with Beautora by SyncOps. Browse live stores by city, view services, and schedule appointments.",
+    "Browse live salons on Beautora — search by name or city, view services, and book online. A global directory powered by SyncOps.",
   path: "/stores",
   keywords: [
-    "best salon in Pakistan",
-    "book salon online Pakistan",
+    "book salon online",
+    "salon directory",
     "Beautora stores",
-    "SyncOps salon directory",
-    "beauty salon near me Pakistan",
-    "best beauty salon Pakistan",
+    "find beauty salon",
     "online salon booking",
   ],
 });
@@ -57,7 +56,9 @@ export default async function StoresPage() {
 
       <section className="bg-[var(--m-paper)] pt-10 pb-24 sm:pt-12 sm:pb-28">
         <div className="mx-auto max-w-6xl px-6">
-          <StoresDirectory stores={stores} />
+          <Suspense fallback={<p className="text-sm text-[var(--m-muted)]">Loading stores…</p>}>
+            <StoresDirectory stores={stores} />
+          </Suspense>
         </div>
       </section>
     </div>

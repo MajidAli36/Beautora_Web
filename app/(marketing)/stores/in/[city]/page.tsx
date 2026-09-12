@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { listPublicStoresByCitySlug, listPublicStoreCities } from "@/lib/actions/stores";
 import { StoresDirectory } from "@/components/marketing/stores-directory";
@@ -75,7 +76,9 @@ export default async function StoresInCityPage({ params }: CityPageProps) {
 
       <section className="bg-[var(--m-paper)] pt-10 pb-24 sm:pt-12 sm:pb-28">
         <div className="mx-auto max-w-6xl px-6">
-          <StoresDirectory stores={stores} />
+          <Suspense fallback={<p className="text-sm text-[var(--m-muted)]">Loading stores…</p>}>
+            <StoresDirectory stores={stores} />
+          </Suspense>
         </div>
       </section>
     </div>

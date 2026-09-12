@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { cn } from "@/lib/utils";
 
@@ -106,9 +107,12 @@ export function HeroProductWidget() {
         >
           <div className="flex items-start justify-between gap-3 border-b border-[var(--m-line)] pb-4">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
-                {SYNCOPS.name}
-              </p>
+              <div className="flex items-center gap-2">
+                <BeautoraLogo size="xs" />
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
+                  {SYNCOPS.name}
+                </p>
+              </div>
               <p className="mt-1 font-display text-xl font-semibold tracking-tight">
                 {slide.title}
               </p>

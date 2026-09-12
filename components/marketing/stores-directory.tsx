@@ -1,7 +1,8 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import type { PublicStore } from "@/lib/actions/stores";
 import { StoreCardMedia } from "@/components/marketing/store-card-media";
@@ -23,9 +24,27 @@ function normalize(value: string) {
 }
 
 export function StoresDirectory({ stores }: { stores: PublicStore[] }) {
-  const [query, setQuery] = useState("");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialQ = searchParams.get("q") ?? "";
+  const [query, setQuery] = useState(initialQ);
   const [city, setCity] = useState<string>("all");
   const deferredQuery = useDeferredValue(query);
+
+  useEffect(() => {
+    setQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const current = searchParams.get("q") ?? "";
+    if (deferredQuery === current) return;
+    const params = new URLSearchParams(searchParams.toString());
+    if (deferredQuery.trim()) params.set("q", deferredQuery.trim());
+    else params.delete("q");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [deferredQuery, pathname, router, searchParams]);
 
   const cities = useMemo(() => {
     const set = new Set<string>();

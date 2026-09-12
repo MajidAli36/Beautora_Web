@@ -110,17 +110,18 @@ export function AppointmentsScheduleTable({
             const serviceTotal = sumServicePrices(services);
             const approvedAdvance = getApprovedDepositTotal(deposits);
             const pendingAdvance = getPendingDepositTotal(deposits);
-            const balanceDue = getAdvanceState(deposits, serviceTotal, advanceSettings)
+            const isOnline = (a.source ?? "").toUpperCase() === "ONLINE";
+            // Online advance settings apply ONLY to public online bookings — never in-house/staff.
+            const rowAdvanceSettings = isOnline ? advanceSettings : undefined;
+            const balanceDue = getAdvanceState(deposits, serviceTotal, rowAdvanceSettings)
               .balanceDue;
-            const settings = advanceSettings;
             const showOpenActions =
               !historyMode && !["CANCELLED", "COMPLETED", "NO_SHOW"].includes(a.status);
-            const isOnline = (a.source ?? "").toUpperCase() === "ONLINE";
             const showManualPayment =
               !isOnline &&
               canCollectPayment &&
               showOpenActions &&
-              canCollectAdvance(deposits, serviceTotal, settings);
+              canCollectAdvance(deposits, serviceTotal, undefined);
             const bookingNo = displayBookingNumber(a.booking_number, a.id);
             const sourceLabel =
               (a.source ?? "").toUpperCase() === "ONLINE"
@@ -233,7 +234,7 @@ export function AppointmentsScheduleTable({
                   <AppointmentOrderSummary
                     services={services}
                     deposits={deposits}
-                    advanceSettings={settings}
+                    advanceSettings={rowAdvanceSettings}
                     compact
                   />
 

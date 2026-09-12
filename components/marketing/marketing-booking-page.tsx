@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { OnlineBookingForm } from "@/components/features/booking/online-booking-form";
 import { CurrencyProvider } from "@/components/providers/currency-provider";
 import {
@@ -202,7 +203,10 @@ export function MarketingBookingPage({ org }: { org: BookingOrg | null }) {
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-              <p className="mt-6 text-xs">Powered by {SYNCOPS.name}</p>
+              <p className="mt-6 inline-flex items-center gap-2 text-xs text-[var(--m-muted)]">
+                <BeautoraLogo size="xs" className="size-4" />
+                Powered by {SYNCOPS.name}
+              </p>
             </div>
           </aside>
 

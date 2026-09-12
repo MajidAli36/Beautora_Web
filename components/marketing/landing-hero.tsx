@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { HeroProductWidget } from "@/components/marketing/hero-product-widget";
 
@@ -27,16 +28,19 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
 
       <div className="relative mx-auto grid min-h-[100svh] max-w-6xl items-end gap-10 px-6 pb-16 pt-[calc(var(--m-chrome)+2.5rem)] sm:pb-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-24 lg:pt-[calc(var(--m-chrome)+3rem)]">
         <div className="max-w-xl">
-          <p className="m-fade-up text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--m-accent-soft)]">
-            A SyncOps product · Built for modern salons
-          </p>
+          <div className="m-fade-up flex items-center gap-3">
+            <BeautoraLogo size="md" priority className="size-9 drop-shadow-sm" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--m-accent-soft)]">
+              Beautora · AI-powered salon management
+            </p>
+          </div>
           <h1 className="m-fade-up m-fade-up-delay-1 mt-4 font-display text-[2.35rem] font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.35rem]">
-            The operating system
-            <span className="block font-medium text-white/90">for modern salons.</span>
+            AI-Powered Salon
+            <span className="block font-medium text-white/90">Management Software</span>
           </h1>
           <p className="m-fade-up m-fade-up-delay-2 mt-5 max-w-md text-base leading-relaxed text-white/75 sm:text-lg">
-            Bookings, POS, staff, queue, WhatsApp, and reports — everything your salon needs to
-            run the day from one place.
+            Online booking, POS, CRM, staff, inventory, and reports — built for beauty businesses
+            worldwide.
           </p>
           <div className="m-fade-up m-fade-up-delay-3 mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
             <Link
@@ -53,8 +57,9 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
             </Link>
           </div>
           <p className="m-fade-up m-fade-up-delay-3 mt-5 text-xs tracking-wide text-white/55">
-            No card required · {SUBSCRIPTION.trialDays} days free · {SUBSCRIPTION.currencyLabel}{" "}
-            {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month after trial
+            No card required · {SUBSCRIPTION.trialDays} days free · Rs{" "}
+            {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")} (PK) or $
+            {SUBSCRIPTION.usdtAmountUsd} USDT (intl)
             {` · ${
               storeCount > 100
                 ? `${storeCount} live salons`

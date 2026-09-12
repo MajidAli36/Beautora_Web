@@ -17,6 +17,7 @@ type OrgBillingRow = {
   admin_disabled_at: string | null;
   lifetime_access: boolean | null;
   created_at: string | null;
+  country?: string | null;
 };
 
 /** Load + resolve subscription for an org (cached per request). */
@@ -26,7 +27,7 @@ export const getOrgSubscriptionSnapshot = cache(
     const { data } = await admin
       .from("organizations")
       .select(
-        "id, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
+        "id, country, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
       )
       .eq("id", organizationId)
       .maybeSingle();

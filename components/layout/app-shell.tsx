@@ -22,6 +22,7 @@ type AppShellProps = {
   myStaffHref?: string | null;
   showPlatformBilling?: boolean;
   subscriptionLocked?: boolean;
+  hasLifetimeAccess?: boolean;
 };
 
 export function AppShell({
@@ -36,6 +37,7 @@ export function AppShell({
   myStaffHref = null,
   showPlatformBilling = false,
   subscriptionLocked = false,
+  hasLifetimeAccess = false,
 }: AppShellProps) {
   return (
     <CurrencyProvider country={organizationCountry}>
@@ -54,6 +56,7 @@ export function AppShell({
             organizationName={organizationName}
             userEmail={userEmail}
             userRole={userRole}
+            hasLifetimeAccess={hasLifetimeAccess}
           />
           <NavRouteGuard
             role={memberRole}

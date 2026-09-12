@@ -37,8 +37,9 @@ export function RolePermissionsEditor({ matrix }: RolePermissionsEditorProps) {
         <CardTitle>Features & actions by role</CardTitle>
         <CardDescription>
           Turn a feature Off to hide it from the sidebar. Leave it On and switch individual
-          actions Off when they may view the page but must not create, edit, delete, approve, or
-          similar. Owner always has full access.
+          actions On/Off for that role — including Receptionist. Admin overrides always apply
+          (no separate “security level” lock beyond Owner/Admin-only controls). Owner always has
+          full access.
         </CardDescription>
       </CardHeader>
       <CardContent>

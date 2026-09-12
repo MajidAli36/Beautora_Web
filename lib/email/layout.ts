@@ -36,8 +36,17 @@ export function renderEmailLayout(input: LayoutInput): { html: string; text: str
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #E4E7E2;border-radius:12px;overflow:hidden;">
           <tr>
             <td style="background:#06211D;padding:28px 32px;">
-              <p style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#F5F6F3;">${escapeHtml(SYNCOPS.name)}</p>
-              <p style="margin:6px 0 0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(245,246,243,0.55);">${escapeHtml(SYNCOPS.builder.short)}</p>
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:12px;">
+                    <img src="${base}/brand/beautora-logo.png" width="36" height="32" alt="${escapeHtml(SYNCOPS.name)}" style="display:block;border:0;" />
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <p style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#F5F6F3;">${escapeHtml(SYNCOPS.name)}</p>
+                    <p style="margin:6px 0 0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(245,246,243,0.55);">${escapeHtml(SYNCOPS.builder.short)}</p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <tr>

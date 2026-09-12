@@ -150,9 +150,9 @@ export function PlatformAdminPanel({
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Platform admin</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {adminEmail} · fee {SUBSCRIPTION.currencyLabel}{" "}
-            {summary.monthlyFee.toLocaleString("en-PK")}/mo · JazzCash{" "}
-            {SUBSCRIPTION.jazzcashDisplay}
+            {adminEmail} · Pakistan JazzCash {SUBSCRIPTION.jazzcashDisplay} (Rs{" "}
+            {summary.monthlyFee.toLocaleString("en-PK")}) · International USDT $
+            {SUBSCRIPTION.usdtAmountUsd} BEP-20
           </p>
         </div>
         <div className="flex gap-2">
@@ -173,10 +173,18 @@ export function PlatformAdminPanel({
         <Stat label="Pending partners" value={String(summary.pendingPartners)} />
       </div>
 
+      {summary.pendingInvoices > 0 ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+          <strong>{summary.pendingInvoices}</strong> payment proof
+          {summary.pendingInvoices === 1 ? "" : "s"} waiting for review (JazzCash or USDT). Scroll to
+          Customer invoices below — an email was also sent to platform admin when each was submitted.
+        </div>
+      ) : null}
+
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Stores</h2>
         <p className="text-sm text-muted-foreground">
-          <strong>Lifetime</strong> = no monthly JazzCash (store paid once / complimentary). Toggle
+          <strong>Lifetime</strong> = no monthly fee (store paid once / complimentary). Toggle
           off anytime to return to normal billing. <strong>Enable</strong> unlocks +30 days.{" "}
           <strong>Disable</strong> force-locks the salon.
         </p>
@@ -219,7 +227,7 @@ export function PlatformAdminPanel({
                       </p>
                     ) : (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        No JazzCash invoice submitted yet
+                        No payment proof submitted yet
                       </p>
                     )}
                   </div>
@@ -281,7 +289,8 @@ export function PlatformAdminPanel({
           <div>
             <h2 className="text-lg font-semibold">Customer invoices</h2>
             <p className="text-sm text-muted-foreground">
-              Full JazzCash proof from store owners (transaction ID + uploaded screenshot/PDF).
+              JazzCash (Pakistan) and USDT BEP-20 (international) proofs from store owners —
+              transaction ID + uploaded screenshot/PDF. You get an email when a new proof arrives.
             </p>
           </div>
           <div className="flex gap-2">
@@ -307,8 +316,8 @@ export function PlatformAdminPanel({
                 will see:
               </p>
               <ul className="mt-2 list-inside list-disc space-y-1">
-                <li>JazzCash transaction / reference ID</li>
-                <li>Amount ({SUBSCRIPTION.currencyLabel} {summary.monthlyFee.toLocaleString("en-PK")})</li>
+                <li>JazzCash or USDT transaction / reference ID</li>
+                <li>Amount (Rs 3,000 or $15 USDT)</li>
                 <li>Payer name & notes</li>
                 <li>Uploaded invoice screenshot or PDF</li>
               </ul>
@@ -361,17 +370,44 @@ export function PlatformAdminPanel({
                 </div>
 
                 <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                  <Detail label="JazzCash transaction ID" value={p.transaction_ref} mono />
                   <Detail
-                    label="Amount paid"
-                    value={`${SUBSCRIPTION.currencyLabel} ${Number(p.amount).toLocaleString("en-PK")}`}
+                    label={
+                      p.payment_method === "usdt_bep20"
+                        ? "USDT transaction hash"
+                        : "JazzCash transaction ID"
+                    }
+                    value={p.transaction_ref}
+                    mono
                   />
                   <Detail
-                    label="Sent to JazzCash"
+                    label="Amount paid"
+                    value={
+                      p.currency === "USD" || p.payment_method === "usdt_bep20"
+                        ? `$${Number(p.amount).toLocaleString("en-US")} USDT`
+                        : `${SUBSCRIPTION.currencyLabel} ${Number(p.amount).toLocaleString("en-PK")}`
+                    }
+                  />
+                  <Detail
+                    label={
+                      p.payment_method === "usdt_bep20"
+                        ? "USDT wallet (BEP-20)"
+                        : "Sent to JazzCash"
+                    }
                     value={p.jazzcash_number || SUBSCRIPTION.jazzcashDisplay}
                     mono
                   />
+                  <Detail
+                    label="Method"
+                    value={
+                      p.payment_method === "usdt_bep20"
+                        ? "USDT · BNB Smart Chain"
+                        : "JazzCash · Pakistan"
+                    }
+                  />
                   <Detail label="Payer name" value={p.payer_name || "—"} />
+                  {p.organization_country ? (
+                    <Detail label="Store country" value={p.organization_country} />
+                  ) : null}
                   {p.notes && (
                     <div className="sm:col-span-2">
                       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

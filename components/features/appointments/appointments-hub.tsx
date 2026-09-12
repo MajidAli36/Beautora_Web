@@ -268,6 +268,7 @@ export function AppointmentsHub({
           status === "APPROVED"
             ? "CONFIRMED"
             : status === "REFUNDED" &&
+                a.source === "ONLINE" &&
                 advanceSettings &&
                 (advanceSettings.booking_advance_amount > 0 ||
                   advanceSettings.booking_advance_percent > 0)
@@ -438,7 +439,6 @@ export function AppointmentsHub({
                   <AppointmentsScheduleTable
                     appointments={inHouse}
                     mode="staff"
-                    advanceSettings={advanceSettings ?? undefined}
                     emptyMessage="No open in-house appointments on this date."
                     emptyAction={
                       canCreateAppointment

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { BeautoraWordmark } from "@/components/brand/beautora-logo";
 import { SYNCOPS } from "@/lib/print/syncops";
 
 export default function NotFound() {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center bg-[var(--m-paper)] px-6 py-24 text-center text-[var(--m-ink)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
+      <BeautoraWordmark size="lg" textClassName="text-[var(--m-ink)]" />
+      <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
         404
       </p>
       <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -21,22 +23,22 @@ export default function NotFound() {
           Home
         </Link>
         <Link
+          href="/salon-management-software"
+          className="inline-flex h-11 items-center justify-center border border-[var(--m-line)] px-5 text-sm font-medium text-[var(--m-ink)]"
+        >
+          Product
+        </Link>
+        <Link
           href="/stores"
           className="inline-flex h-11 items-center justify-center border border-[var(--m-line)] px-5 text-sm font-medium text-[var(--m-ink)]"
         >
           Stores
         </Link>
         <Link
-          href="/about"
+          href="/blog"
           className="inline-flex h-11 items-center justify-center border border-[var(--m-line)] px-5 text-sm font-medium text-[var(--m-ink)]"
         >
-          About
-        </Link>
-        <Link
-          href="/contact"
-          className="inline-flex h-11 items-center justify-center border border-[var(--m-line)] px-5 text-sm font-medium text-[var(--m-ink)]"
-        >
-          Contact
+          Blog
         </Link>
       </div>
     </div>

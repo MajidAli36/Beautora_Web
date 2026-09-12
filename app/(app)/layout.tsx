@@ -48,6 +48,9 @@ export default async function AppLayout({
     getLinkedStaffProfile().catch(() => null),
   ]);
   const locked = billing?.snapshot.phase === "locked";
+  const hasLifetimeAccess =
+    billing?.snapshot.phase === "lifetime" ||
+    Boolean(billing?.snapshot.lifetimeAccess);
 
   // When locked, every role must reach /billing (avoid redirect loops)
   const effectiveOverrides: NavPermissionsConfig = locked
@@ -110,8 +113,10 @@ export default async function AppLayout({
       myStaffHref={myStaffHref}
       showPlatformBilling={isPlatformAdmin}
       subscriptionLocked={Boolean(locked)}
+      hasLifetimeAccess={hasLifetimeAccess}
     >
       {billing &&
+        !hasLifetimeAccess &&
         (billing.snapshot.phase === "grace" || billing.snapshot.phase === "locked") && (
           <SubscriptionCautionModal
             snapshot={billing.snapshot}

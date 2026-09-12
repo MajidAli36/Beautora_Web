@@ -342,7 +342,7 @@ function TemplateEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{template ? "Edit template" : "Add template"}</DialogTitle>
           <DialogDescription>

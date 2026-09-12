@@ -1,86 +1,80 @@
-import type { Metadata } from "next";
+/**
+ * Beautora SEO — backwards-compatible surface.
+ * Prefer importing from `@/lib/seo/metadata`, `@/lib/seo/urls`, `@/lib/seo/schema` for new code.
+ */
+
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { SYNCOPS } from "@/lib/print/syncops";
+import { SEO_BRAND } from "@/lib/seo/constants";
+import { absoluteUrl, getSiteUrl } from "@/lib/seo/urls";
 
-/** Public site origin for absolute SEO URLs (OG, sitemap, canonical). */
-export function getSiteUrl(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
-  const vercel = process.env.VERCEL_URL?.replace(/\/$/, "");
-  if (vercel) return vercel.startsWith("http") ? vercel : `https://${vercel}`;
-  return SYNCOPS.url;
-}
+export { absoluteUrl, canonicalPath, getSiteUrl } from "@/lib/seo/urls";
+export { buildPageMetadata, buildRootMetadata } from "@/lib/seo/metadata";
+export { SEO_BRAND, SEO_MARKETS, SEO_LOCALES } from "@/lib/seo/constants";
 
 const PRICE = SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK");
 
-/** Product SEO — Beautora (salon OS) + SyncOps (studio). */
+/** Product SEO — global brand; Pakistan is one market, not the identity. */
 export const SITE_SEO = {
-  product: SYNCOPS.name,
-  builder: SYNCOPS.builder.name,
-  tagline: "The operating system for modern salons",
-  titleDefault: `${SYNCOPS.name} | Best Salon Software in Pakistan & Worldwide`,
-  titleTemplate: `%s | ${SYNCOPS.name}`,
-  description: `${SYNCOPS.name} is salon management software by ${SYNCOPS.builder.name} for beauty businesses in Pakistan and worldwide — online booking, POS, staff, queue, WhatsApp, and reports. ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month per store. Discover and book live salons online.`,
-  shortDescription: `${SYNCOPS.name} — best salon software for booking, POS, staff & reports in Pakistan and worldwide. Built by ${SYNCOPS.builder.name}.`,
+  product: SEO_BRAND.product,
+  builder: SEO_BRAND.builder,
+  tagline: SEO_BRAND.tagline,
+  titleDefault: SEO_BRAND.titleDefault,
+  titleTemplate: SEO_BRAND.titleTemplate,
+  description: `${SEO_BRAND.product} is an AI-powered salon management platform by ${SEO_BRAND.builder} for beauty businesses worldwide — online booking, POS, CRM, staff, inventory, queue, WhatsApp tools, and reports. Available internationally; ${SUBSCRIPTION.trialDays}-day free trial.`,
+  shortDescription: `${SEO_BRAND.product} — ${SEO_BRAND.tagline}. Booking, POS, CRM, staff & analytics for modern beauty businesses.`,
   keywords: [
-    SYNCOPS.name,
-    SYNCOPS.builder.name,
-    "best salon software Pakistan",
-    "best salon software",
-    "best salon management software",
-    "salon software Pakistan",
-    "salon POS Pakistan",
-    "salon management system",
-    "online salon booking Pakistan",
+    SEO_BRAND.product,
+    SEO_BRAND.builder,
+    "AI-powered salon management software",
+    "salon management software",
+    "salon booking software",
+    "salon POS",
+    "salon CRM",
     "beauty salon software",
-    "best beauty salon software",
-    "barbershop POS",
-    "book salon online Pakistan",
-    "best salon in Pakistan",
-    "salon software worldwide",
-    "JazzCash salon subscription",
+    "spa management software",
+    "barbershop software",
+    "online salon booking",
+    "salon staff management",
   ],
-  locale: "en_PK",
-  htmlLang: "en-PK",
+  locale: SEO_BRAND.ogLocale,
+  htmlLang: SEO_BRAND.htmlLang,
 } as const;
 
 export const SITE_FAQ = [
   {
     question: "What is Beautora?",
-    answer: `Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — a product of SyncOps (${SYNCOPS.builder.domain}). It helps salons in Pakistan and worldwide run modern beauty businesses.`,
+    answer: `Beautora is an AI-powered salon and beauty-business management platform by SyncOps — online booking, POS, CRM-style customer profiles, staff, queue, inventory, WhatsApp tools, and reports for salons worldwide.`,
   },
   {
-    question: "Is Beautora good for salons in Pakistan?",
-    answer: `Yes. Beautora is Pakistan-ready with JazzCash billing, Pakistan timezone booking, PKR pricing, and a public stores directory so guests can find and book salons online.`,
+    question: "Who is Beautora for?",
+    answer:
+      "Hair salons, beauty salons, barbershops, spas, nail studios, med spas, and multi-chair beauty clinics that want one system for bookings, checkout, and team operations.",
+  },
+  {
+    question: "Does Beautora work outside Pakistan?",
+    answer:
+      "Yes. Beautora is built for beauty businesses internationally. Country and currency settings support global stores; local payment options (such as JazzCash in Pakistan) apply where configured.",
   },
   {
     question: "Who builds Beautora?",
     answer: `Beautora is built by SyncOps (${SYNCOPS.builder.domain}), founded by ${SYNCOPS.ceo.name}. Official studio: ${SYNCOPS.builder.url}.`,
   },
   {
-    question: "What is SyncOps?",
-    answer: SYNCOPS.builder.seoDescription,
-  },
-  {
     question: "How much does Beautora cost?",
-    answer: `First ${SUBSCRIPTION.trialDays} days free, then Rs ${PRICE}/month via JazzCash per store.`,
+    answer: `Start with a ${SUBSCRIPTION.trialDays}-day free trial. After trial: Pakistan renews at Rs ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month via JazzCash; other countries renew at $${SUBSCRIPTION.usdtAmountUsd} USDT on BNB Smart Chain (BEP-20). Upload proof in Billing for SyncOps review.`,
   },
   {
     question: "Can customers book online?",
     answer:
-      "Yes. Each store gets a public booking page and optional public store listing so guests searching for salons in Pakistan or elsewhere can book services and stylists online.",
+      "Yes. Each store can publish a booking page and optional public listing so guests can choose services, stylists, and times online.",
   },
   {
-    question: "Where can I find salons on Beautora?",
-    answer: `Browse live salons on beautora.app/stores, filter by city, open a store page, and book online.`,
+    question: "Does Beautora include AI?",
+    answer:
+      "Beautora includes AI-assisted marketing help on the public site (optional). Core product automates booking, floor ops, and reporting. Advanced AI receptionist features are positioned honestly as evolving capabilities — not voice-call magic that does not exist yet.",
   },
 ] as const;
-
-export function absoluteUrl(path = "/"): string {
-  const base = getSiteUrl();
-  if (!path || path === "/") return base;
-  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
-}
 
 export function cityToSlug(city: string): string {
   return city
@@ -100,133 +94,7 @@ export function slugToCityLabel(slug: string): string {
     .join(" ");
 }
 
-export function buildPageMetadata(input: {
-  title: string;
-  description: string;
-  path: string;
-  keywords?: string[];
-  noIndex?: boolean;
-  image?: string | null;
-}): Metadata {
-  const url = absoluteUrl(input.path);
-  const title = input.title;
-  const description = input.description;
-  const image = input.image
-    ? input.image.startsWith("http")
-      ? input.image
-      : absoluteUrl(input.image)
-    : absoluteUrl("/opengraph-image");
-
-  return {
-    title,
-    description,
-    keywords: input.keywords
-      ? [...SITE_SEO.keywords, ...input.keywords]
-      : [...SITE_SEO.keywords],
-    alternates: { canonical: input.path },
-    openGraph: {
-      type: "website",
-      locale: SITE_SEO.locale,
-      url,
-      siteName: `${SITE_SEO.product} · ${SITE_SEO.builder}`,
-      title,
-      description,
-      images: [{ url: image }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [image],
-    },
-    robots: input.noIndex
-      ? { index: false, follow: false }
-      : {
-          index: true,
-          follow: true,
-          googleBot: {
-            index: true,
-            follow: true,
-            "max-image-preview": "large",
-            "max-snippet": -1,
-            "max-video-preview": -1,
-          },
-        },
-  };
-}
-
-export function buildRootMetadata(): Metadata {
-  const siteUrl = getSiteUrl();
-  const verificationToken = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim();
-
-  return {
-    metadataBase: new URL(siteUrl),
-    title: {
-      default: SITE_SEO.titleDefault,
-      template: SITE_SEO.titleTemplate,
-    },
-    description: SITE_SEO.description,
-    applicationName: `${SITE_SEO.product} by ${SITE_SEO.builder}`,
-    authors: [
-      { name: SYNCOPS.builder.name, url: SYNCOPS.builder.url },
-      { name: SYNCOPS.ceo.name, url: absoluteUrl("/ceo") },
-    ],
-    creator: SYNCOPS.builder.name,
-    publisher: SYNCOPS.builder.name,
-    keywords: [...SITE_SEO.keywords],
-    category: "business",
-    referrer: "origin-when-cross-origin",
-    formatDetection: {
-      email: false,
-      address: false,
-      telephone: false,
-    },
-    alternates: {
-      canonical: "/",
-    },
-    openGraph: {
-      type: "website",
-      locale: SITE_SEO.locale,
-      url: siteUrl,
-      siteName: `${SITE_SEO.product} · ${SITE_SEO.builder}`,
-      title: SITE_SEO.titleDefault,
-      description: SITE_SEO.description,
-      images: [{ url: absoluteUrl("/opengraph-image") }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: SITE_SEO.titleDefault,
-      description: SITE_SEO.description,
-      images: [absoluteUrl("/opengraph-image")],
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        "max-image-preview": "large",
-        "max-snippet": -1,
-        "max-video-preview": -1,
-      },
-    },
-    verification: verificationToken
-      ? {
-          google: verificationToken,
-        }
-      : undefined,
-    other: {
-      "application-name": `${SITE_SEO.product} by ${SITE_SEO.builder}`,
-      "msapplication-TileColor": "#0f172a",
-      "theme-color": "#0f172a",
-      copyright: `${SITE_SEO.product}. Built by ${SITE_SEO.builder} (${SYNCOPS.builder.domain})`,
-      "product:brand": SITE_SEO.product,
-      "product:publisher": SITE_SEO.builder,
-    },
-  };
-}
-
-/** Core site graph — FAQ is intentionally separate (only on FAQ-visible pages). */
+/** Core site graph — FAQ is separate (only on pages with visible FAQ UI). */
 export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
   const syncOpsOrgId = `${SYNCOPS.builder.url}/#organization`;
   const beautoraOrgId = `${siteUrl}/#organization`;
@@ -246,7 +114,7 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         alternateName: [
           `${SITE_SEO.product} by ${SITE_SEO.builder}`,
           SITE_SEO.builder,
-          SYNCOPS.builder.short,
+          SEO_BRAND.tagline,
         ],
         description: SITE_SEO.description,
         publisher: { "@id": syncOpsOrgId },
@@ -255,7 +123,10 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         inLanguage: SITE_SEO.htmlLang,
         potentialAction: {
           "@type": "SearchAction",
-          target: `${siteUrl}/stores?q={search_term_string}`,
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${siteUrl}/stores?q={search_term_string}`,
+          },
           "query-input": "required name=search_term_string",
         },
       },
@@ -293,20 +164,22 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         url: siteUrl,
         email: SYNCOPS.email,
         telephone: SYNCOPS.phone,
-        description: SYNCOPS.seoDescription,
+        description: SITE_SEO.description,
         parentOrganization: { "@id": syncOpsOrgId },
-        logo: ogImage,
+        logo: absoluteUrl(SYNCOPS.logo),
         sameAs: [
           SYNCOPS.url,
           absoluteUrl("/syncops"),
           SYNCOPS.builder.url,
           absoluteUrl("/ceo"),
+          absoluteUrl("/salon-management-software"),
         ],
         brand: {
           "@type": "Brand",
           name: SYNCOPS.name,
           slogan: SITE_SEO.tagline,
         },
+        areaServed: "Worldwide",
       },
       {
         "@type": "SoftwareApplication",
@@ -314,13 +187,13 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         name: SYNCOPS.name,
         alternateName: [
           `${SYNCOPS.name} by ${SYNCOPS.builder.name}`,
-          `${SYNCOPS.name} Salon Platform`,
-          "Best salon software Pakistan",
+          SEO_BRAND.tagline,
           "Salon management software",
-          "Beauty salon POS software",
+          "Salon booking software",
+          "Salon POS software",
         ],
         applicationCategory: "BusinessApplication",
-        applicationSubCategory: "Salon management · POS · Online booking",
+        applicationSubCategory: "Salon management · POS · Online booking · CRM",
         operatingSystem: "Web",
         url: siteUrl,
         image: ogImage,
@@ -330,34 +203,29 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         publisher: { "@id": syncOpsOrgId },
         creator: { "@id": syncOpsOrgId },
         brand: { "@id": beautoraOrgId },
-        audience: {
-          "@type": "Audience",
-          geographicArea: [
-            { "@type": "Country", name: "Pakistan" },
-            { "@type": "AdministrativeArea", name: "Worldwide" },
-          ],
-        },
         offers: {
           "@type": "Offer",
           url: absoluteUrl("/pricing"),
           priceCurrency: "PKR",
           price: String(SUBSCRIPTION.monthlyAmountPkr),
           availability: "https://schema.org/InStock",
-          description: `${SUBSCRIPTION.trialDays} days free trial, then Rs ${PRICE}/month via JazzCash`,
+          description: `${SUBSCRIPTION.trialDays}-day free trial; see pricing for regional payment options`,
           seller: { "@id": syncOpsOrgId },
         },
         featureList: [
           "Online salon booking",
           "Salon POS and sales",
+          "Customer profiles (CRM)",
           "Staff and attendance",
           "Queue management",
-          "WhatsApp updates",
+          "WhatsApp messaging tools",
           "Inventory and reports",
           "Public store directory",
         ],
         sameAs: [
-          absoluteUrl("/salon-software"),
-          absoluteUrl("/salon-platform"),
+          absoluteUrl("/salon-management-software"),
+          absoluteUrl("/salon-booking-software"),
+          absoluteUrl("/salon-pos"),
           absoluteUrl("/features"),
           absoluteUrl("/stores"),
         ],
@@ -404,3 +272,21 @@ export function buildFaqJsonLd(
     })),
   };
 }
+
+export function buildBreadcrumbJsonLd(
+  items: readonly { name: string; path: string }[]
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: absoluteUrl(item.path),
+    })),
+  };
+}
+
+/** Kept for any legacy import; prefer SUBSCRIPTION display on pricing page. */
+export const SEO_PRICE_LABEL = `Rs ${PRICE}`;

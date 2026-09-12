@@ -7,7 +7,11 @@ import {
 } from "@/lib/actions/billing";
 import { BillingPaymentForm } from "@/components/billing/billing-payment-form";
 import { ViewSubscriptionInvoiceButton } from "@/components/billing/view-subscription-invoice-button";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
+import {
+  formatPlanAmount,
+  formatStoredPaymentAmount,
+  SUBSCRIPTION,
+} from "@/lib/billing/subscription";
 import {
   Card,
   CardContent,
@@ -23,7 +27,8 @@ function phaseBadge(phase: string) {
   if (phase === "lifetime") return <Badge className="bg-violet-700">Lifetime access</Badge>;
   if (phase === "trial") return <Badge variant="secondary">Free trial</Badge>;
   if (phase === "active") return <Badge className="bg-emerald-600">Active</Badge>;
-  if (phase === "grace") return <Badge className="bg-amber-500">Grace ({SUBSCRIPTION.graceDays}-day caution)</Badge>;
+  if (phase === "grace")
+    return <Badge className="bg-amber-500">Grace ({SUBSCRIPTION.graceDays}-day caution)</Badge>;
   return <Badge variant="destructive">Locked</Badge>;
 }
 
@@ -33,6 +38,9 @@ export default async function BillingPage() {
 
   const payments = await listMySubscriptionPayments();
   const { snapshot, orgName } = sub;
+  const plan = snapshot.plan;
+  const amountLabel = formatPlanAmount(plan);
+  const isUsdt = plan.method === "usdt_bep20";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -47,9 +55,9 @@ export default async function BillingPage() {
             <CardTitle>Store access paused</CardTitle>
             <CardDescription>
               The {SUBSCRIPTION.graceDays}-day caution window has ended. Send{" "}
-              {SUBSCRIPTION.currencyLabel}{" "}
-              {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")} via JazzCash to{" "}
-              <strong>{SUBSCRIPTION.jazzcashDisplay}</strong>, then submit proof below. After
+              <strong>{amountLabel}</strong> via {isUsdt ? "USDT (BEP-20)" : "JazzCash"} to{" "}
+              <strong className="break-all">{plan.destinationDisplay}</strong>
+              {plan.networkLabel ? ` · ${plan.networkLabel}` : ""}, then submit proof below. After
               Beautora verifies the payment, your store is re-enabled for{" "}
               {SUBSCRIPTION.periodDays} days.
             </CardDescription>
@@ -62,8 +70,8 @@ export default async function BillingPage() {
           <CardHeader>
             <CardTitle>Lifetime access</CardTitle>
             <CardDescription>
-              This store has complimentary / lifetime access. No monthly JazzCash subscription
-              is required. Beautora support can change this anytime.
+              This store has complimentary / lifetime access. No monthly subscription is required.
+              Beautora support can change this anytime.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -76,7 +84,7 @@ export default async function BillingPage() {
             <CardDescription>
               {snapshot.phase === "lifetime"
                 ? "Lifetime / complimentary — monthly fee waived"
-                : `1 month free trial → then ${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month (JazzCash)`}
+                : `1 month free trial → then ${amountLabel}/month (${isUsdt ? "USDT BEP-20" : "JazzCash"})`}
             </CardDescription>
           </div>
           {phaseBadge(snapshot.phase)}
@@ -119,26 +127,41 @@ export default async function BillingPage() {
             </p>
           )}
           {snapshot.phase !== "lifetime" && (
-            <p className="text-muted-foreground">
-              JazzCash: {SUBSCRIPTION.jazzcashDisplay} · Amount: {SUBSCRIPTION.currencyLabel}{" "}
-              {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}
-            </p>
+            <div className="space-y-1 text-muted-foreground">
+              <p>
+                {isUsdt ? "USDT wallet" : "JazzCash"}:{" "}
+                <span className="break-all font-medium text-foreground">
+                  {plan.destinationDisplay}
+                </span>
+              </p>
+              {plan.networkLabel ? <p>{plan.networkLabel}</p> : null}
+              <p>
+                Amount: <span className="font-medium text-foreground">{amountLabel}</span>
+              </p>
+              <p className="text-xs">
+                Payment method follows your store country in Settings (
+                {isUsdt ? "outside Pakistan → USDT" : "Pakistan → JazzCash"}).
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {snapshot.phase !== "lifetime" && (
-      <Card>
-        <CardHeader>
-          <CardTitle>Submit JazzCash payment</CardTitle>
-          <CardDescription>
-            Manual verification by Beautora — we re-enable your store after approval.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BillingPaymentForm />
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Submit {isUsdt ? "USDT" : "JazzCash"} payment
+            </CardTitle>
+            <CardDescription>
+              Manual verification by Beautora — we re-enable your store after approval. Platform
+              admin is notified when you submit proof.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BillingPaymentForm plan={plan} />
+          </CardContent>
+        </Card>
       )}
 
       <Card>
@@ -156,7 +179,8 @@ export default async function BillingPage() {
                     <p className="font-medium">Ref {p.transaction_ref}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(p.created_at).toLocaleString("en-PK")} ·{" "}
-                      {SUBSCRIPTION.currencyLabel} {Number(p.amount).toLocaleString("en-PK")}
+                      {formatStoredPaymentAmount(p.amount, p.currency)}
+                      {p.payment_method === "usdt_bep20" ? " · USDT" : " · JazzCash"}
                     </p>
                     {p.has_invoice && (
                       <div className="mt-2">

@@ -191,7 +191,7 @@ export function AuditLogTable({ logs }: { logs: AuditLogRow[] }) {
           }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{selected?.presented.actionLabel ?? "Audit details"}</DialogTitle>
             <DialogDescription>

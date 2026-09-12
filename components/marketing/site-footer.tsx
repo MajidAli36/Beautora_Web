@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BeautoraWordmark } from "@/components/brand/beautora-logo";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -9,7 +10,7 @@ export function SiteFooter() {
     <footer className="bg-[var(--m-ink)] text-[var(--m-accent-soft)]">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
-          <p className="font-display text-3xl font-semibold text-white">{SYNCOPS.name}</p>
+          <BeautoraWordmark size="lg" textClassName="text-white" />
           <p className="mt-2 text-sm text-white/60">
             The operating system for modern salons.
           </p>
@@ -17,8 +18,9 @@ export function SiteFooter() {
             {SYNCOPS.builder.label}
           </p>
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/45">
-            {SUBSCRIPTION.trialDays} days free, then {SUBSCRIPTION.currencyLabel}{" "}
-            {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month per store.
+            {SUBSCRIPTION.trialDays} days free, then Rs{" "}
+            {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/mo (Pakistan) or $
+            {SUBSCRIPTION.usdtAmountUsd} USDT/mo (international).
           </p>
         </div>
 
@@ -28,23 +30,23 @@ export function SiteFooter() {
           </p>
           <ul className="mt-4 space-y-2.5 text-sm text-white/70">
             <li>
+              <Link href="/salon-management-software" className="transition-colors hover:text-white">
+                Salon management
+              </Link>
+            </li>
+            <li>
+              <Link href="/salon-booking-software" className="transition-colors hover:text-white">
+                Booking
+              </Link>
+            </li>
+            <li>
+              <Link href="/salon-pos" className="transition-colors hover:text-white">
+                POS
+              </Link>
+            </li>
+            <li>
               <Link href="/features" className="transition-colors hover:text-white">
                 Features
-              </Link>
-            </li>
-            <li>
-              <Link href="/salon-platform" className="transition-colors hover:text-white">
-                Platform
-              </Link>
-            </li>
-            <li>
-              <Link href="/how-it-works" className="transition-colors hover:text-white">
-                How it works
-              </Link>
-            </li>
-            <li>
-              <Link href="/salon-software" className="transition-colors hover:text-white">
-                Salon software
               </Link>
             </li>
             <li>
@@ -58,8 +60,13 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
-              <Link href="/apps" className="transition-colors hover:text-white">
-                Apps
+              <Link href="/blog" className="transition-colors hover:text-white">
+                Blog
+              </Link>
+            </li>
+            <li>
+              <Link href="/tools" className="transition-colors hover:text-white">
+                Tools
               </Link>
             </li>
             <li>

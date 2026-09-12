@@ -85,7 +85,7 @@ type ActionMeta = {
   key: ActionKey;
   feature: NavKey;
   label: string;
-  /** Built-in minimum role before admin overrides */
+  /** Built-in default before org admin overrides in Staff → Features & actions */
   defaultMinRole: MemberRole;
 };
 

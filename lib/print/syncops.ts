@@ -1,6 +1,8 @@
 /** Platform brand — Beautora salon OS (product by SyncOps) */
 export const SYNCOPS = {
   name: "Beautora",
+  /** Product mark — transparent PNG */
+  logo: "/brand/beautora-logo.png",
   /** Canonical public site (www is the production host on Vercel). */
   url: "https://www.beautora.app",
   domain: "www.beautora.app",

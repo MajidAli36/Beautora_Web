@@ -330,6 +330,7 @@ export type Database = {
           organization_id: string;
           amount: number;
           currency: string;
+          payment_method: string;
           jazzcash_number: string;
           transaction_ref: string;
           payer_name: string | null;
@@ -349,6 +350,7 @@ export type Database = {
           organization_id: string;
           amount?: number;
           currency?: string;
+          payment_method?: string;
           jazzcash_number?: string;
           transaction_ref: string;
           payer_name?: string | null;
@@ -368,6 +370,7 @@ export type Database = {
           organization_id?: string;
           amount?: number;
           currency?: string;
+          payment_method?: string;
           jazzcash_number?: string;
           transaction_ref?: string;
           payer_name?: string | null;

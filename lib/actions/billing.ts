@@ -6,8 +6,10 @@ import { requireOrganization, getActiveOrganization } from "@/lib/auth/organizat
 import { hasMinimumRole } from "@/lib/permissions/roles";
 import {
   isPlatformAdminEmail,
+  resolveBillingPlanFromCountry,
   resolveSubscription,
   SUBSCRIPTION,
+  type BillingPlan,
   type SubscriptionSnapshot,
 } from "@/lib/billing/subscription";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,6 +18,7 @@ import {
   getSubscriptionInvoiceSignedUrl,
   uploadSubscriptionInvoice,
 } from "@/lib/storage/subscription-invoices";
+import { sendPlatformPaymentSubmittedEmail } from "@/lib/email/notify";
 import type { ActionResult } from "@/types/commerce";
 
 const MAX_INVOICE_BYTES = 5 * 1024 * 1024;
@@ -29,6 +32,8 @@ const ALLOWED_INVOICE_TYPES = new Set([
 export type BillingPaymentRow = {
   id: string;
   amount: number;
+  currency: string;
+  payment_method: "jazzcash" | "usdt_bep20";
   transaction_ref: string;
   payer_name: string | null;
   notes: string | null;
@@ -43,6 +48,7 @@ export type BillingPaymentRow = {
   organization_name?: string;
   organization_slug?: string;
   organization_city?: string | null;
+  organization_country?: string | null;
 };
 
 function invoiceExtension(mime: string): string | null {
@@ -65,7 +71,7 @@ export async function getOrganizationSubscription(): Promise<{
   const { data } = await admin
     .from("organizations")
     .select(
-      "id, name, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
+      "id, name, country, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
     )
     .eq("id", org.organizationId)
     .single();
@@ -112,15 +118,46 @@ export async function listMySubscriptionPayments(): Promise<BillingPaymentRow[]>
   const { data } = await supabase
     .from("subscription_payments")
     .select(
-      "id, amount, transaction_ref, payer_name, notes, status, jazzcash_number, created_at, reviewed_at, review_notes, invoice_path, invoice_mime"
+      "id, amount, currency, payment_method, transaction_ref, payer_name, notes, status, jazzcash_number, created_at, reviewed_at, review_notes, invoice_path, invoice_mime"
     )
     .eq("organization_id", org.organizationId)
     .order("created_at", { ascending: false })
     .limit(20);
 
-  return (data ?? []).map((row) => ({
+  return (data ?? []).map((row) => mapPaymentRow(row));
+}
+
+function mapPaymentRow(row: {
+  id: string;
+  amount: number | string;
+  currency?: string | null;
+  payment_method?: string | null;
+  transaction_ref: string;
+  payer_name: string | null;
+  notes: string | null;
+  status: string;
+  jazzcash_number: string;
+  created_at: string;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  invoice_path?: string | null;
+  invoice_mime?: string | null;
+  organization_id?: string;
+  organization?: {
+    name?: string;
+    slug?: string;
+    city?: string | null;
+    country?: string | null;
+  } | null;
+}): BillingPaymentRow {
+  const org = row.organization;
+  const method =
+    row.payment_method === "usdt_bep20" ? "usdt_bep20" : "jazzcash";
+  return {
     id: row.id,
     amount: Number(row.amount),
+    currency: (row.currency ?? (method === "usdt_bep20" ? "USD" : "PKR")).toUpperCase(),
+    payment_method: method,
     transaction_ref: row.transaction_ref,
     payer_name: row.payer_name,
     notes: row.notes,
@@ -130,8 +167,13 @@ export async function listMySubscriptionPayments(): Promise<BillingPaymentRow[]>
     reviewed_at: row.reviewed_at,
     review_notes: row.review_notes,
     has_invoice: Boolean(row.invoice_path),
-    invoice_mime: (row as { invoice_mime?: string | null }).invoice_mime ?? null,
-  }));
+    invoice_mime: row.invoice_mime ?? null,
+    organization_id: row.organization_id,
+    organization_name: org?.name,
+    organization_slug: org?.slug,
+    organization_city: org?.city ?? null,
+    organization_country: org?.country ?? null,
+  };
 }
 
 export async function submitSubscriptionPayment(input: {
@@ -142,29 +184,38 @@ export async function submitSubscriptionPayment(input: {
 }): Promise<ActionResult> {
   const org = await requireAction("billing.manage");
 
+  let plan: BillingPlan = resolveBillingPlanFromCountry(null);
+  let storeName = "Store";
   {
     const admin = createAdminClient();
     const { data: orgRow } = await admin
       .from("organizations")
-      .select("lifetime_access, admin_disabled_at")
+      .select("name, country, lifetime_access, admin_disabled_at")
       .eq("id", org.organizationId)
       .maybeSingle();
     if (orgRow?.lifetime_access && !orgRow.admin_disabled_at) {
       return {
         error:
-          "This store has lifetime access — monthly JazzCash payment is not required.",
+          "This store has lifetime access — monthly subscription payment is not required.",
       };
     }
+    plan = resolveBillingPlanFromCountry(orgRow?.country);
+    storeName = orgRow?.name?.trim() || "Store";
   }
 
   const ref = input.transactionRef.trim();
   if (ref.length < 4) {
-    return { error: "Enter your JazzCash transaction / reference ID" };
+    return {
+      error:
+        plan.method === "usdt_bep20"
+          ? "Enter your USDT transaction hash / reference ID"
+          : "Enter your JazzCash transaction / reference ID",
+    };
   }
 
   const invoice = input.invoice;
   if (!invoice || !(invoice instanceof File) || invoice.size === 0) {
-    return { error: "Upload your JazzCash invoice / payment screenshot" };
+    return { error: "Upload your payment invoice / screenshot" };
   }
   if (invoice.size > MAX_INVOICE_BYTES) {
     return { error: "Invoice must be 5 MB or smaller" };
@@ -200,9 +251,10 @@ export async function submitSubscriptionPayment(input: {
     .from("subscription_payments")
     .insert({
       organization_id: org.organizationId,
-      amount: SUBSCRIPTION.monthlyAmountPkr,
-      currency: "PKR",
-      jazzcash_number: SUBSCRIPTION.jazzcashNumber,
+      amount: plan.amount,
+      currency: plan.currency,
+      payment_method: plan.method,
+      jazzcash_number: plan.destination,
       transaction_ref: ref,
       payer_name: input.payerName?.trim() || null,
       notes: input.notes?.trim() || null,
@@ -212,19 +264,77 @@ export async function submitSubscriptionPayment(input: {
     .select("id")
     .single();
 
-  if (error || !created) return { error: error?.message ?? "Could not submit payment" };
+  if (error || !created) {
+    // Fallback if payment_method column not migrated yet
+    if (error?.message?.toLowerCase().includes("payment_method")) {
+      const legacy = await supabase
+        .from("subscription_payments")
+        .insert({
+          organization_id: org.organizationId,
+          amount: plan.amount,
+          currency: plan.currency,
+          jazzcash_number: plan.destination,
+          transaction_ref: ref,
+          payer_name: input.payerName?.trim() || null,
+          notes: input.notes?.trim() || null,
+          status: "pending",
+          submitted_by: user.id,
+        })
+        .select("id")
+        .single();
+      if (legacy.error || !legacy.data) {
+        return { error: legacy.error?.message ?? error.message };
+      }
+      return finishPaymentSubmit({
+        paymentId: legacy.data.id,
+        organizationId: org.organizationId,
+        storeName,
+        plan,
+        transactionRef: ref,
+        invoice,
+        mime,
+        extension,
+      });
+    }
+    return { error: error?.message ?? "Could not submit payment" };
+  }
+
+  return finishPaymentSubmit({
+    paymentId: created.id,
+    organizationId: org.organizationId,
+    storeName,
+    plan,
+    transactionRef: ref,
+    invoice,
+    mime,
+    extension,
+  });
+}
+
+async function finishPaymentSubmit(input: {
+  paymentId: string;
+  organizationId: string;
+  storeName: string;
+  plan: BillingPlan;
+  transactionRef: string;
+  invoice: File;
+  mime: string;
+  extension: string;
+}): Promise<ActionResult> {
+  const { paymentId, organizationId, storeName, plan, transactionRef, invoice, mime, extension } =
+    input;
 
   const bytes = Buffer.from(await invoice.arrayBuffer());
   const uploaded = await uploadSubscriptionInvoice({
-    organizationId: org.organizationId,
-    paymentId: created.id,
+    organizationId,
+    paymentId,
     bytes,
     contentType: mime,
     extension,
   });
 
   if (!uploaded.ok) {
-    await createAdminClient().from("subscription_payments").delete().eq("id", created.id);
+    await createAdminClient().from("subscription_payments").delete().eq("id", paymentId);
     return { error: uploaded.error };
   }
 
@@ -234,13 +344,25 @@ export async function submitSubscriptionPayment(input: {
       invoice_path: uploaded.result.path,
       invoice_mime: mime,
     })
-    .eq("id", created.id);
+    .eq("id", paymentId);
 
   if (pathErr) {
     return { error: pathErr.message };
   }
 
+  // Notify platform admin (email) — fire-and-forget; store submit still succeeds.
+  void sendPlatformPaymentSubmittedEmail({
+    organizationId,
+    storeName,
+    paymentId,
+    plan,
+    transactionRef,
+  }).catch((err) => {
+    console.warn("[email] platform payment notify failed", err);
+  });
+
   revalidatePath("/billing");
+  revalidatePath("/platform");
   revalidatePath("/platform/subscriptions");
   return { success: true };
 }
@@ -294,32 +416,12 @@ export async function listPendingPlatformPayments(): Promise<BillingPaymentRow[]
   const { data } = await admin
     .from("subscription_payments")
     .select(
-      "id, organization_id, amount, transaction_ref, payer_name, notes, status, jazzcash_number, created_at, reviewed_at, review_notes, invoice_path, invoice_mime, organization:organizations(name, slug, city)"
+      "id, organization_id, amount, currency, payment_method, transaction_ref, payer_name, notes, status, jazzcash_number, created_at, reviewed_at, review_notes, invoice_path, invoice_mime, organization:organizations(name, slug, city, country)"
     )
     .eq("status", "pending")
     .order("created_at", { ascending: true });
 
-  return (data ?? []).map((row) => {
-    const org = row.organization as { name?: string; slug?: string; city?: string | null } | null;
-    return {
-      id: row.id,
-      amount: Number(row.amount),
-      transaction_ref: row.transaction_ref,
-      payer_name: row.payer_name,
-      notes: row.notes,
-      status: row.status as BillingPaymentRow["status"],
-      jazzcash_number: row.jazzcash_number,
-      created_at: row.created_at,
-      reviewed_at: row.reviewed_at,
-      review_notes: row.review_notes,
-      has_invoice: Boolean(row.invoice_path),
-      invoice_mime: row.invoice_mime ?? null,
-      organization_id: row.organization_id,
-      organization_name: org?.name ?? "Store",
-      organization_slug: org?.slug,
-      organization_city: org?.city ?? null,
-    };
-  });
+  return (data ?? []).map((row) => mapPaymentRow(row as Parameters<typeof mapPaymentRow>[0]));
 }
 
 export async function reviewSubscriptionPayment(input: {
@@ -338,7 +440,7 @@ export async function reviewSubscriptionPayment(input: {
   const admin = createAdminClient();
   const { data: payment, error } = await admin
     .from("subscription_payments")
-    .select("id, organization_id, status, amount")
+    .select("id, organization_id, status, amount, currency, payment_method")
     .eq("id", input.paymentId)
     .single();
 
@@ -408,10 +510,16 @@ export async function reviewSubscriptionPayment(input: {
   // First approved subscription for a referred store → full amount to partner
   try {
     const { creditPartnerFirstSubscription } = await import("@/lib/actions/partners");
+    // Partner program is PKR-based — use JazzCash plan amount for USDT renewals.
+    const commissionPkr =
+      payment.payment_method === "usdt_bep20" ||
+      String(payment.currency ?? "").toUpperCase() === "USD"
+        ? SUBSCRIPTION.monthlyAmountPkr
+        : Number(payment.amount);
     await creditPartnerFirstSubscription({
       organizationId: org.id,
       paymentId: payment.id,
-      amountPkr: Number(payment.amount),
+      amountPkr: commissionPkr,
     });
   } catch (err) {
     console.error("partner commission failed", err);
@@ -419,10 +527,16 @@ export async function reviewSubscriptionPayment(input: {
 
   try {
     const { sendSubscriptionActivatedEmail } = await import("@/lib/email/notify");
+    const { formatStoredPaymentAmount } = await import("@/lib/billing/plans");
     await sendSubscriptionActivatedEmail({
       organizationId: org.id,
       paymentId: payment.id,
       amount: Number(payment.amount),
+      amountLabel: formatStoredPaymentAmount(
+        Number(payment.amount),
+        payment.currency ??
+          (payment.payment_method === "usdt_bep20" ? "USD" : "PKR")
+      ),
       renewsAt: nextEnd.toISOString(),
     });
   } catch (err) {

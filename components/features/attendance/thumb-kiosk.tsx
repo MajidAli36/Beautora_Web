@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/toast";
 import { formatTime } from "@/lib/format";
@@ -353,30 +361,39 @@ export function ThumbAttendanceKiosk() {
         </div>
       </section>
 
-      {setupOpen && savedKey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="w-full max-w-md space-y-4 rounded-xl border border-white/10 bg-slate-900 p-6">
-            <h3 className="font-semibold">Kiosk settings</h3>
+      <Sheet open={setupOpen && Boolean(savedKey)} onOpenChange={setSetupOpen}>
+        <SheetContent
+          side="right"
+          className="gap-0 border-white/10 bg-slate-900 p-0 text-white sm:max-w-2xl"
+          showCloseButton
+        >
+          <SheetHeader className="border-b border-white/10 px-5 py-5 pr-12">
+            <SheetTitle className="text-white">Kiosk settings</SheetTitle>
+            <SheetDescription className="text-white/60">
+              Update or disconnect this attendance device.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 px-5 py-5">
             <div className="space-y-2">
-              <Label>Device API key</Label>
+              <Label className="text-white/80">Device API key</Label>
               <Input
                 value={deviceKey || savedKey}
                 onChange={(e) => setDeviceKey(e.target.value)}
                 className="border-white/20 bg-white/10 text-white"
               />
             </div>
-            <div className="flex gap-2">
-              <Button onClick={saveKey}>Save</Button>
-              <Button variant="outline" onClick={() => setSetupOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="ghost" onClick={clearKey}>
-                Disconnect
-              </Button>
-            </div>
           </div>
-        </div>
-      )}
+          <SheetFooter className="flex-row flex-wrap gap-2 border-t border-white/10 bg-black/20 p-4 sm:space-y-0">
+            <Button onClick={saveKey}>Save</Button>
+            <Button variant="outline" onClick={() => setSetupOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="ghost" onClick={clearKey}>
+              Disconnect
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

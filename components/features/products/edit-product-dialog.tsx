@@ -70,7 +70,7 @@ export function EditProductButton({
         Edit
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit {catalog === "inhouse" ? "in-house product" : "product"}</DialogTitle>
             <DialogDescription>

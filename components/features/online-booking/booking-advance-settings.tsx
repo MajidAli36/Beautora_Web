@@ -27,9 +27,10 @@ export function BookingAdvanceSettings({ settings }: Props) {
       <CardHeader>
         <CardTitle>Online advance payment</CardTitle>
         <CardDescription>
-          Set how much customers must pay in advance when booking online. Use a fixed amount{" "}
-          <em>or</em> a percent of selected services (not both — fixed wins if you fill both). Leave
-          both at 0 for no advance. Admin approves payment before the appointment is confirmed.
+          Applies only to the public online booking page — not in-house appointments, POS, or
+          walk-ins. Set how much guests must pay up front online: fixed amount <em>or</em> a percent
+          of selected services (fixed wins if both are filled). Leave both at 0 for no advance.
+          Staff approve the payment screenshot before the online booking is confirmed.
         </CardDescription>
       </CardHeader>
       <CardContent>

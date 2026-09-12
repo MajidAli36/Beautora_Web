@@ -46,6 +46,20 @@ const nextConfig: NextConfig = {
   },
   // Host redirects are owned by Vercel:
   // beautora.app → www.beautora.app. Do NOT redirect www → apex here (causes a loop).
+  async redirects() {
+    return [
+      {
+        source: "/salon-software",
+        destination: "/salon-management-software",
+        permanent: true,
+      },
+      {
+        source: "/salon-platform",
+        destination: "/salon-management-software",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

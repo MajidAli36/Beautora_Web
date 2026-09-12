@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Scissors, UserRound, Wallet } from "lucide-react";
+import { ChevronDown, UserRound, Wallet } from "lucide-react";
+import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { filterNavGroupsForRole, type NavPermissionsConfig } from "@/lib/permissions/nav";
 import type { MemberRole } from "@/types";
 import { getInitials } from "@/lib/format";
@@ -67,8 +68,8 @@ export function AppSidebar({
           <DropdownMenuTrigger
             className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-sidebar-accent outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Scissors className="size-4" />
+            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--m-ink)] ring-1 ring-sidebar-border">
+              <BeautoraLogo size="sm" className="size-7" />
             </div>
             <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-sm font-semibold text-foreground">{organizationName}</p>
