@@ -6,6 +6,7 @@
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { SEO_BRAND } from "@/lib/seo/constants";
+import { BEAUTORA_PRODUCT_PAIR } from "@/lib/marketing/products";
 import { absoluteUrl, getSiteUrl } from "@/lib/seo/urls";
 
 export { absoluteUrl, canonicalPath, getSiteUrl } from "@/lib/seo/urls";
@@ -14,27 +15,23 @@ export { SEO_BRAND, SEO_MARKETS, SEO_LOCALES } from "@/lib/seo/constants";
 
 const PRICE = SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK");
 
-/** Product SEO — global brand; Pakistan is one market, not the identity. */
+/** Product SEO — Salon Management (POS) + Marketplace. */
 export const SITE_SEO = {
   product: SEO_BRAND.product,
   builder: SEO_BRAND.builder,
   tagline: SEO_BRAND.tagline,
   titleDefault: SEO_BRAND.titleDefault,
   titleTemplate: SEO_BRAND.titleTemplate,
-  description: `${SEO_BRAND.product} is an AI-powered salon management platform by ${SEO_BRAND.builder} for beauty businesses worldwide — online booking, POS, CRM, staff, inventory, queue, WhatsApp tools, and reports. Available internationally; ${SUBSCRIPTION.trialDays}-day free trial.`,
-  shortDescription: `${SEO_BRAND.product} — ${SEO_BRAND.tagline}. Booking, POS, CRM, staff & analytics for modern beauty businesses.`,
+  description: `${SEO_BRAND.product} is ${SEO_BRAND.category} by ${SEO_BRAND.builder} — online booking, salon POS, CRM, staff, inventory, queue, WhatsApp, reports, and a product Marketplace with COD checkout. Available internationally; ${SUBSCRIPTION.trialDays}-day free trial.`,
+  shortDescription: `${SEO_BRAND.product} — ${BEAUTORA_PRODUCT_PAIR.title}. ${BEAUTORA_PRODUCT_PAIR.subtitle}`,
   keywords: [
     SEO_BRAND.product,
     SEO_BRAND.builder,
-    "AI-powered salon management software",
-    "salon management software",
-    "salon booking software",
-    "salon POS",
-    "salon CRM",
+    ...BEAUTORA_PRODUCT_PAIR.keywords,
     "beauty salon software",
     "spa management software",
     "barbershop software",
-    "online salon booking",
+    "salon CRM",
     "salon staff management",
   ],
   locale: SEO_BRAND.ogLocale,
@@ -44,12 +41,12 @@ export const SITE_SEO = {
 export const SITE_FAQ = [
   {
     question: "What is Beautora?",
-    answer: `Beautora is an AI-powered salon and beauty-business management platform by SyncOps — online booking, POS, CRM-style customer profiles, staff, queue, inventory, WhatsApp tools, and reports for salons worldwide.`,
+    answer: `Beautora is AI-powered Salon Management, POS & Marketplace by SyncOps — online booking, salon POS, CRM-style customer profiles, staff, queue, inventory, WhatsApp tools, reports, and a product Marketplace with COD checkout for beauty businesses worldwide.`,
   },
   {
     question: "Who is Beautora for?",
     answer:
-      "Hair salons, beauty salons, barbershops, spas, nail studios, med spas, and multi-chair beauty clinics that want one system for bookings, checkout, and team operations.",
+      "Hair salons, beauty salons, barbershops, spas, nail studios, med spas, and multi-chair beauty clinics that want one workspace for bookings, floor POS, team operations, and online product selling.",
   },
   {
     question: "Does Beautora work outside Pakistan?",

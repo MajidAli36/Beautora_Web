@@ -5,6 +5,7 @@ import { getActiveOrganization } from "@/lib/auth/organization";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
 import { getOrgNavPermissions } from "@/lib/actions/role-permissions";
 import { getOrganizationSubscription, getPlatformAdminFlag } from "@/lib/actions/billing";
+import { getAppMode } from "@/lib/marketplace/actions";
 import {
   canAccessNavKey,
   canAccessPath,
@@ -22,6 +23,7 @@ import { redirect } from "next/navigation";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { currencyFromCountry } from "@/lib/currency/from-country";
 import { runWithCurrency } from "@/lib/currency/runtime.server";
+import { parseProductIntent } from "@/lib/auth/account-types";
 
 export const metadata: Metadata = {
   title: {
@@ -41,11 +43,12 @@ export default async function AppLayout({
   if (!org) {
     redirect("/onboarding");
   }
-  const [overrides, billing, isPlatformAdmin, linkedStaff] = await Promise.all([
+  const [overrides, billing, isPlatformAdmin, linkedStaff, appMode] = await Promise.all([
     getOrgNavPermissions(),
     getOrganizationSubscription(),
     getPlatformAdminFlag(),
     getLinkedStaffProfile().catch(() => null),
+    getAppMode(),
   ]);
   const locked = billing?.snapshot.phase === "locked";
   const hasLifetimeAccess =
@@ -66,19 +69,31 @@ export default async function AppLayout({
   const myStaffHref = linkedStaff ? `/staff/${linkedStaff.id}` : null;
   const staffNavAllowed = canAccessNavKey(org.role, "staff", effectiveOverrides);
 
-  let landingPath = locked
-    ? "/billing"
-    : getDefaultLandingPath(org.role, effectiveOverrides);
+  let landingPath =
+    appMode === "marketplace"
+      ? "/marketplace"
+      : locked
+        ? "/billing"
+        : getDefaultLandingPath(org.role, effectiveOverrides);
 
   // Staff login with a linked salon profile lands on their own dashboard.
-  if (!locked && myStaffHref && (org.role === "STAFF" || !staffNavAllowed)) {
+  if (
+    appMode !== "marketplace" &&
+    !locked &&
+    myStaffHref &&
+    (org.role === "STAFF" || !staffNavAllowed)
+  ) {
     landingPath = myStaffHref;
   }
 
   const headerList = await headers();
   const pathname = headerList.get("x-pathname") ?? "";
+  const onMarketplace =
+    pathname === "/marketplace" || pathname.startsWith("/marketplace/");
   const onBilling =
-    pathname.startsWith("/billing") || pathname.startsWith("/platform");
+    pathname.startsWith("/billing") ||
+    pathname.startsWith("/platform") ||
+    onMarketplace;
   const onOwnStaffDashboard = isOwnStaffDashboardPath(pathname, linkedStaff?.id);
 
   if (locked && !onBilling) {
@@ -97,7 +112,13 @@ export default async function AppLayout({
   }
 
   // /staff directory without staff nav → own dashboard if linked
-  if (pathname === "/staff" && !locked && !staffNavAllowed && myStaffHref) {
+  if (
+    appMode !== "marketplace" &&
+    pathname === "/staff" &&
+    !locked &&
+    !staffNavAllowed &&
+    myStaffHref
+  ) {
     redirect(myStaffHref);
   }
 
@@ -114,6 +135,8 @@ export default async function AppLayout({
       showPlatformBilling={isPlatformAdmin}
       subscriptionLocked={Boolean(locked)}
       hasLifetimeAccess={hasLifetimeAccess}
+      appMode={appMode}
+      productIntent={parseProductIntent(user.user_metadata?.product_intent) ?? "both"}
     >
       {billing &&
         !hasLifetimeAccess &&

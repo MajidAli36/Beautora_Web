@@ -1,4 +1,4 @@
-/** Platform brand — Beautora salon OS (product by SyncOps) */
+/** Platform brand — Beautora Salon Management, POS & Marketplace (product by SyncOps) */
 export const SYNCOPS = {
   name: "Beautora",
   /** Product mark — transparent PNG */
@@ -12,7 +12,7 @@ export const SYNCOPS = {
   label: "Powered by Beautora",
   line: "Powered by Beautora · Built by SyncOps · www.beautora.app · syncops.tech",
   seoDescription:
-    "Beautora is the salon operating system from SyncOps — online booking, POS, staff, attendance, WhatsApp, and reports for modern beauty brands.",
+    "Beautora is Salon Management, POS & Marketplace from SyncOps — online booking, salon POS, staff, inventory, reports, and a product marketplace for modern beauty brands.",
   html: `<span class="credit">Powered by <strong>Beautora</strong> · Built by <strong>SyncOps</strong> · <a href="https://www.beautora.app" rel="noopener noreferrer me author">www.beautora.app</a> · <a href="https://syncops.tech" rel="noopener noreferrer me author">syncops.tech</a></span>`,
   /** Parent studio / product house */
   builder: {
@@ -22,7 +22,7 @@ export const SYNCOPS = {
     label: "Built by SyncOps",
     short: "Beautora — a SyncOps product",
     seoDescription:
-      "SyncOps builds software products for real businesses. Beautora is our salon operating system for bookings, POS, staff, and operations.",
+      "SyncOps builds software products for real businesses. Beautora is our Salon Management, POS & Marketplace platform for beauty operators.",
   },
   /** Thermal receipt footer lines (POS, token, appointment) */
   receipt: {

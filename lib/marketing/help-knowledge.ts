@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Beautora marketing help knowledge base — full platform coverage.
  * Keep answers factual; the site assistant must not invent features.
  */
@@ -23,6 +23,7 @@ export const HELP_SUGGESTIONS = [
   "How much does it cost?",
   "How does online booking work?",
   "How does POS checkout work?",
+  "What is Marketplace?",
   "How do I start a free trial?",
 ] as const;
 
@@ -34,6 +35,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "what is beautora",
       "beautora",
       "salon software",
+      "salon management",
+      "salon POS",
+      "marketplace",
       "salon os",
       "operating system",
       "platform",
@@ -42,9 +46,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "what do you do",
       "explain beautora",
     ],
-    answer: `${SYNCOPS.name} is the salon operating system from ${SYNCOPS.builder.name}. One login for the whole store: online booking, appointments, walk-in queue, POS & sales, services/products/chairs, staff & attendance, customers, WhatsApp, feedback, inventory (retail + in-house), reports, finances, billing, and settings. It replaces juggling WhatsApp, notebooks, spreadsheets, and a separate POS.`,
+    answer: `${SYNCOPS.name} is Salon Management, POS & Marketplace from ${SYNCOPS.builder.name}. One workspace for the whole store: online booking, appointments, walk-in queue, salon POS & sales, services/products/chairs, staff & attendance, customers, WhatsApp, feedback, inventory (retail + in-house), reports, finances, billing, settings — plus a separate Marketplace to list products and take COD orders online (shop stock and money stay separate from salon POS). It replaces juggling WhatsApp, notebooks, spreadsheets, a separate till, and a random online shop.`,
     links: [
       { label: "Platform", href: "/salon-management-software" },
+      { label: "Marketplace shop", href: "/shop" },
       { label: "How it works", href: "/how-it-works" },
     ],
   },
@@ -66,9 +71,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "tell me everything",
       "overview",
     ],
-    answer: `Beautora includes: Dashboard · Customers · Appointments (in-house + online + deposit approvals) · Queue (walk-in tokens) · POS · Sales (amend / void / refund / dues) · Services & packages · Products (retail) · In-house stock (cream/ml recipes) · Chairs · Staff & roles · Attendance (fingerprint kiosk) · Devices (printer, drawer, token, attendance) · Reports · Finances (expenses, staff pay, COGS, advances) · WhatsApp templates · Feedback ratings · Billing (trial / JazzCash) · Settings (hours, payment accounts, public listing, audit). Guests book on your public store page. Native mobile/desktop apps are Coming Soon — the web app is live today.`,
+    answer: `Beautora includes Salon Management: Dashboard · Customers · Appointments (in-house + online + deposit approvals) · Queue (walk-in tokens) · POS · Sales (amend / void / refund / dues) · Services & packages · Products (retail) · In-house stock (cream/ml recipes) · Chairs · Staff & roles · Attendance (fingerprint kiosk) · Devices (printer, drawer, token, attendance) · Reports · Finances (expenses, staff pay, COGS, advances) · WhatsApp templates · Feedback ratings · Billing (trial / JazzCash) · Settings. Plus Marketplace: product listings, COD shop orders, marketplace stock, and seller tools — separate from salon POS inventory and finances. Guests book on your public store page and shop on /shop. Native mobile/desktop apps are Coming Soon — the web app is live today.`,
     links: [
       { label: "Platform modules", href: "/salon-management-software" },
+      { label: "Marketplace shop", href: "/shop" },
       { label: "Pricing", href: "/pricing" },
       { label: "Start free", href: "/signup" },
     ],
@@ -262,8 +268,33 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "cashier",
     ],
     answer:
-      "POS builds a cart of services, retail products, and packages; attributes multi-staff; links an open appointment; applies deposit credit; supports discount/tax; takes cash/card/other (including partial pay and unpaid dues with permission); can collect prior due invoices in the same flow; previews in-house usage (cream/ml) before deducting stock; prints receipts; opens the cash drawer; or marks no-show without billing.",
-    links: [{ label: "Platform", href: "/salon-management-software" }],
+      "POS builds a cart of services, retail products, and packages; attributes multi-staff; links an open appointment; applies deposit credit; supports discount/tax; takes cash/card/other (including partial pay and unpaid dues with permission); can collect prior due invoices in the same flow; previews in-house usage (cream/ml) before deducting stock; prints receipts; opens the cash drawer; or marks no-show without billing. Marketplace shop sales are separate — they do not mix into salon POS stock or finances.",
+    links: [
+      { label: "Platform", href: "/salon-management-software" },
+      { label: "Marketplace shop", href: "/shop" },
+    ],
+  },
+  {
+    id: "marketplace",
+    title: "Marketplace & online product selling",
+    keywords: [
+      "marketplace",
+      "sell products online",
+      "cod",
+      "cash on delivery",
+      "online shop",
+      "product marketplace",
+      "beautora shop",
+      "seller",
+      "commerce",
+    ],
+    answer:
+      "Beautora Marketplace lets stores and sellers list products and take COD orders on the public /shop experience. Marketplace inventory, orders, and payouts stay separate from salon POS products and finances. Switch between Salon Management and Marketplace in the app mode switcher. Platform moderation may review listings.",
+    links: [
+      { label: "Marketplace shop", href: "/shop" },
+      { label: "Videos", href: "/videos" },
+      { label: "Start free", href: "/signup" },
+    ],
   },
   {
     id: "sales",

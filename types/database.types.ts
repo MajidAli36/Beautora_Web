@@ -1580,11 +1580,222 @@ export type Database = {
         Update: Record<string, unknown>;
         Relationships: [];
       };
+      marketplace_sellers: {
+        Row: {
+          id: string;
+          user_id: string;
+          organization_id: string | null;
+          shop_name: string;
+          slug: string;
+          bio: string | null;
+          payout_notes: string | null;
+          status: "pending" | "approved" | "suspended";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          organization_id?: string | null;
+          shop_name: string;
+          slug: string;
+          bio?: string | null;
+          payout_notes?: string | null;
+          status?: "pending" | "approved" | "suspended";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_sellers"]["Insert"]>;
+        Relationships: [];
+      };
+      marketplace_categories: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_categories"]["Insert"]>;
+        Relationships: [];
+      };
+      marketplace_products: {
+        Row: {
+          id: string;
+          seller_id: string;
+          category_id: string | null;
+          title: string;
+          slug: string;
+          description: string | null;
+          price: number;
+          stock: number;
+          image_url: string | null;
+          status: "draft" | "pending" | "published" | "rejected";
+          rejection_reason: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          seller_id: string;
+          category_id?: string | null;
+          title: string;
+          slug: string;
+          description?: string | null;
+          price: number;
+          stock?: number;
+          image_url?: string | null;
+          status?: "draft" | "pending" | "published" | "rejected";
+          rejection_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_products"]["Insert"]>;
+        Relationships: [];
+      };
+      marketplace_orders: {
+        Row: {
+          id: string;
+          order_number: string;
+          buyer_name: string;
+          buyer_phone: string;
+          buyer_address: string;
+          buyer_notes: string | null;
+          status: "placed" | "confirmed" | "shipped" | "delivered" | "cancelled";
+          payment_method: string;
+          subtotal: number;
+          total: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_number: string;
+          buyer_name: string;
+          buyer_phone: string;
+          buyer_address: string;
+          buyer_notes?: string | null;
+          status?: "placed" | "confirmed" | "shipped" | "delivered" | "cancelled";
+          payment_method?: string;
+          subtotal?: number;
+          total?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_orders"]["Insert"]>;
+        Relationships: [];
+      };
+      marketplace_order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          seller_id: string;
+          product_id: string | null;
+          product_title: string;
+          unit_price: number;
+          quantity: number;
+          line_total: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          seller_id: string;
+          product_id?: string | null;
+          product_title: string;
+          unit_price: number;
+          quantity: number;
+          line_total: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_order_items"]["Insert"]>;
+        Relationships: [];
+      };
+      marketplace_commissions: {
+        Row: {
+          id: string;
+          order_id: string;
+          seller_id: string;
+          gross_amount: number;
+          rate: number;
+          commission_amount: number;
+          payout_status: "owed" | "paid";
+          payout_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          seller_id: string;
+          gross_amount: number;
+          rate?: number;
+          commission_amount: number;
+          payout_status?: "owed" | "paid";
+          payout_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_commissions"]["Insert"]>;
+        Relationships: [];
+      };
+      marketplace_payouts: {
+        Row: {
+          id: string;
+          seller_id: string;
+          amount: number;
+          notes: string | null;
+          paid_at: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          seller_id: string;
+          amount: number;
+          notes?: string | null;
+          paid_at?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_payouts"]["Insert"]>;
+        Relationships: [];
+      };
+      marketplace_reviews: {
+        Row: {
+          id: string;
+          product_id: string;
+          rating: number;
+          comment: string | null;
+          reviewer_name: string;
+          is_hidden: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          rating: number;
+          comment?: string | null;
+          reviewer_name: string;
+          is_hidden?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["marketplace_reviews"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       next_queue_token_number: { Args: { org_id: string }; Returns: number };
       next_booking_number: { Args: { org_id: string }; Returns: string };
+      next_marketplace_order_number: { Args: Record<string, never>; Returns: string };
     };
     Enums: {
       member_role: MemberRole;

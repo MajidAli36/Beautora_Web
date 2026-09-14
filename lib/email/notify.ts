@@ -6,6 +6,7 @@ import {
   partnerWelcomeVerifyEmail,
   passwordResetEmail,
   platformPaymentSubmittedEmail,
+  customerWelcomeVerifyEmail,
   salonWelcomeVerifyEmail,
   subscriptionActivatedEmail,
   subscriptionDeactivatedEmail,
@@ -53,6 +54,39 @@ export async function sendSalonSignupVerificationEmail(input: {
     idempotencyKey: input.userId
       ? `salon-verify:${input.userId}:${Math.floor(Date.now() / 60_000)}`
       : `salon-verify:${input.email}:${Math.floor(Date.now() / 60_000)}`,
+  });
+}
+
+export async function sendCustomerSignupVerificationEmail(input: {
+  email: string;
+  fullName?: string | null;
+  userId?: string;
+}) {
+  const link = await generateAuthActionLink({
+    email: input.email,
+    type: "magiclink",
+    nextPath: "/shop",
+  });
+  if (!link.ok) {
+    console.error("[email] customer verify link failed", { message: link.error });
+    return { ok: false as const, error: link.error };
+  }
+
+  const content = customerWelcomeVerifyEmail({
+    name: input.fullName,
+    verifyUrl: link.actionLink,
+  });
+
+  return sendTransactionalEmail({
+    to: input.email,
+    toName: input.fullName,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
+    type: EmailType.CustomerWelcomeVerify,
+    idempotencyKey: input.userId
+      ? `customer-verify:${input.userId}:${Math.floor(Date.now() / 60_000)}`
+      : `customer-verify:${input.email}:${Math.floor(Date.now() / 60_000)}`,
   });
 }
 

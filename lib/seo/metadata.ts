@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SEO_BRAND } from "@/lib/seo/constants";
+import { BEAUTORA_PRODUCT_PAIR } from "@/lib/marketing/products";
 import { absoluteUrl, canonicalPath, getSiteUrl } from "@/lib/seo/urls";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -17,13 +18,10 @@ export type PageMetadataInput = {
 const DEFAULT_KEYWORDS = [
   SEO_BRAND.product,
   SEO_BRAND.builder,
-  "salon management software",
-  "salon booking software",
-  "salon POS",
+  ...BEAUTORA_PRODUCT_PAIR.keywords,
   "beauty salon software",
   "spa management software",
   "barbershop software",
-  "online salon booking",
   "salon CRM",
   "salon staff management",
 ];
@@ -87,7 +85,7 @@ export function buildRootMetadata(): Metadata {
       default: SEO_BRAND.titleDefault,
       template: SEO_BRAND.titleTemplate,
     },
-    description: `${SEO_BRAND.product} is ${SEO_BRAND.category} by ${SEO_BRAND.builder} — online booking, POS, CRM, staff, inventory, and operations for beauty businesses worldwide.`,
+    description: `${SEO_BRAND.product} is ${SEO_BRAND.category} by ${SEO_BRAND.builder} — online booking, salon POS, CRM, staff, inventory, reports, and a product Marketplace for beauty businesses worldwide.`,
     applicationName: `${SEO_BRAND.product} by ${SEO_BRAND.builder}`,
     authors: [
       { name: SYNCOPS.builder.name, url: SYNCOPS.builder.url },
@@ -110,7 +108,7 @@ export function buildRootMetadata(): Metadata {
       url: siteUrl,
       siteName: `${SEO_BRAND.product} · ${SEO_BRAND.builder}`,
       title: SEO_BRAND.titleDefault,
-      description: `${SEO_BRAND.product} — ${SEO_BRAND.tagline}. Booking, POS, CRM, staff, and analytics for modern beauty businesses.`,
+      description: `${SEO_BRAND.product} — ${SEO_BRAND.tagline}. Salon POS, booking, and Marketplace in one workspace.`,
       images: [{ url: absoluteUrl("/opengraph-image"), width: 1200, height: 630 }],
     },
     twitter: {

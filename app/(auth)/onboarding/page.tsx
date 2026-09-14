@@ -7,7 +7,8 @@ import { requireAuth } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Quick start",
-  description: "Name your salon and open the Beautora dashboard.",
+  description:
+    "Choose Marketplace, Salon POS, or Both — then name your salon and open Beautora.",
 };
 
 export default async function OnboardingPage() {

@@ -7,7 +7,7 @@ import { SYNCOPS } from "@/lib/print/syncops";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Terms of Service",
-  description: `Terms of Service for ${SYNCOPS.name} salon management software by ${SYNCOPS.builder.name}.`,
+  description: `Terms of Service for ${SYNCOPS.name} Salon Management, POS & Marketplace by ${SYNCOPS.builder.name}.`,
   path: "/terms",
 });
 
@@ -23,8 +23,9 @@ export default function TermsPage() {
       <section>
         <h2>The service</h2>
         <p>
-          Beautora provides salon management tools including booking, POS, staff, queue, messaging
-          helpers, and reports. Features may evolve; we aim to keep core salon operations reliable.
+          Beautora provides Salon Management, POS & Marketplace tools including booking, salon
+          checkout, staff, queue, messaging helpers, reports, and online product selling. Features
+          may evolve; we aim to keep core salon and commerce operations reliable.
         </p>
       </section>
       <section>

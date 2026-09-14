@@ -15,6 +15,8 @@ const PRIMARY_NAV = [
   { label: "Features", href: "/features" },
   { label: "Pricing", href: "/pricing" },
   { label: "Stores", href: "/stores" },
+  { label: "Shop", href: "/shop" },
+  { label: "Videos", href: "/videos" },
 ] as const;
 
 const MORE_NAV = [

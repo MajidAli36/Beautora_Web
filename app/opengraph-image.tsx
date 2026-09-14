@@ -73,7 +73,7 @@ export default async function OpenGraphImage() {
             {SITE_SEO.tagline}
           </div>
           <div style={{ display: "flex", fontSize: 24, color: "#C5D4CE" }}>
-            {`A ${SYNCOPS.builder.name} product · Salon POS, booking & operations`}
+            {`A ${SYNCOPS.builder.name} product · Salon Management, POS & Marketplace`}
           </div>
         </div>
         <div

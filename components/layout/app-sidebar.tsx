@@ -6,7 +6,10 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, UserRound, Wallet } from "lucide-react";
 import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { filterNavGroupsForRole, type NavPermissionsConfig } from "@/lib/permissions/nav";
+import { marketplaceNavGroups } from "@/lib/navigation";
 import type { MemberRole } from "@/types";
+import type { AppMode } from "@/lib/marketplace/constants";
+import type { ProductIntent } from "@/lib/auth/account-types";
 import { getInitials } from "@/lib/format";
 import {
   Sidebar,
@@ -28,7 +31,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BRAND } from "@/lib/marketing/brand";
+import { productForMode } from "@/lib/marketing/products";
 import { UserMenu } from "@/components/layout/user-menu";
+import { AppModeSwitcherItems } from "@/components/layout/app-mode-switcher";
 
 type AppSidebarProps = {
   memberRole: MemberRole;
@@ -38,6 +43,8 @@ type AppSidebarProps = {
   userRole?: string;
   myStaffHref?: string | null;
   showPlatformBilling?: boolean;
+  appMode?: AppMode;
+  productIntent?: ProductIntent | null;
 };
 
 export function AppSidebar({
@@ -48,17 +55,23 @@ export function AppSidebar({
   userRole = "Owner",
   myStaffHref = null,
   showPlatformBilling = false,
+  appMode = "saas",
+  productIntent = "both",
 }: AppSidebarProps) {
   const pathname = usePathname();
-  const navGroups = useMemo(
-    () => filterNavGroupsForRole(memberRole, navOverrides),
-    [memberRole, navOverrides]
-  );
-  const showSettingsLink = navGroups.some((g) =>
-    g.items.some((item) => item.href === "/settings")
-  );
+  const isMarketplace = appMode === "marketplace";
+  const activeProduct = productForMode(appMode);
+  const navGroups = useMemo(() => {
+    if (isMarketplace) return marketplaceNavGroups;
+    return filterNavGroupsForRole(memberRole, navOverrides);
+  }, [isMarketplace, memberRole, navOverrides]);
+  const showSettingsLink =
+    !isMarketplace &&
+    navGroups.some((g) => g.items.some((item) => item.href === "/settings"));
   const myWorkActive = Boolean(
-    myStaffHref && (pathname === myStaffHref || pathname.startsWith(`${myStaffHref}/`))
+    !isMarketplace &&
+      myStaffHref &&
+      (pathname === myStaffHref || pathname.startsWith(`${myStaffHref}/`))
   );
 
   return (
@@ -73,15 +86,30 @@ export function AppSidebar({
             </div>
             <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-sm font-semibold text-foreground">{organizationName}</p>
-              <p className="truncate text-xs text-muted-foreground">{BRAND.tagline}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {activeProduct.name} · {activeProduct.tagline}
+              </p>
             </div>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuItem disabled>{organizationName}</DropdownMenuItem>
+          <DropdownMenuContent align="start" className="w-[min(100vw-2rem,20rem)]">
+            <DropdownMenuItem disabled className="opacity-100">
+              <span className="min-w-0 flex-1 space-y-0.5">
+                <span className="block truncate text-sm font-semibold">{organizationName}</span>
+                <span className="block text-[11px] leading-snug text-muted-foreground whitespace-normal">
+                  Active: {activeProduct.name} — {activeProduct.tagline}
+                </span>
+              </span>
+            </DropdownMenuItem>
+            <AppModeSwitcherItems mode={appMode} productIntent={productIntent} />
             {showSettingsLink && (
               <DropdownMenuItem>
                 <Link href="/settings">Workspace settings</Link>
+              </DropdownMenuItem>
+            )}
+            {isMarketplace && (
+              <DropdownMenuItem>
+                <Link href="/marketplace/settings">Shop settings</Link>
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -89,7 +117,7 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-3">
-        {myStaffHref ? (
+        {!isMarketplace && myStaffHref ? (
           <SidebarGroup>
             <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
               Me
@@ -120,22 +148,25 @@ export function AppSidebar({
               <SidebarMenu>
                 {group.items.map((item) => {
                   const isActive =
-                    pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    pathname === item.href ||
+                    (item.href !== "/marketplace" &&
+                      pathname.startsWith(`${item.href}/`)) ||
+                    (item.href === "/marketplace" && pathname === "/marketplace");
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         isActive={isActive}
                         tooltip={item.title}
                         className="h-10 rounded-lg px-2.5 transition-colors duration-150 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:[&_svg]:text-sidebar-accent-foreground"
-                        render={<Link href={item.href} />}
+                        render={
+                          <Link
+                            href={item.href}
+                            target={item.href === "/shop" ? "_blank" : undefined}
+                          />
+                        }
                       >
                         <item.icon className="size-[18px] shrink-0" />
                         <span className="text-[13px]">{item.title}</span>
-                        {item.badge ? (
-                          <span className="ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                            {item.badge}
-                          </span>
-                        ) : null}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );

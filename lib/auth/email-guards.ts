@@ -4,13 +4,18 @@ import { isHardcodedPlatformAdminEmail } from "@/lib/platform/admin";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-export type EmailIntent = "salon_signup" | "partner_apply" | "team_invite";
+export type EmailIntent =
+  | "salon_signup"
+  | "customer_signup"
+  | "partner_apply"
+  | "team_invite";
 
 export type AuthAccountKind =
   | "platform_admin"
   | "partner"
   | "staff"
   | "owner"
+  | "customer"
   | "unknown";
 
 export function normalizeEmail(email: string) {
@@ -26,6 +31,7 @@ export function classifyAuthMetadata(
   const type = typeof meta.account_type === "string" ? meta.account_type : "";
   if (type === "platform_admin") return "platform_admin";
   if (type === "partner") return "partner";
+  if (type === "customer") return "customer";
   if (
     type === "staff" ||
     meta.created_by_admin === true ||
@@ -57,8 +63,8 @@ function messageForExistingAccount(
   intent: EmailIntent
 ): string {
   if (kind === "partner") {
-    if (intent === "salon_signup") {
-      return "This email is registered as a Beautora partner. Partners cannot open a salon with the same email — use a different email, or sign in to the partner portal.";
+    if (intent === "salon_signup" || intent === "customer_signup") {
+      return "This email is registered as a Beautora partner. Partners cannot open a salon or shopper account with the same email — use a different email, or sign in to the partner portal.";
     }
     if (intent === "team_invite") {
       return "This email belongs to a partner account and cannot be invited as salon staff.";
@@ -67,8 +73,8 @@ function messageForExistingAccount(
   }
 
   if (kind === "staff") {
-    if (intent === "salon_signup") {
-      return "This email is already a staff login for a salon. Sign in with your invite credentials — you cannot open a new store with this email.";
+    if (intent === "salon_signup" || intent === "customer_signup") {
+      return "This email is already a staff login for a salon. Sign in with your invite credentials — you cannot open a new store or shopper account with this email.";
     }
     if (intent === "partner_apply") {
       return "This email is already a salon staff login. Staff accounts cannot register as partners — use a different email.";
@@ -76,7 +82,23 @@ function messageForExistingAccount(
     return "This email is already a staff login.";
   }
 
+  if (kind === "customer") {
+    if (intent === "salon_signup") {
+      return "This email is already a Marketplace shopper account. Sign in to shop, or use a different email to open a salon.";
+    }
+    if (intent === "partner_apply") {
+      return "This email is already a shopper account. Use a different email for partner registration.";
+    }
+    if (intent === "team_invite") {
+      return "This email is a shopper account and cannot be invited as salon staff. Use a different email.";
+    }
+    return "An account with this email already exists. Please sign in.";
+  }
+
   if (kind === "owner") {
+    if (intent === "customer_signup") {
+      return "This email already owns a salon account. Sign in to your salon, or use a different email to shop.";
+    }
     if (intent === "partner_apply") {
       return "This email already owns a salon account. Salon owners cannot register as partners with the same email.";
     }
@@ -131,8 +153,8 @@ export async function getEmailBlockReason(
     .maybeSingle();
 
   if (partner) {
-    if (intent === "salon_signup") {
-      return "This email is registered as a Beautora partner. Use a different email to open a salon.";
+    if (intent === "salon_signup" || intent === "customer_signup") {
+      return "This email is registered as a Beautora partner. Use a different email.";
     }
     if (intent === "team_invite") {
       return "This email belongs to a partner and cannot be invited as salon staff.";
@@ -150,8 +172,8 @@ export async function getEmailBlockReason(
     .maybeSingle();
 
   if (pendingInvite) {
-    if (intent === "salon_signup") {
-      return "This email was invited to a salon team. Accept the invite from your email — you cannot open a new store with it.";
+    if (intent === "salon_signup" || intent === "customer_signup") {
+      return "This email was invited to a salon team. Accept the invite from your email — you cannot open a new store or shopper account with it.";
     }
     if (intent === "partner_apply") {
       return "This email was invited to a salon team. Accept that invite or use a different email for partner registration.";

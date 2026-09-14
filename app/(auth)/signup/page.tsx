@@ -5,9 +5,9 @@ import { SignupForm } from "@/components/features/auth/signup-form";
 import { buildPageMetadata } from "@/lib/seo/site";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Open a store",
+  title: "Sign up",
   description:
-    "Create your Beautora salon account — POS, booking, and staff tools by SyncOps. First month free.",
+    "Create a Beautora account as a Marketplace shopper or salon owner — then configure Marketplace, Salon POS, or Both.",
   path: "/signup",
 });
 

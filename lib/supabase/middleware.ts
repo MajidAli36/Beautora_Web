@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isPlatformAdminEmail } from "@/lib/billing/subscription";
+import {
+  isCustomerAccount,
+  landingPathForProductIntent,
+  parseProductIntent,
+} from "@/lib/auth/account-types";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import type { Database } from "@/types/database.types";
 
@@ -98,6 +103,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/settings") ||
     pathname.startsWith("/billing") ||
     pathname.startsWith("/platform") ||
+    pathname.startsWith("/marketplace") ||
     isPartnerDashboard;
 
   if (isServerAction) {
@@ -114,7 +120,25 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const isPlatformAdmin = isPlatformAdminEmail(user.email);
     const isPartner = await userIsPartner(supabase, user);
+    const isCustomer = isCustomerAccount(
+      user.user_metadata as Record<string, unknown>
+    );
     const isPlatformRoute = pathname.startsWith("/platform");
+
+    // Marketplace shoppers never enter salon app / onboarding / partner portal
+    if (isCustomer && !isPlatformAdmin) {
+      if (
+        (isAuthRoute && !isResetPasswordRoute) ||
+        isOnboardingRoute ||
+        isProtectedRoute
+      ) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/shop";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+      return supabaseResponse;
+    }
 
     // Partners only ever use the partner dashboard (never salon app / onboarding)
     if (isPartner && !isPlatformAdmin) {
@@ -133,6 +157,11 @@ export async function updateSession(request: NextRequest) {
     }
 
     const hasOrg = await userHasOrganization(supabase, user.id);
+    const ownerLanding = landingPathForProductIntent(
+      parseProductIntent(
+        (user.user_metadata as Record<string, unknown> | undefined)?.product_intent
+      )
+    );
 
     // Allow recovery + invite accept pages while authenticated
     if (isAuthRoute && !isResetPasswordRoute && !isInviteRoute) {
@@ -140,14 +169,14 @@ export async function updateSession(request: NextRequest) {
       url.pathname = isPlatformAdmin
         ? "/platform"
         : hasOrg
-          ? "/dashboard"
+          ? ownerLanding
           : "/onboarding";
       return NextResponse.redirect(url);
     }
 
     if (isOnboardingRoute && hasOrg) {
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname = ownerLanding;
       return NextResponse.redirect(url);
     }
 

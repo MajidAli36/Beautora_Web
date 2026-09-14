@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   DeleteProductButton,
 } from "@/components/features/products/product-actions";
@@ -8,6 +9,7 @@ import { EditProductButton } from "@/components/features/products/edit-product-d
 import { LinkProductToServiceButton } from "@/components/features/products/link-product-to-service-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import {
   Table,
@@ -49,11 +51,47 @@ export function InHouseProductsTable({
   linksByProduct: Record<string, ServiceLink[]>;
   canManage: boolean;
 }) {
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return products;
+    return products.filter((p) => {
+      const links = linksByProduct[p.id] ?? [];
+      const haystack = [
+        p.name,
+        p.sku ?? "",
+        p.category?.name ?? "",
+        p.unit_label ?? "",
+        p.is_active ? "active" : "inactive",
+        ...links.map((l) => l.serviceName),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [products, linksByProduct, query]);
+
   return (
-    <PaginatedList
-      items={products}
-      empty={<p className="text-sm text-muted-foreground">No in-house products yet.</p>}
-    >
+    <div className="space-y-3">
+      <Input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search name, SKU, category, or linked service…"
+        className="max-w-sm"
+        aria-label="Search in-house products"
+      />
+      <PaginatedList
+        items={filtered}
+        empty={
+          <p className="text-sm text-muted-foreground">
+            {products.length === 0
+              ? "No in-house products yet."
+              : "No products match your search."}
+          </p>
+        }
+      >
       {(slice) => (
         <div className="overflow-x-auto rounded-lg border">
           <Table>
@@ -203,5 +241,6 @@ export function InHouseProductsTable({
         </div>
       )}
     </PaginatedList>
+    </div>
   );
 }

@@ -104,9 +104,23 @@ export function LoginForm() {
     notify.success("Signed in successfully");
 
     const { resolvePostLoginDestination } = await import("@/lib/actions/partners");
+    const { safeAuthRedirect } = await import("@/lib/auth/account-types");
     const dest = await resolvePostLoginDestination();
-    // Soft navigate — avoid full browser reload flash after login
-    router.replace(dest);
+    const redirectParam = searchParams.get("redirect");
+
+    let next = dest;
+    if (dest === "/shop") {
+      next = safeAuthRedirect(redirectParam, "/shop");
+    } else if (
+      redirectParam &&
+      dest !== "/onboarding" &&
+      dest !== "/partner/dashboard" &&
+      dest !== "/platform"
+    ) {
+      next = safeAuthRedirect(redirectParam, dest);
+    }
+
+    router.replace(next);
     router.refresh();
   }
 
@@ -128,12 +142,12 @@ export function LoginForm() {
   }
 
   return (
-    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-7 sm:p-8">
+    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-5 sm:p-7 lg:p-8">
       <div>
-        <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-4xl">
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl lg:text-4xl">
           Sign in
         </h2>
-        <p className="mt-2 text-sm text-[var(--m-muted)]">
+        <p className="mt-1.5 text-sm text-[var(--m-muted)] sm:mt-2">
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"
@@ -150,11 +164,12 @@ export function LoginForm() {
           </Link>
         </p>
         <p className="mt-2 text-xs text-[var(--m-muted)]">
-          Partners land on the partner dashboard only — not the salon app.
+          Shoppers land on Marketplace Shop. Salon owners continue to onboarding or their
+          workspace. Partners use the partner dashboard only.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+      <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-7 sm:space-y-5">
         <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium text-[var(--m-ink-soft)]">
             Email

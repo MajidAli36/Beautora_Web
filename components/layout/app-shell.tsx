@@ -7,6 +7,8 @@ import { CurrencyProvider } from "@/components/providers/currency-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import type { NavPermissionsConfig } from "@/lib/permissions/nav";
 import type { MemberRole } from "@/types";
+import type { AppMode } from "@/lib/marketplace/constants";
+import type { ProductIntent } from "@/lib/auth/account-types";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -23,6 +25,8 @@ type AppShellProps = {
   showPlatformBilling?: boolean;
   subscriptionLocked?: boolean;
   hasLifetimeAccess?: boolean;
+  appMode?: AppMode;
+  productIntent?: ProductIntent | null;
 };
 
 export function AppShell({
@@ -38,7 +42,10 @@ export function AppShell({
   showPlatformBilling = false,
   subscriptionLocked = false,
   hasLifetimeAccess = false,
+  appMode = "saas",
+  productIntent = "both",
 }: AppShellProps) {
+  const isMarketplace = appMode === "marketplace";
   return (
     <CurrencyProvider country={organizationCountry}>
       <SidebarProvider>
@@ -48,8 +55,10 @@ export function AppShell({
           organizationName={organizationName}
           userEmail={userEmail}
           userRole={userRole}
-          myStaffHref={myStaffHref}
+          myStaffHref={isMarketplace ? null : myStaffHref}
           showPlatformBilling={showPlatformBilling}
+          appMode={appMode}
+          productIntent={productIntent}
         />
         <SidebarInset className="flex min-h-svh flex-col bg-background">
           <AppHeader
@@ -61,15 +70,17 @@ export function AppShell({
           <NavRouteGuard
             role={memberRole}
             overrides={navOverrides}
-            landingPath={landingPath}
-            myStaffHref={myStaffHref}
+            landingPath={isMarketplace ? "/marketplace" : landingPath}
+            myStaffHref={isMarketplace ? null : myStaffHref}
             subscriptionLocked={subscriptionLocked}
           >
             <div className="app-main relative flex-1 overflow-x-hidden overscroll-x-contain p-4 sm:p-6 lg:p-8">
               <NavigationLoader />
               {children}
             </div>
-            <QuickActionFab memberRole={memberRole} navOverrides={navOverrides} />
+            {!isMarketplace ? (
+              <QuickActionFab memberRole={memberRole} navOverrides={navOverrides} />
+            ) : null}
           </NavRouteGuard>
         </SidebarInset>
       </SidebarProvider>

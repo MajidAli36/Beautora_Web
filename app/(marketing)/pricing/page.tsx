@@ -12,9 +12,14 @@ export const revalidate = 0;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Pricing",
-  description: `${SYNCOPS.name} pricing for salon management software worldwide — ${SUBSCRIPTION.trialDays} days free trial, then Rs 3,000/month (Pakistan · JazzCash) or $15/month USDT BEP-20 (international).`,
+  description: `${SYNCOPS.name} pricing for Salon Management, POS & Marketplace worldwide — ${SUBSCRIPTION.trialDays} days free trial, then Rs 3,000/month (Pakistan · JazzCash) or $15/month USDT BEP-20 (international).`,
   path: "/pricing",
-  keywords: ["Beautora pricing", "salon software pricing", "salon POS subscription"],
+  keywords: [
+    "Beautora pricing",
+    "salon software pricing",
+    "salon POS subscription",
+    "salon marketplace pricing",
+  ],
 });
 
 export default async function PricingPage() {
@@ -31,8 +36,9 @@ export default async function PricingPage() {
             Simple per-store pricing
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
-            {SITE_SEO.product} gives every salon a full operating system — booking, POS,
-            staff, queue, WhatsApp tools, and reports — with regional payment options.
+            {SITE_SEO.product} includes Salon Management, POS & Marketplace — booking, floor
+            checkout, staff, queue, WhatsApp tools, reports, and online product selling — with
+            regional payment options.
           </p>
           <p className="mt-6 text-sm text-[var(--m-muted)]">
             Looking for features first?{" "}

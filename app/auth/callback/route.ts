@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { getActiveOrganization } from "@/lib/auth/organization";
+import {
+  isCustomerAccount,
+  landingPathForProductIntent,
+  parseProductIntent,
+  safeAuthRedirect,
+} from "@/lib/auth/account-types";
 import { createClient } from "@/lib/supabase/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 function safeNextPath(raw: string | null) {
-  if (!raw) return "/dashboard";
-  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
+  return safeAuthRedirect(raw, "/dashboard");
 }
 
 /**
@@ -68,19 +73,31 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const meta = user?.user_metadata as Record<string, unknown> | undefined;
+
+  if (isCustomerAccount(meta)) {
+    return NextResponse.redirect(`${origin}/shop`);
+  }
+
   const isPartner =
-    user?.user_metadata?.account_type === "partner" ||
-    requested.startsWith("/partner");
+    meta?.account_type === "partner" || requested.startsWith("/partner");
 
   if (isPartner) {
     return NextResponse.redirect(`${origin}/partner/dashboard`);
   }
 
   const org = await getActiveOrganization();
-  const destination = org
-    ? requested === "/onboarding"
-      ? "/dashboard"
-      : requested
-    : "/onboarding";
+  if (!org) {
+    return NextResponse.redirect(`${origin}/onboarding`);
+  }
+
+  const intentLanding = landingPathForProductIntent(
+    parseProductIntent(meta?.product_intent)
+  );
+  const destination =
+    requested === "/onboarding" || requested === "/dashboard"
+      ? intentLanding
+      : requested;
+
   return NextResponse.redirect(`${origin}${destination}`);
 }

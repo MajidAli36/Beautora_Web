@@ -1,16 +1,19 @@
 /**
- * Global SEO constants — Beautora is a worldwide salon SaaS brand.
+ * Global SEO constants — Beautora is Salon Management (POS) + Marketplace.
  * Pakistan is one market, not the global identity.
  */
+
+import { BEAUTORA_PRODUCT_PAIR } from "@/lib/marketing/products";
 
 export const SEO_BRAND = {
   product: "Beautora",
   builder: "SyncOps",
   /** Prefer env NEXT_PUBLIC_SITE_URL; fallback matches production www host. */
   fallbackSiteUrl: "https://www.beautora.app",
-  category: "AI-powered salon and beauty-business management platform",
-  tagline: "AI-Powered Salon Management Software",
-  titleDefault: "Beautora | AI-Powered Salon Management Software",
+  category:
+    "AI-powered salon management, POS, and marketplace platform for beauty businesses",
+  tagline: BEAUTORA_PRODUCT_PAIR.seoPhrase,
+  titleDefault: `Beautora | ${BEAUTORA_PRODUCT_PAIR.seoPhrase}`,
   titleTemplate: "%s | Beautora",
   /** Default language for global English site */
   htmlLang: "en",

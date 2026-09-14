@@ -10,15 +10,15 @@ import { SYNCOPS } from "@/lib/print/syncops";
 export const revalidate = 3600;
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Salon Software Features",
-  description: `${SYNCOPS.name} features for the best salon software experience: online booking, POS, staff & attendance, queue, WhatsApp, inventory, and reports — for salons in Pakistan and worldwide.`,
+  title: "Salon Management, POS & Marketplace Features",
+  description: `${SYNCOPS.name} features: online booking, salon POS, Marketplace commerce, staff & attendance, queue, WhatsApp, inventory, and reports — for beauty businesses worldwide.`,
   path: "/features",
   keywords: [
     "Beautora features",
     "salon POS features",
+    "salon marketplace features",
     "online salon booking software",
     "salon management features",
-    "best salon software features",
   ],
 });
 
@@ -31,11 +31,11 @@ export default function FeaturesPage() {
             Platform
           </p>
           <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl lg:text-6xl">
-            Everything your salon needs
+            Salon Management, POS & Marketplace
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
-            {SITE_SEO.tagline}. One Beautora workspace for bookings, floor ops, POS, and
-            reporting — built by {SYNCOPS.builder.name}.
+            {SITE_SEO.tagline}. One Beautora workspace for bookings, floor POS, reporting, and
+            online Marketplace retail — built by {SYNCOPS.builder.name}.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link

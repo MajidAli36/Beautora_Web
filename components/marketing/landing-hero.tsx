@@ -16,7 +16,7 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
       <div className="absolute inset-0">
         <Image
           src={HERO_IMAGE}
-          alt="Modern salon interior with styling stations — Beautora salon operating system"
+          alt="Modern salon interior with styling stations — Beautora Salon Management, POS & Marketplace"
           fill
           priority
           sizes="100vw"
@@ -31,20 +31,20 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
           <div className="m-fade-up flex items-center gap-3">
             <BeautoraLogo size="md" priority className="size-9 drop-shadow-sm" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--m-accent-soft)]">
-              Beautora · AI-powered salon management
+              Beautora · Salon Management, POS & Marketplace
             </p>
           </div>
           <h1 className="m-fade-up m-fade-up-delay-1 mt-4 font-display text-[2.35rem] font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.35rem]">
-            AI-Powered Salon
-            <span className="block font-medium text-white/90">Management Software</span>
+            AI-Powered Salon Management,
+            <span className="block font-medium text-white/90">POS & Marketplace</span>
           </h1>
           <p className="m-fade-up m-fade-up-delay-2 mt-5 max-w-md text-base leading-relaxed text-white/75 sm:text-lg">
-            Online booking, POS, CRM, staff, inventory, and reports — built for beauty businesses
-            worldwide.
+            Online booking, salon POS, CRM, staff, and reports — plus a Marketplace to sell products
+            online. Built for beauty businesses worldwide.
           </p>
           <div className="m-fade-up m-fade-up-delay-3 mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
             <Link
-              href="/signup"
+              href="/signup?as=owner"
               className="inline-flex h-12 items-center justify-center bg-white px-7 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-mist)]"
             >
               Start 30 days free

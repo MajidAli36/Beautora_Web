@@ -23,10 +23,37 @@ export function salonWelcomeVerifyEmail(input: {
       bodyHtml: `
         <p style="margin:0 0 12px;">Hi ${name},</p>
         <p style="margin:0 0 12px;">Welcome to <strong>${escapeHtml(SYNCOPS.name)}</strong>. Your store <strong>${salon}</strong> is almost ready.</p>
-        <p style="margin:0 0 12px;">Click the button below to verify your email and sign in. This link expires in about <strong>${hours} hours</strong>.</p>
+        <p style="margin:0 0 12px;">Click the button below to verify your email and continue onboarding. This link expires in about <strong>${hours} hours</strong>.</p>
         <p style="margin:0;font-size:13px;color:#6B7672;">If you didn’t create this account, you can ignore this email.</p>
       `,
       ctaLabel: "Verify email & continue",
+      ctaUrl: input.verifyUrl,
+      footerNote:
+        "For your security, never share this link. Beautora will never ask for your password by email.",
+    }),
+  };
+}
+
+export function customerWelcomeVerifyEmail(input: {
+  name?: string | null;
+  verifyUrl: string;
+  expiresHours?: number;
+}) {
+  const name = escapeHtml(input.name || "there");
+  const hours = input.expiresHours ?? 24;
+
+  return {
+    subject: `Welcome to ${SYNCOPS.name} Marketplace — verify your email`,
+    ...renderEmailLayout({
+      preheader: "Verify your email to shop on Beautora Marketplace.",
+      title: "Verify your email",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Hi ${name},</p>
+        <p style="margin:0 0 12px;">Welcome to <strong>${escapeHtml(SYNCOPS.name)} Marketplace</strong>. Verify your email to sign in, add products to your cart, and place COD orders.</p>
+        <p style="margin:0 0 12px;">This link expires in about <strong>${hours} hours</strong>.</p>
+        <p style="margin:0;font-size:13px;color:#6B7672;">If you didn’t create this account, you can ignore this email.</p>
+      `,
+      ctaLabel: "Verify email & shop",
       ctaUrl: input.verifyUrl,
       footerNote:
         "For your security, never share this link. Beautora will never ask for your password by email.",

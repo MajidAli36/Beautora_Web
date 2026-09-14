@@ -199,7 +199,7 @@ export default function CeoPage() {
             SyncOps & Beautora
           </p>
           <h2 className="mt-4 max-w-2xl font-display text-3xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-4xl">
-            Building the studio behind the salon OS.
+            Building the studio behind Salon Management, POS & Marketplace.
           </h2>
           <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <BackLink

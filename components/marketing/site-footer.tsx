@@ -12,7 +12,7 @@ export function SiteFooter() {
         <div>
           <BeautoraWordmark size="lg" textClassName="text-white" />
           <p className="mt-2 text-sm text-white/60">
-            The operating system for modern salons.
+            Salon Management, POS & Marketplace for modern beauty businesses.
           </p>
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--m-accent-soft)]">
             {SYNCOPS.builder.label}
@@ -57,6 +57,16 @@ export function SiteFooter() {
             <li>
               <Link href="/stores" className="transition-colors hover:text-white">
                 Stores
+              </Link>
+            </li>
+            <li>
+              <Link href="/shop" className="transition-colors hover:text-white">
+                Shop
+              </Link>
+            </li>
+            <li>
+              <Link href="/videos" className="transition-colors hover:text-white">
+                Videos
               </Link>
             </li>
             <li>

@@ -19,9 +19,9 @@ export const PUBLISHED_MARKET_PAGES: MarketPageContent[] = [
     slug: "usa",
     title: "Salon Management Software in the USA",
     description:
-      "Beautora salon management software for US beauty businesses — online booking, POS, CRM, staff, and reporting for salons nationwide.",
+      "Beautora Salon Management, POS & Marketplace for US beauty businesses — online booking, salon POS, CRM, staff, reporting, and product marketplace nationwide.",
     h1: "Salon Management Software in the USA",
-    lead: "US salons need reliable online booking, clean checkout, and team visibility. Beautora delivers a modern web platform for independent shops and growing studios.",
+    lead: "US salons need reliable online booking, clean checkout, team visibility, and a path to sell products online. Beautora delivers Salon Management, POS & Marketplace for independent shops and growing studios.",
     localNotes: [
       "Operate in English with a web-first workflow that fits US salon desks.",
       "Use store country settings for display currency appropriate to your business.",
@@ -39,9 +39,9 @@ export const PUBLISHED_MARKET_PAGES: MarketPageContent[] = [
     slug: "uk",
     title: "Salon Management Software in the UK",
     description:
-      "Beautora salon management software for UK salons — booking, POS, staff, and client history for British beauty businesses.",
+      "Beautora Salon Management, POS & Marketplace for UK salons — booking, POS, staff, client history, and online product selling for British beauty businesses.",
     h1: "Salon Management Software in the UK",
-    lead: "From high-street salons to multi-stylist studios, Beautora helps UK teams run booking, floor ops, and checkout in one place.",
+    lead: "From high-street salons to multi-stylist studios, Beautora helps UK teams run booking, floor POS, and Marketplace product sales in one workspace.",
     localNotes: [
       "Web-based POS and booking suit UK salon counters without a heavyweight install.",
       "Staff schedules keep online booking aligned to who is actually working.",
@@ -58,9 +58,9 @@ export const PUBLISHED_MARKET_PAGES: MarketPageContent[] = [
     slug: "uae",
     title: "Salon Management Software in the UAE",
     description:
-      "Beautora salon management software for UAE beauty businesses — online booking, POS, staff, and operations for Dubai and beyond.",
+      "Beautora Salon Management, POS & Marketplace for UAE beauty businesses — online booking, POS, staff, operations, and Marketplace retail for Dubai and beyond.",
     h1: "Salon Management Software in the UAE",
-    lead: "UAE salons move fast and serve international clients. Beautora supports online booking, clear checkout, and team coordination.",
+    lead: "UAE salons move fast and serve international clients. Beautora supports online booking, salon POS, team coordination, and Marketplace retail.",
     localNotes: [
       "English-first interface suitable for diverse salon teams.",
       "Public booking reduces WhatsApp-only scheduling pressure.",
@@ -77,9 +77,9 @@ export const PUBLISHED_MARKET_PAGES: MarketPageContent[] = [
     slug: "pakistan",
     title: "Salon Management Software in Pakistan",
     description:
-      "Beautora salon management software for Pakistan — JazzCash-friendly billing options, online booking, POS, staff, and a public salon directory.",
+      "Beautora Salon Management, POS & Marketplace for Pakistan — JazzCash-friendly billing, online booking, salon POS, staff, public directory, and Marketplace COD shop.",
     h1: "Salon Management Software in Pakistan",
-    lead: "Beautora started with strong Pakistan operations in mind — JazzCash subscription flows, Pakistan timezone booking, and a public directory — while remaining a global product.",
+    lead: "Beautora started with strong Pakistan operations in mind — JazzCash subscription flows, Pakistan timezone booking, a public directory, and Marketplace COD — while remaining a global Salon Management, POS & Marketplace product.",
     localNotes: [
       "Trial and subscription flows support JazzCash where configured.",
       "Booking times follow Pakistan Standard Time for local stores.",

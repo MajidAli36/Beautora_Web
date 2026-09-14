@@ -1,5 +1,12 @@
-const BEFORE = ["WhatsApp", "Notebook", "Spreadsheet", "Separate POS", "Manual reports"];
-const AFTER = ["Bookings", "Queue", "POS", "Staff", "Customers", "Reports"];
+const BEFORE = [
+  "WhatsApp",
+  "Notebook",
+  "Spreadsheet",
+  "Separate POS",
+  "Random online shop",
+  "Manual reports",
+];
+const AFTER = ["Bookings", "Queue", "Salon POS", "Marketplace", "Staff", "Customers", "Reports"];
 
 export function ProblemSolutionSection() {
   return (
@@ -13,11 +20,11 @@ export function ProblemSolutionSection() {
             Your salon shouldn&apos;t run on five different tools.
           </h2>
           <p className="mt-5 text-lg leading-relaxed text-[var(--m-muted)]">
-            Bookings in WhatsApp. Walk-ins on paper. Sales in a separate POS. Staff attendance
-            somewhere else. Reports built manually.
+            Bookings in WhatsApp. Walk-ins on paper. Sales in a separate POS. Products on a random
+            shop. Staff attendance somewhere else. Reports built manually.
           </p>
           <p className="mt-3 text-base font-medium text-[var(--m-ink-soft)]">
-            Beautora brings the entire operation together.
+            Beautora brings Salon Management, POS & Marketplace together.
           </p>
         </div>
 

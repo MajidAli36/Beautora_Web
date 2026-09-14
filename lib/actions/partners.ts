@@ -435,10 +435,8 @@ export async function getPartnerDashboard(): Promise<{
   };
 }
 
-/** Where to send the user after password login (partner → partner dashboard only). */
-export async function resolvePostLoginDestination(): Promise<
-  "/platform" | "/partner/dashboard" | "/dashboard" | "/onboarding"
-> {
+/** Where to send the user after password login. */
+export async function resolvePostLoginDestination(): Promise<string> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -446,6 +444,10 @@ export async function resolvePostLoginDestination(): Promise<
   if (!user) return "/onboarding";
 
   if (isPlatformAdminEmail(user.email)) return "/platform";
+
+  if (user.user_metadata?.account_type === "customer") {
+    return "/shop";
+  }
 
   const admin = createAdminClient();
   const { data: partner } = await admin
@@ -473,7 +475,16 @@ export async function resolvePostLoginDestination(): Promise<
     .select("*", { count: "exact", head: true })
     .eq("user_id", user.id);
 
-  return (count ?? 0) > 0 ? "/dashboard" : "/onboarding";
+  if ((count ?? 0) > 0) {
+    const { landingPathForProductIntent, parseProductIntent } = await import(
+      "@/lib/auth/account-types"
+    );
+    return landingPathForProductIntent(
+      parseProductIntent(user.user_metadata?.product_intent)
+    );
+  }
+
+  return "/onboarding";
 }
 
 export async function listPlatformPartners(): Promise<PartnerRow[]> {

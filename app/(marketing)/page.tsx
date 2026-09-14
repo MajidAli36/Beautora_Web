@@ -25,9 +25,11 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/",
   absoluteTitle: true,
   keywords: [
-    "AI-powered salon management software",
+    "AI-powered salon management POS marketplace",
+    "salon management and marketplace",
+    "salon POS software",
+    "salon marketplace",
     "salon booking software",
-    "salon POS",
     "salon CRM",
   ],
 });

@@ -39,6 +39,13 @@ const TABS = [
     caption: "Services, retail, and staff attribution in a single sale — ready for end-of-day reports.",
   },
   {
+    id: "marketplace",
+    label: "Marketplace",
+    title: "Sell products online",
+    caption:
+      "List products, take COD orders, and keep marketplace stock separate from salon POS finances.",
+  },
+  {
     id: "sales",
     label: "Sales",
     title: "Invoice history you can trust",
@@ -480,6 +487,23 @@ function TabMock({ tab }: { tab: TabId }) {
               Complete sale
             </p>
           </div>
+        </div>
+      );
+    case "marketplace":
+      return (
+        <div className="space-y-3">
+          <div className="border border-[var(--m-line)] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--m-accent)]">
+              Marketplace shop
+            </p>
+            <p className="mt-2 font-display text-xl font-semibold text-[var(--m-ink)]">
+              Sell products online
+            </p>
+            <p className="mt-1 text-xs text-[var(--m-muted)]">COD · Separate from salon POS</p>
+          </div>
+          <Row left="Hair serum" mid="In stock" right="Rs 2,200" />
+          <Row left="Shampoo kit" mid="In stock" right="Rs 3,500" />
+          <Row left="Order #1042" mid="COD pending" right="New" />
         </div>
       );
     case "sales":

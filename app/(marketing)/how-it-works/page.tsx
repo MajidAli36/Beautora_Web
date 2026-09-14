@@ -10,14 +10,14 @@ export const revalidate = 3600;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "How Beautora Works",
-  description: `See how ${SYNCOPS.name} salon software works: open your store, set services and staff, then run bookings, POS, and reports — trusted by salons in Pakistan and worldwide.`,
+  description: `See how ${SYNCOPS.name} Salon Management, POS & Marketplace works: open your store, set services and staff, run bookings and POS, then sell products online — trusted by salons worldwide.`,
   path: "/how-it-works",
   keywords: [
     "how Beautora works",
-    "salon software setup",
+    "salon POS setup",
+    "salon marketplace setup",
     "salon management how to start",
-    "online salon booking setup Pakistan",
-    "best salon software for beginners",
+    "online salon booking setup",
   ],
 });
 
@@ -33,8 +33,9 @@ export default function HowItWorksPage() {
             From signup to a live salon floor
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
-            {SITE_SEO.product} is built for beauty businesses in Pakistan and abroad — a clear path
-            from empty store to daily bookings, POS, and team ops. Built by {SYNCOPS.builder.name}.
+            {SITE_SEO.product} is built for beauty businesses worldwide — a clear path from empty
+            store to daily bookings, salon POS, team ops, and Marketplace product sales. Built by{" "}
+            {SYNCOPS.builder.name}.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link

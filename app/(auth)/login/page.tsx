@@ -8,7 +8,7 @@ import { SYNCOPS } from "@/lib/print/syncops";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Sign in",
-  description: `Sign in to your ${SYNCOPS.name} salon dashboard — a ${SYNCOPS.builder.name} product.`,
+  description: `Sign in to ${SYNCOPS.name} — Salon Management, POS & Marketplace by ${SYNCOPS.builder.name}.`,
   path: "/login",
   noIndex: true,
 });

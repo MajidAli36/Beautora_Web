@@ -7,11 +7,17 @@ import { buildPageMetadata } from "@/lib/seo/site";
 export const revalidate = 3600;
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Blog — Salon Operations Insights",
+  title: "Blog — Salon Management, POS & Marketplace",
   description:
-    "Practical articles for salon and beauty-business owners: booking, POS, no-shows, staffing, and operations — from Beautora.",
+    "Practical articles for salon and beauty-business owners: booking, POS, Marketplace, no-shows, staffing, and operations — from Beautora.",
   path: "/blog",
-  keywords: ["salon blog", "salon operations tips", "beauty business management"],
+  keywords: [
+    "salon blog",
+    "salon POS tips",
+    "salon marketplace",
+    "salon operations tips",
+    "beauty business management",
+  ],
 });
 
 export default function BlogIndexPage() {
@@ -21,10 +27,11 @@ export default function BlogIndexPage() {
         <div className="mx-auto max-w-6xl px-6 py-14">
           <Breadcrumbs items={[{ name: "Home", path: "/" }, { name: "Blog", path: "/blog" }]} />
           <h1 className="mt-8 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
-            Salon operations blog
+            Salon Management, POS & Marketplace blog
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
-            Short, useful articles for owners and managers — not keyword spam.
+            Short, useful articles for owners and managers — booking, floor POS, and selling
+            online.
           </p>
         </div>
       </div>

@@ -7,15 +7,17 @@ import {
   ArrowLeft,
   ArrowUpRight,
   CalendarDays,
+  Check,
   ClipboardList,
   Globe,
   Mail,
   MessageCircle,
+  ShoppingBag,
   ShoppingCart,
   Users,
 } from "lucide-react";
 import { BeautoraWordmark } from "@/components/brand/beautora-logo";
-import { CEO_PAGE } from "@/lib/marketing/ceo-page";
+import { BEAUTORA_PRODUCT_PAIR, BEAUTORA_PRODUCTS } from "@/lib/marketing/products";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +44,7 @@ type FeatureSlide = {
   headline: string;
   body: string;
   tagline: string;
+  points: string[];
   icon: typeof ShoppingCart;
 };
 
@@ -52,62 +55,80 @@ type CeoSlide = {
   headline: string;
   body: string;
   tagline: string;
+  points: string[];
 };
 
+/** Auth-only short copy — keeps the left panel viewport-fit (no scroll). */
 const CEO_SLIDE: CeoSlide = {
   kind: "ceo",
   id: "ceo",
-  eyebrow: CEO_PAGE.ceo.messageTitle,
-  headline: CEO_PAGE.ceo.headline,
-  body: CEO_PAGE.ceo.message,
-  tagline: CEO_PAGE.ceo.focus,
+  eyebrow: "Message from the CEO",
+  headline: "Built to last.",
+  body: "Partnerships over features — Salon Management, POS & Marketplace.",
+  tagline: "Booking → POS → Marketplace COD.",
+  points: ["Salon POS", "Marketplace shop", "One workspace", "Beauty-first"],
 };
 
 const FEATURE_SLIDES: FeatureSlide[] = [
   {
     kind: "feature",
     id: "pos",
-    eyebrow: "Point of sale",
-    headline: "Checkout that matches the salon floor.",
-    body: "Services, retail, and staff attribution in one sale — ready for end-of-day reports without juggling tools.",
-    tagline: "POS, invoices, and payments in one place.",
+    eyebrow: "Salon POS",
+    headline: "Checkout for the floor.",
+    body: "Services, retail, and staff credit in one sale.",
+    tagline: "Invoices & payments — one place.",
     icon: ShoppingCart,
+    points: ["One ticket", "Staff credit", "Cash & card", "End-of-day"],
+  },
+  {
+    kind: "feature",
+    id: "marketplace",
+    eyebrow: BEAUTORA_PRODUCTS.marketplace.name,
+    headline: "Sell products online.",
+    body: "COD shop orders — separate from salon POS money.",
+    tagline: `${BEAUTORA_PRODUCT_PAIR.title} — switch anytime.`,
+    icon: ShoppingBag,
+    points: ["Public shop", "Seller stock", "COD orders", "Commissions"],
   },
   {
     kind: "feature",
     id: "booking",
     eyebrow: "Online booking",
-    headline: "Clients book themselves — you stay in control.",
-    body: "Public store page with services, stylists, and slots. Optional advance payment when you need deposits.",
+    headline: "Clients book themselves.",
+    body: "Services, stylists, slots — optional deposits.",
     tagline: "Your booking link, your rules.",
     icon: CalendarDays,
+    points: ["Public page", "Pick stylist", "Deposits", "Into POS"],
   },
   {
     kind: "feature",
     id: "queue",
     eyebrow: "Queue & chairs",
-    headline: "Walk-ins without the chaos.",
-    body: "Issue tokens, assign chairs, and keep the floor ordered when appointments and walk-ins stack up.",
+    headline: "Walk-ins, ordered.",
+    body: "Tokens and chairs when the floor gets busy.",
     tagline: "Floor status you can trust.",
     icon: ClipboardList,
+    points: ["Walk-in tokens", "Chair assign", "Mix bookings", "Live desk"],
   },
   {
     kind: "feature",
     id: "staff",
     eyebrow: "Staff & attendance",
-    headline: "Who is on the floor — and who earned it.",
-    body: "Schedules, attendance, and sale attribution so payroll and performance stay clear.",
-    tagline: "Team ops built for busy days.",
+    headline: "Who earned it.",
+    body: "Rosters, check-in, and sale attribution.",
+    tagline: "Team ops for busy days.",
     icon: Users,
+    points: ["Schedules", "Attendance", "Sale credit", "Payroll view"],
   },
   {
     kind: "feature",
     id: "whatsapp",
     eyebrow: "WhatsApp & reports",
-    headline: "Follow-ups and numbers that stay connected.",
-    body: "Message clients when it matters, and read sales, attendance, and floor reports from the same system.",
-    tagline: "One operating system for modern salons.",
+    headline: "Follow-ups & numbers.",
+    body: "Client messages plus sales and floor reports.",
+    tagline: `${BEAUTORA_PRODUCT_PAIR.title} in one workspace.`,
     icon: MessageCircle,
+    points: ["WhatsApp", "Sales reports", "Feedback", "Owner view"],
   },
 ];
 
@@ -140,7 +161,7 @@ export function AuthBrandPanel(_props: AuthBrandPanelProps = {}) {
 
   return (
     <aside
-      className="relative flex min-h-0 flex-col overflow-hidden bg-[var(--m-ink)] text-white max-lg:shrink-0 lg:min-h-full lg:w-[48%]"
+      className="auth-brand relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[var(--m-ink)] text-white"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -149,7 +170,7 @@ export function AuthBrandPanel(_props: AuthBrandPanelProps = {}) {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_10%_-8%,rgba(197,212,206,0.18),transparent_55%),radial-gradient(700px_420px_at_90%_85%,rgba(61,107,95,0.35),transparent_50%)]"
       />
 
-      <div className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-8 lg:px-10">
+      <div className="relative z-10 flex shrink-0 items-center justify-between px-[clamp(1.25rem,3vw,2.25rem)] py-[clamp(0.65rem,1.6vh,1rem)]">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm font-medium text-white/70 transition-colors hover:text-white"
@@ -162,105 +183,119 @@ export function AuthBrandPanel(_props: AuthBrandPanelProps = {}) {
         </Link>
       </div>
 
-      <div className="relative z-10 hidden flex-1 flex-col justify-center px-6 py-10 sm:flex sm:px-8 lg:flex lg:px-12 xl:px-14">
-        <div key={message.id} className="auth-slide-panel space-y-8">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--m-accent-soft)]">
-              {message.eyebrow}
-            </p>
-            <h1 className="mt-5 max-w-xl font-display text-[1.85rem] font-semibold leading-[1.15] tracking-tight text-white sm:text-4xl lg:text-[2.55rem]">
-              {message.headline}
-            </h1>
-          </div>
-
-          {isCeo ? (
-            <div className="flex items-start gap-4">
-              <div className="relative size-14 shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/25 sm:size-16">
-                <Image
-                  src={SYNCOPS.ceo.photo}
-                  alt={`${SYNCOPS.ceo.name}, ${SYNCOPS.ceo.role} of ${SYNCOPS.builder.name}`}
-                  fill
-                  sizes="64px"
-                  className="object-cover object-[center_20%]"
-                  priority
-                />
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <p className="text-[15px] font-semibold text-white">{SYNCOPS.ceo.name}</p>
-                <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
-                  {SYNCOPS.ceo.role}, {SYNCOPS.builder.name}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-white/60">
-                  Building Beautora and enterprise digital products worldwide.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-start gap-4">
-              <div className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/5 ring-1 ring-white/15 sm:size-16">
-                <message.icon className="size-7 text-[var(--m-accent-soft)]" aria-hidden />
-              </div>
-              <p className="min-w-0 pt-1 text-sm leading-relaxed text-white/65 sm:text-[15px]">
-                {message.body}
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-[clamp(1.25rem,3vw,2.5rem)] pb-[clamp(0.75rem,2vh,1.25rem)]">
+        <div
+          key={message.id}
+          className="auth-slide-panel flex min-h-0 flex-1 flex-col justify-between gap-3 overflow-hidden"
+        >
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-[clamp(0.65rem,1.8vh,1.1rem)] overflow-hidden">
+            <div>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent-soft)]">
+                {message.eyebrow}
               </p>
+              <h1 className="mt-2 max-w-[18ch] font-display font-semibold leading-[1.1] tracking-tight text-white [font-size:clamp(1.55rem,2.4vw+0.35rem,2.15rem)]">
+                {message.headline}
+              </h1>
             </div>
-          )}
 
-          {isCeo ? (
-            <blockquote className="max-w-lg border-l border-white/15 pl-4 font-display text-[15px] italic leading-relaxed text-white/75 sm:text-base">
-              “{message.body}”
-            </blockquote>
-          ) : null}
-        </div>
+            {isCeo ? (
+              <div className="flex items-center gap-3">
+                <div className="relative size-11 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/25">
+                  <Image
+                    src={SYNCOPS.ceo.photo}
+                    alt={`${SYNCOPS.ceo.name}, ${SYNCOPS.ceo.role} of ${SYNCOPS.builder.name}`}
+                    fill
+                    sizes="44px"
+                    className="object-cover object-[center_20%]"
+                    priority
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white">{SYNCOPS.ceo.name}</p>
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-white/45">
+                    {SYNCOPS.ceo.role}, {SYNCOPS.builder.name}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2.5">
+                <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/5 ring-1 ring-white/15">
+                  <message.icon className="size-5 text-[var(--m-accent-soft)]" aria-hidden />
+                </div>
+                <p className="min-w-0 pt-1.5 text-sm leading-snug text-white/65">{message.body}</p>
+              </div>
+            )}
 
-        {isCeo ? (
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <SocialIcon href={SYNCOPS.ceo.links.linkedin} label="LinkedIn">
-              <LinkedInIcon className="size-4" />
-            </SocialIcon>
-            <SocialIcon href={SYNCOPS.ceo.links.website} label="Website">
-              <Globe className="size-4" />
-            </SocialIcon>
-            <SocialIcon href={SYNCOPS.ceo.links.github} label="GitHub">
-              <GitHubIcon className="size-4" />
-            </SocialIcon>
-            <SocialIcon href={`mailto:${SYNCOPS.ceo.links.email}`} label="Email">
-              <Mail className="size-4" />
-            </SocialIcon>
-            <Link
-              href="/ceo"
-              className="ml-1 inline-flex items-center gap-1.5 text-sm font-medium text-white/75 transition-colors hover:text-white"
-            >
-              Full message
-              <ArrowUpRight className="size-3.5" />
-            </Link>
+            {isCeo ? (
+              <p className="max-w-[36ch] text-sm leading-snug text-white/70">{message.body}</p>
+            ) : null}
+
+            {isCeo ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <SocialIcon href={SYNCOPS.ceo.links.linkedin} label="LinkedIn">
+                  <LinkedInIcon className="size-3" />
+                </SocialIcon>
+                <SocialIcon href={SYNCOPS.ceo.links.website} label="Website">
+                  <Globe className="size-3" />
+                </SocialIcon>
+                <SocialIcon href={SYNCOPS.ceo.links.github} label="GitHub">
+                  <GitHubIcon className="size-3" />
+                </SocialIcon>
+                <SocialIcon href={`mailto:${SYNCOPS.ceo.links.email}`} label="Email">
+                  <Mail className="size-3" />
+                </SocialIcon>
+                <Link
+                  href="/ceo"
+                  className="ml-1 inline-flex items-center gap-0.5 text-xs font-medium text-white/70 transition-colors hover:text-white"
+                >
+                  Full message
+                  <ArrowUpRight className="size-3" />
+                </Link>
+              </div>
+            ) : null}
+
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {message.points.map((point) => (
+                <li key={point} className="flex items-center gap-2">
+                  <span className="inline-flex size-3.5 shrink-0 items-center justify-center bg-[var(--m-accent)]/40 text-[var(--m-accent-soft)]">
+                    <Check className="size-2 stroke-[3]" aria-hidden />
+                  </span>
+                  <span className="text-[0.8125rem] leading-tight text-white/80">{point}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        ) : (
-          <p className="mt-8 text-xs font-medium uppercase tracking-[0.18em] text-white/35">
-            Beautora · Salon operating system
-          </p>
-        )}
-      </div>
 
-      <div className="relative z-10 mt-auto hidden items-end justify-between gap-6 px-6 pb-6 sm:flex sm:px-8 lg:px-10">
-        <p key={`tag-${message.id}`} className="auth-slide-panel max-w-[16rem] text-xs leading-relaxed text-white/40">
-          {message.tagline}
-        </p>
-        <div className="flex items-center gap-1.5 pb-0.5" role="tablist" aria-label="Auth highlights">
-          {SLIDES.map((item, i) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={i === active}
-              aria-label={item.eyebrow}
-              onClick={() => goTo(i)}
-              className={cn(
-                "h-1.5 rounded-full transition-all",
-                i === active ? "w-6 bg-[var(--m-accent-soft)]" : "w-1.5 bg-white/30 hover:bg-white/50"
-              )}
-            />
-          ))}
+          <div className="flex shrink-0 items-end justify-between gap-3 pt-1">
+            <p
+              key={`tag-${message.id}`}
+              className="auth-slide-panel max-w-[16rem] text-[0.7rem] leading-snug text-white/40"
+            >
+              {message.tagline}
+            </p>
+            <div
+              className="flex shrink-0 items-center gap-1.5 pb-0.5"
+              role="tablist"
+              aria-label="Auth highlights"
+            >
+              {SLIDES.map((item, i) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === active}
+                  aria-label={item.eyebrow}
+                  onClick={() => goTo(i)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    i === active
+                      ? "w-5 bg-[var(--m-accent-soft)]"
+                      : "w-1.5 bg-white/30 hover:bg-white/50"
+                  )}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </aside>
@@ -283,7 +318,7 @@ function SocialIcon({
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
       aria-label={label}
-      className="inline-flex size-9 items-center justify-center rounded-full bg-white/5 text-white/70 ring-1 ring-white/10 transition-colors hover:bg-white/10 hover:text-white"
+      className="inline-flex size-7 items-center justify-center rounded-full bg-white/5 text-white/70 ring-1 ring-white/10 transition-colors hover:bg-white/10 hover:text-white"
     >
       {children}
     </a>

@@ -8,7 +8,7 @@ export const INDUSTRY_PAGES: CommercialPage[] = [
     navLabel: "Hair salons",
     title: "Software for Hair Salons",
     description:
-      "Beautora software for hair salons — online booking, stylist schedules, POS, retail, and team tools for color and cut businesses worldwide.",
+      "Beautora software for hair salons — online booking, stylist schedules, salon POS, retail, Marketplace product sales, and team tools for color and cut businesses worldwide.",
     h1: "Software for Hair Salons",
     lead: "Color services, timed appointments, and retail add-ons need software that understands chair time — not a generic calendar.",
     keywords: ["hair salon software", "software for hair salons", "hair salon booking POS"],
@@ -51,7 +51,7 @@ export const INDUSTRY_PAGES: CommercialPage[] = [
     navLabel: "Beauty salons",
     title: "Software for Beauty Salons",
     description:
-      "Beautora for beauty salons — booking, POS, staff, inventory, and client history for makeup, facials, and full-service beauty studios.",
+      "Beautora for beauty salons — booking, salon POS, staff, inventory, Marketplace product sales, and client history for makeup, facials, and full-service beauty studios.",
     h1: "Software for Beauty Salons",
     lead: "Full-service beauty floors mix short and long appointments. Beautora keeps booking, checkout, and clients in one place.",
     keywords: ["beauty salon software", "software for beauty salons"],
@@ -90,7 +90,7 @@ export const INDUSTRY_PAGES: CommercialPage[] = [
     navLabel: "Spas",
     title: "Spa Management Software",
     description:
-      "Spa management software from Beautora — appointment booking, room/chair ops mindset, POS, and staff tools for spa and wellness studios.",
+      "Spa management software from Beautora — appointment booking, salon POS, Marketplace retail options, and staff tools for spa and wellness studios.",
     h1: "Spa Management Software",
     lead: "Spas need calm scheduling and clear checkout. Beautora covers booking, team, and sales without spa-theater complexity.",
     keywords: ["spa management software", "spa booking software"],
@@ -129,7 +129,7 @@ export const INDUSTRY_PAGES: CommercialPage[] = [
     navLabel: "Nail salons",
     title: "Nail Salon Software",
     description:
-      "Nail salon software from Beautora — fast booking, technician schedules, POS, and walk-in queue for nail studios worldwide.",
+      "Nail salon software from Beautora — fast booking, technician schedules, salon POS, Marketplace product sales, and walk-in queue for nail studios worldwide.",
     h1: "Nail Salon Software",
     lead: "Nail floors move quickly. Beautora helps with booking, walk-ins, and checkout so the desk stays ahead of the line.",
     keywords: ["nail salon software", "nail salon booking POS"],
@@ -168,7 +168,7 @@ export const INDUSTRY_PAGES: CommercialPage[] = [
     navLabel: "Barbershops",
     title: "Barbershop Management Software",
     description:
-      "Barbershop management software from Beautora — chair booking, walk-in queue, POS, and staff tools for barbers worldwide.",
+      "Barbershop management software from Beautora — chair booking, walk-in queue, salon POS, Marketplace retail, and staff tools for barbers worldwide.",
     h1: "Barbershop Management Software",
     lead: "Barbershops thrive on speed and fairness in the line. Beautora covers booking, queue, and checkout for modern barber floors.",
     keywords: ["barbershop software", "barbershop POS", "barber booking software"],
@@ -211,7 +211,7 @@ export const INDUSTRY_PAGES: CommercialPage[] = [
     navLabel: "Med spas",
     title: "Med Spa Software",
     description:
-      "Med spa operations software from Beautora — booking, staff, POS, and client history for aesthetic studios. Not a clinical EMR.",
+      "Med spa operations software from Beautora — booking, staff, salon POS, Marketplace product sales, and client history for aesthetic studios. Not a clinical EMR.",
     h1: "Med Spa Software",
     lead: "Aesthetic studios need precise scheduling and clean checkout. Beautora supports operations — and we are clear it is not a medical EMR.",
     keywords: ["med spa software", "medspa booking software"],
@@ -251,7 +251,7 @@ export const INDUSTRY_PAGES: CommercialPage[] = [
     navLabel: "Beauty clinics",
     title: "Beauty Clinic Software",
     description:
-      "Beauty clinic software from Beautora — appointments, team, POS, and customer history for clinic-style beauty businesses worldwide.",
+      "Beauty clinic software from Beautora — appointments, team, salon POS, Marketplace options, and customer history for clinic-style beauty businesses worldwide.",
     h1: "Beauty Clinic Software",
     lead: "Clinic-style beauty businesses need orderly appointments and clear billing. Beautora focuses on operations and guest experience.",
     keywords: ["beauty clinic software", "beauty clinic booking"],

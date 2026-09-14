@@ -1,4 +1,5 @@
 import { SYNCOPS } from "@/lib/print/syncops";
+import { BEAUTORA_PRODUCT_PAIR } from "@/lib/marketing/products";
 
 /** Content for /ceo — Majid Ali founder page. */
 export const CEO_PAGE = {
@@ -15,19 +16,19 @@ export const CEO_PAGE = {
     photo: SYNCOPS.ceo.photo,
     portraitAlt: `${SYNCOPS.ceo.name}, Founder & CEO of ${SYNCOPS.builder.name} and ${SYNCOPS.name}`,
     messageTitle: "Message from the CEO",
-    headline: "Partnerships that outlast releases.",
+    headline: "Salon Management, POS & Marketplace — built to last.",
     message:
-      "We don't just build software—we build partnerships that drive lasting success. Beautora creates long-term products and systems for beauty businesses worldwide, with quality, discipline, and trust at the center of every engagement.",
+      "We don't just ship features—we build partnerships that drive lasting success. Beautora gives beauty businesses Salon Management with a real POS floor, plus a Marketplace to sell products online — with quality, discipline, and trust at the center of every engagement.",
     focus:
-      "From the first booking link to multi-store operations, SyncOps ships products operators can trust on the floor — calm UX, reliable systems, and support that feels like a real partnership.",
+      "From the first booking and POS ticket to Marketplace COD orders, SyncOps ships products operators can trust — calm UX, reliable systems, and support that feels like a real partnership.",
     principles: [
       {
         title: "Operators first",
-        body: "Every feature must earn its place on a busy salon floor — not in a demo deck.",
+        body: "Every feature must earn its place on a busy salon floor — POS, queue, and booking included — not just in a demo deck.",
       },
       {
-        title: "Long-term craft",
-        body: "We build products meant to last years: disciplined UX, clear ops, and honest pricing.",
+        title: "Two products, clear books",
+        body: `${BEAUTORA_PRODUCT_PAIR.title}: salon ops stay separate from Marketplace sales so money and stock never mix by accident.`,
       },
       {
         title: "Global, grounded",

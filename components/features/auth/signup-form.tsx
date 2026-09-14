@@ -3,21 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, ShoppingBag, Store } from "lucide-react";
 import { notify } from "@/lib/toast";
-// import { AuthSocialButtons } from "@/components/features/auth/auth-social-buttons";
 import {
   checkEmailAvailable,
   checkSalonNameAvailable,
   registerAccount,
 } from "@/lib/actions/auth";
 import { rememberPartnerReferral } from "@/lib/actions/partners";
+import type { SignupAccountType } from "@/lib/auth/account-types";
 import { cn } from "@/lib/utils";
 
 export function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [accountType, setAccountType] = useState<SignupAccountType>("owner");
   const [salonName, setSalonName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -31,7 +33,16 @@ export function SignupForm() {
   const [partnerRef, setPartnerRef] = useState<string | null>(null);
   const [refHint, setRefHint] = useState<string | null>(null);
 
+  const isOwner = accountType === "owner";
+  const isCustomer = accountType === "customer";
+
   useEffect(() => {
+    const intent = searchParams.get("as");
+    if (intent === "customer" || intent === "shopper" || intent === "user") {
+      setAccountType("customer");
+    } else if (intent === "owner" || intent === "salon") {
+      setAccountType("owner");
+    }
     const ref = searchParams.get("ref")?.trim();
     if (!ref) return;
     void (async () => {
@@ -47,6 +58,11 @@ export function SignupForm() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (!isOwner) {
+      setNameOk(null);
+      setNameHint(null);
+      return;
+    }
     if (salonName.trim().length < 2) {
       setNameOk(null);
       setNameHint(null);
@@ -58,7 +74,7 @@ export function SignupForm() {
       setNameHint(result.available ? "Salon name is available" : result.error ?? null);
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [salonName]);
+  }, [salonName, isOwner]);
 
   useEffect(() => {
     const value = email.trim().toLowerCase();
@@ -68,12 +84,15 @@ export function SignupForm() {
       return;
     }
     const handle = window.setTimeout(async () => {
-      const result = await checkEmailAvailable(value);
+      const result = await checkEmailAvailable(
+        value,
+        isCustomer ? "customer_signup" : "salon_signup"
+      );
       setEmailOk(result.available);
       setEmailHint(result.available ? "Email is available" : result.error ?? null);
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [email]);
+  }, [email, isCustomer]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +100,7 @@ export function SignupForm() {
 
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedSalon = salonName.trim();
+    const trimmedName = fullName.trim();
 
     if (password.length < 8) {
       notify.error("Password must be at least 8 characters");
@@ -94,12 +114,14 @@ export function SignupForm() {
       return;
     }
 
-    if (nameOk === false || emailOk === false) {
-      const msg =
-        nameOk === false
-          ? nameHint ?? "Salon name is already taken"
-          : emailHint ?? "Email is already in use";
-      notify.error(msg);
+    if (isOwner && nameOk === false) {
+      notify.error(nameHint ?? "Salon name is already taken");
+      setLoading(false);
+      return;
+    }
+
+    if (emailOk === false) {
+      notify.error(emailHint ?? "Email is already in use");
       setLoading(false);
       return;
     }
@@ -107,8 +129,10 @@ export function SignupForm() {
     const created = await registerAccount({
       email: trimmedEmail,
       password,
-      salonName: trimmedSalon,
-      referralCode: partnerRef,
+      accountType,
+      salonName: isOwner ? trimmedSalon : undefined,
+      fullName: isCustomer ? trimmedName : undefined,
+      referralCode: isOwner ? partnerRef : null,
     });
 
     if (created.error) {
@@ -117,18 +141,22 @@ export function SignupForm() {
       return;
     }
 
-    notify.success("Account created — check your email to verify and continue.");
+    notify.success(
+      isCustomer
+        ? "Account created — check your email to verify, then shop and add to cart."
+        : "Account created — check your email to verify and finish onboarding."
+    );
     router.push(`/login?verified=pending&email=${encodeURIComponent(trimmedEmail)}`);
     setLoading(false);
   }
 
   return (
-    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-7 sm:p-8">
+    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-5 sm:p-7 lg:p-8">
       <div>
-        <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-4xl">
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl lg:text-4xl">
           Sign up
         </h2>
-        <p className="mt-2 text-sm text-[var(--m-muted)]">
+        <p className="mt-1.5 text-sm text-[var(--m-muted)] sm:mt-2">
           Already have an account?{" "}
           <Link
             href="/login"
@@ -137,59 +165,130 @@ export function SignupForm() {
             Sign in
           </Link>
         </p>
-        {partnerRef ? (
+        <p className="mt-2 text-sm leading-relaxed text-[var(--m-muted)] sm:mt-3">
+          First tell us why you&apos;re here — we only ask for the fields that match your path.
+        </p>
+        {isOwner && partnerRef ? (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
             Referred by partner <span className="font-semibold">@{partnerRef}</span> — they
             earn your first month&apos;s subscription when you pay.
           </p>
         ) : null}
-        {refHint ? (
+        {isOwner && refHint ? (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
             {refHint}. You can still open a store without a partner referral.
           </p>
         ) : null}
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-        <div className="space-y-2">
-          <label htmlFor="salonName" className="text-sm font-medium text-[var(--m-ink-soft)]">
-            Salon / store name
-          </label>
-          <input
-            id="salonName"
-            type="text"
-            placeholder="e.g. Glow Studio"
-            value={salonName}
-            onChange={(e) => setSalonName(e.target.value)}
-            required
-            autoComplete="organization"
-            className={fieldClassName}
-          />
-          {nameHint && (
-            <p
+      <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-7 sm:space-y-5">
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-[var(--m-ink-soft)]">
+            Why are you joining Beautora?
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setAccountType("customer")}
               className={cn(
-                "text-xs",
-                nameOk ? "text-[var(--m-accent)]" : "text-red-700"
+                "flex items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
+                isCustomer
+                  ? "border-[var(--m-ink)] bg-[var(--m-mist)]"
+                  : "border-[var(--m-line)] hover:border-[var(--m-accent)]/50"
               )}
             >
-              {nameHint}
-            </p>
-          )}
-          {!nameHint && (
+              <ShoppingBag className="mt-0.5 size-4 shrink-0 text-[var(--m-accent)]" />
+              <span>
+                <span className="block text-sm font-semibold text-[var(--m-ink)]">
+                  I want to shop
+                </span>
+                <span className="mt-0.5 block text-xs text-[var(--m-muted)]">
+                  Marketplace buyer — sign in to add to cart &amp; COD checkout
+                </span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountType("owner")}
+              className={cn(
+                "flex w-full items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
+                isOwner
+                  ? "border-[var(--m-ink)] bg-[var(--m-mist)]"
+                  : "border-[var(--m-line)] hover:border-[var(--m-accent)]/50"
+              )}
+            >
+              <Store className="mt-0.5 size-4 shrink-0 text-[var(--m-accent)]" />
+              <span>
+                <span className="block text-sm font-semibold text-[var(--m-ink)]">
+                  I run a salon / shop
+                </span>
+                <span className="mt-0.5 block text-xs text-[var(--m-muted)]">
+                  Owner — after email verify, pick Marketplace, Salon POS, or Both
+                </span>
+              </span>
+            </button>
+          </div>
+        </fieldset>
+
+        {isOwner ? (
+          <div className="space-y-2">
+            <label htmlFor="salonName" className="text-sm font-medium text-[var(--m-ink-soft)]">
+              Salon / store name
+            </label>
+            <input
+              id="salonName"
+              type="text"
+              placeholder="e.g. Glow Studio"
+              value={salonName}
+              onChange={(e) => setSalonName(e.target.value)}
+              required
+              autoComplete="organization"
+              className={fieldClassName}
+            />
+            {nameHint && (
+              <p
+                className={cn(
+                  "text-xs",
+                  nameOk ? "text-[var(--m-accent)]" : "text-red-700"
+                )}
+              >
+                {nameHint}
+              </p>
+            )}
+            {!nameHint && (
+              <p className="text-xs text-[var(--m-muted)]">
+                Must be unique. You&apos;ll choose Marketplace, Salon POS, or Both next.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label htmlFor="fullName" className="text-sm font-medium text-[var(--m-ink-soft)]">
+              Your name
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              placeholder="e.g. Sara Ahmed"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="name"
+              className={fieldClassName}
+            />
             <p className="text-xs text-[var(--m-muted)]">
-              Must be unique. You’ll fine-tune setup next.
+              Optional — used on Marketplace orders after you sign in.
             </p>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium text-[var(--m-ink-soft)]">
-            Work email
+            {isOwner ? "Work email" : "Email"}
           </label>
           <input
             id="email"
             type="email"
-            placeholder="you@salon.com"
+            placeholder={isOwner ? "you@salon.com" : "you@email.com"}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -277,22 +376,20 @@ export function SignupForm() {
           type="submit"
           disabled={
             loading ||
-            nameOk === false ||
+            (isOwner && nameOk === false) ||
             emailOk === false ||
             (confirmPassword.length > 0 && password !== confirmPassword)
           }
           className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[var(--m-ink)] text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)] disabled:opacity-60"
         >
-          {loading ? "Creating account…" : "Create account"}
+          {loading
+            ? "Creating account…"
+            : isCustomer
+              ? "Create shopper account"
+              : "Create salon account"}
           {!loading && <ArrowRight className="size-4" />}
         </button>
       </form>
-
-      {/* Social login — enable later when OAuth providers are configured
-      <div className="mt-7">
-        <AuthSocialButtons />
-      </div>
-      */}
     </div>
   );
 }

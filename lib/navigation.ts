@@ -12,13 +12,17 @@ import {
   Receipt,
   Scissors,
   Settings,
+  ShoppingBag,
   ShoppingCart,
   Armchair,
   Star,
+  Store,
   Ticket,
   UserCog,
   Users,
   Wallet,
+  Boxes,
+  ClipboardList,
 } from "lucide-react";
 
 export type NavItem = {
@@ -90,6 +94,26 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
+/** Seller-side marketplace nav — separate from salon management. */
+export const marketplaceNavGroups: NavGroup[] = [
+  {
+    label: "Marketplace",
+    items: [
+      { title: "Dashboard", href: "/marketplace", icon: LayoutDashboard, key: "mp_dashboard" },
+      { title: "Products", href: "/marketplace/products", icon: Package, key: "mp_products" },
+      { title: "Inventory", href: "/marketplace/inventory", icon: Boxes, key: "mp_inventory" },
+      { title: "Orders", href: "/marketplace/orders", icon: ClipboardList, key: "mp_orders" },
+      { title: "Payouts", href: "/marketplace/payouts", icon: Wallet, key: "mp_payouts" },
+      { title: "Reviews", href: "/marketplace/reviews", icon: Star, key: "mp_reviews" },
+      { title: "Shop settings", href: "/marketplace/settings", icon: Store, key: "mp_settings" },
+    ],
+  },
+  {
+    label: "Storefront",
+    items: [{ title: "Public shop", href: "/shop", icon: ShoppingBag, key: "mp_shop" }],
+  },
+];
+
 export const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/billing": "Billing",
@@ -114,11 +138,20 @@ export const pageTitles: Record<string, string> = {
   "/whatsapp": "WhatsApp",
   "/feedback": "Feedback",
   "/settings": "Settings",
+  "/marketplace": "Marketplace",
+  "/marketplace/products": "Marketplace products",
+  "/marketplace/inventory": "Marketplace inventory",
+  "/marketplace/orders": "Marketplace orders",
+  "/marketplace/payouts": "Marketplace payouts",
+  "/marketplace/reviews": "Marketplace reviews",
+  "/marketplace/settings": "Shop settings",
+  "/shop": "Marketplace Shop",
 };
 
 export function getPageTitle(pathname: string) {
   if (pageTitles[pathname]) return pageTitles[pathname];
   if (pathname.startsWith("/in-house/")) return "In-house product";
+  if (pathname.startsWith("/marketplace")) return "Marketplace";
   const base = pathname.split("/").slice(0, 2).join("/");
   if (pageTitles[base]) return pageTitles[base];
   return "Hair & Care Salon";

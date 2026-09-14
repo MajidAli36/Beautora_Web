@@ -70,7 +70,7 @@ export function buildSyncOpsPageJsonLd() {
         "@id": pageId,
         url: pageUrl,
         name: `${SYNCOPS.builder.name} — Product studio behind ${SYNCOPS.name}`,
-        description: `${SYNCOPS.builder.name} builds software that runs real businesses. ${SYNCOPS.name} is our salon operating system.`,
+        description: `${SYNCOPS.builder.name} builds software that runs real businesses. ${SYNCOPS.name} is our Salon Management, POS & Marketplace platform.`,
         isPartOf: { "@id": `${siteUrl}/#website` },
         about: { "@id": orgId },
         primaryImageOfPage: absoluteUrl(SYNCOPS.ceo.photo),

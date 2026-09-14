@@ -9,8 +9,16 @@ import {
 } from "@/lib/onboarding/slug";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { requireStoreLocation } from "@/lib/location/store-location";
+import {
+  defaultAppModeForIntent,
+  landingPathForProductIntent,
+  parseProductIntent,
+  type ProductIntent,
+} from "@/lib/auth/account-types";
+import { APP_MODE_COOKIE } from "@/lib/marketplace/constants";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cookies } from "next/headers";
 import type { ActionResult } from "@/types/commerce";
 
 export type CreateOrganizationInput = {
@@ -25,14 +33,23 @@ export type CreateOrganizationInput = {
   bookingDaysAhead?: number;
   /** Partner username / referral code from ?ref= or cookie */
   referralCode?: string | null;
+  /** Marketplace | Salon POS | Both */
+  productIntent: ProductIntent;
 };
 
 export async function createSalonOrganization(
   input: CreateOrganizationInput
-): Promise<ActionResult & { slug?: string; organizationId?: string }> {
+): Promise<
+  ActionResult & { slug?: string; organizationId?: string; landingPath?: string }
+> {
   const salonName = input.salonName.trim();
   if (salonName.length < 2) {
     return { error: "Salon name must be at least 2 characters" };
+  }
+
+  const productIntent = parseProductIntent(input.productIntent);
+  if (!productIntent) {
+    return { error: "Choose Marketplace, Salon POS, or Both" };
   }
 
   const location = requireStoreLocation({
@@ -118,6 +135,13 @@ export async function createSalonOrganization(
     return {
       error:
         "Partner accounts cannot open a salon store. Use the partner dashboard, or sign up with a different email.",
+    };
+  }
+
+  if (meta.account_type === "customer") {
+    return {
+      error:
+        "Shopper accounts cannot open a salon. Sign up as a salon owner with a different email.",
     };
   }
 
@@ -242,19 +266,32 @@ export async function createSalonOrganization(
   await admin.auth.admin.updateUserById(user.id, {
     user_metadata: {
       ...user.user_metadata,
+      account_type: "owner",
       salon_name: salonName,
+      product_intent: productIntent,
       onboarding_completed: true,
       // Clear referral after attribution so it cannot be reused
       partner_referral: null,
     },
   });
 
+  const mode = defaultAppModeForIntent(productIntent);
+  const jar = await cookies();
+  jar.set(APP_MODE_COOKIE, mode, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+
+  const landingPath = landingPathForProductIntent(productIntent);
+
   revalidatePath("/");
   revalidatePath("/stores");
   revalidatePath("/dashboard");
+  revalidatePath("/marketplace");
   revalidatePath("/onboarding");
 
-  return { success: true, slug: org.slug, organizationId: org.id };
+  return { success: true, slug: org.slug, organizationId: org.id, landingPath };
 }
 
 export async function checkSlugAvailable(

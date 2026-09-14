@@ -288,6 +288,23 @@
     min-height: 100dvh;
   }
 
+  .auth-screen .auth-card {
+    width: 100%;
+  }
+
+  .auth-brand {
+    container-type: size;
+  }
+
+  @container (max-height: 640px) {
+    .auth-brand .auth-slide-panel blockquote {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4;
+      overflow: hidden;
+    }
+  }
+
   @keyframes auth-fade-up {
     from {
       opacity: 0;

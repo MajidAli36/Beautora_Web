@@ -9,12 +9,12 @@ const STEPS = [
   {
     step: "02",
     title: "Set the floor",
-    body: "Add services, products, chairs, staff, schedules, and booking rules.",
+    body: "Add services, products, chairs, staff, schedules, booking rules — and Marketplace listings when you sell online.",
   },
   {
     step: "03",
     title: "Run every day",
-    body: "Manage bookings, walk-ins, POS, staff, customers, WhatsApp, and reports from one place.",
+    body: "Manage bookings, walk-ins, salon POS, staff, customers, Marketplace orders, WhatsApp, and reports from one workspace.",
   },
 ];
 

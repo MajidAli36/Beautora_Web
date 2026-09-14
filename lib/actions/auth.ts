@@ -4,9 +4,15 @@ import {
   findAuthUserByEmail,
   getEmailBlockReason,
   normalizeEmail,
+  type EmailIntent,
 } from "@/lib/auth/email-guards";
+import {
+  parseSignupAccountType,
+  type SignupAccountType,
+} from "@/lib/auth/account-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  sendCustomerSignupVerificationEmail,
   sendPasswordResetEmail,
   sendSalonSignupVerificationEmail,
 } from "@/lib/email/notify";
@@ -26,7 +32,10 @@ async function salonNameTaken(
   return (data ?? []).some((o) => o.name.trim().toLowerCase() === target);
 }
 
-export async function checkEmailAvailable(emailInput: string): Promise<{
+export async function checkEmailAvailable(
+  emailInput: string,
+  intent: EmailIntent = "salon_signup"
+): Promise<{
   available: boolean;
   error?: string;
 }> {
@@ -37,7 +46,7 @@ export async function checkEmailAvailable(emailInput: string): Promise<{
 
   try {
     const admin = createAdminClient();
-    const blocked = await getEmailBlockReason(admin, email, "salon_signup");
+    const blocked = await getEmailBlockReason(admin, email, intent);
     if (blocked) return { available: false, error: blocked };
     return { available: true };
   } catch (err) {
@@ -77,26 +86,36 @@ export async function checkSalonNameAvailable(nameInput: string): Promise<{
 
 /**
  * Creates an auth user (email unconfirmed) and sends Beautora verification email via Resend.
- * User completes signup by clicking the email link (session + confirmed).
+ * - Salon owners → verify → /onboarding (product intent + store setup)
+ * - Customers / shoppers → verify → /shop (login required to add to cart)
  */
 export async function registerAccount(input: {
   email: string;
   password: string;
-  salonName: string;
-  /** Approved partner username from ?ref= */
+  /** Required for salon owners */
+  salonName?: string;
+  /** Display name for shoppers */
+  fullName?: string;
+  accountType: SignupAccountType;
+  /** Approved partner username from ?ref= (owners only) */
   referralCode?: string | null;
 }): Promise<ActionResult & { needsEmailVerification?: boolean }> {
   const email = normalizeEmail(input.email);
   const password = input.password;
-  const salonName = normalizeSalonName(input.salonName);
+  const accountType = parseSignupAccountType(input.accountType);
+  const salonName = normalizeSalonName(input.salonName ?? "");
+  const fullName = (input.fullName ?? "").trim().replace(/\s+/g, " ");
 
+  if (!accountType) {
+    return { error: "Choose whether you are a shopper or a salon owner" };
+  }
   if (!email || !email.includes("@")) {
     return { error: "Enter a valid email address" };
   }
   if (password.length < 8) {
     return { error: "Password must be at least 8 characters" };
   }
-  if (salonName.length < 2) {
+  if (accountType === "owner" && salonName.length < 2) {
     return { error: "Salon name must be at least 2 characters" };
   }
 
@@ -107,37 +126,41 @@ export async function registerAccount(input: {
     return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY" };
   }
 
+  const emailIntent: EmailIntent =
+    accountType === "customer" ? "customer_signup" : "salon_signup";
+
   let partnerReferral: string | null = null;
   try {
-    const blocked = await getEmailBlockReason(admin, email, "salon_signup");
+    const blocked = await getEmailBlockReason(admin, email, emailIntent);
     if (blocked) return { error: blocked };
 
-    if (await salonNameTaken(admin, salonName)) {
-      return {
-        error: "This salon name is already taken. Choose a different name.",
-      };
-    }
+    if (accountType === "owner") {
+      if (await salonNameTaken(admin, salonName)) {
+        return {
+          error: "This salon name is already taken. Choose a different name.",
+        };
+      }
 
-    // Persist referral on the user so email-verify on another device still attributes
-    const rawRef =
-      input.referralCode?.trim() ||
-      (await import("@/lib/actions/partners").then((m) =>
-        m.getRememberedPartnerReferral()
-      )) ||
-      null;
-    if (rawRef) {
-      const { resolveApprovedPartnerByUsername } = await import(
-        "@/lib/actions/partners"
-      );
-      const partner = await resolveApprovedPartnerByUsername(rawRef);
-      if (partner) {
-        if (partner.email.toLowerCase() === email) {
-          return {
-            error:
-              "You cannot open a salon with your own partner referral link. Use a different email, or sign up without your partner code.",
-          };
+      const rawRef =
+        input.referralCode?.trim() ||
+        (await import("@/lib/actions/partners").then((m) =>
+          m.getRememberedPartnerReferral()
+        )) ||
+        null;
+      if (rawRef) {
+        const { resolveApprovedPartnerByUsername } = await import(
+          "@/lib/actions/partners"
+        );
+        const partner = await resolveApprovedPartnerByUsername(rawRef);
+        if (partner) {
+          if (partner.email.toLowerCase() === email) {
+            return {
+              error:
+                "You cannot open a salon with your own partner referral link. Use a different email, or sign up without your partner code.",
+            };
+          }
+          partnerReferral = partner.username;
         }
-        partnerReferral = partner.username;
       }
     }
   } catch (err) {
@@ -148,11 +171,17 @@ export async function registerAccount(input: {
     email,
     password,
     email_confirm: false,
-    user_metadata: {
-      salon_name: salonName,
-      account_type: "owner",
-      ...(partnerReferral ? { partner_referral: partnerReferral } : {}),
-    },
+    user_metadata:
+      accountType === "customer"
+        ? {
+            account_type: "customer",
+            full_name: fullName || null,
+          }
+        : {
+            salon_name: salonName,
+            account_type: "owner",
+            ...(partnerReferral ? { partner_referral: partnerReferral } : {}),
+          },
   });
 
   if (error) {
@@ -167,11 +196,18 @@ export async function registerAccount(input: {
     return { error: "Could not create account" };
   }
 
-  const mailed = await sendSalonSignupVerificationEmail({
-    email,
-    salonName,
-    userId: data.user.id,
-  });
+  const mailed =
+    accountType === "customer"
+      ? await sendCustomerSignupVerificationEmail({
+          email,
+          fullName: fullName || null,
+          userId: data.user.id,
+        })
+      : await sendSalonSignupVerificationEmail({
+          email,
+          salonName,
+          userId: data.user.id,
+        });
 
   if (!mailed.ok) {
     await admin.auth.admin.deleteUser(data.user.id);

@@ -21,16 +21,22 @@ export const COMMERCIAL_PAGES: CommercialPage[] = [
     slug: "salon-management-software",
     path: "/salon-management-software",
     navLabel: "Salon management",
-    title: "Salon Management Software",
+    title: "Salon Management, POS & Marketplace",
     description:
-      "Beautora is AI-powered salon management software for beauty businesses worldwide — online booking, POS, CRM, staff, inventory, queue, and reports in one platform.",
-    h1: "Salon Management Software",
-    lead: "Run bookings, checkout, team, and reporting from one Beautora workspace — built for hair, beauty, spa, and barbershop operators who want clarity on the floor and online.",
-    keywords: ["salon management software", "beauty salon management platform", "salon operating system"],
+      "Beautora is AI-powered Salon Management, POS & Marketplace software for beauty businesses worldwide — online booking, salon POS, CRM, staff, inventory, queue, reports, and a product marketplace in one workspace.",
+    h1: "Salon Management, POS & Marketplace Software",
+    lead: "Run bookings, POS checkout, team, and reporting — then sell products online with Marketplace. Built for hair, beauty, spa, and barbershop operators who want clarity on the floor and online.",
+    keywords: [
+      "salon management software",
+      "salon POS software",
+      "salon marketplace",
+      "beauty salon management platform",
+      "AI-powered salon management",
+    ],
     problems: [
       {
         title: "Scattered tools",
-        body: "Bookings in one app, POS in another, and staff notes in chats create missed appointments and messy end-of-day totals.",
+        body: "Bookings in one app, POS in another, an online shop somewhere else, and staff notes in chats create missed appointments and messy end-of-day totals.",
       },
       {
         title: "Front desk overload",
@@ -62,11 +68,16 @@ export const COMMERCIAL_PAGES: CommercialPage[] = [
         title: "Inventory and reports",
         body: "Retail and in-house stock with operational reports for owners and managers.",
       },
+      {
+        title: "Marketplace product sales",
+        body: "List products and take COD orders online — shop inventory and money stay separate from salon POS.",
+      },
     ],
     whoFor: [
       "Independent salons and multi-chair studios",
       "Beauty groups opening additional locations as separate stores",
       "Barbershops and spas that need booking + POS together",
+      "Stores that want to sell products online without a second commerce stack",
     ],
     faqs: [
       {
@@ -156,10 +167,15 @@ export const COMMERCIAL_PAGES: CommercialPage[] = [
     navLabel: "POS",
     title: "Salon POS Software",
     description:
-      "Salon POS software from Beautora — checkout services and retail, take payments, link staff, and keep sales history for beauty businesses worldwide.",
+      "Salon POS software from Beautora — checkout services and retail, take payments, link staff, and keep sales history. Part of Salon Management; Marketplace shop sales stay separate.",
     h1: "Salon POS Software",
-    lead: "Checkout that matches how salons actually sell: services, retail, deposits, and staff attribution — without a separate retail-only till.",
-    keywords: ["salon POS", "beauty salon point of sale", "salon checkout software"],
+    lead: "Checkout that matches how salons actually sell: services, retail, deposits, and staff attribution — without a separate retail-only till. Online Marketplace orders stay in their own ledger.",
+    keywords: [
+      "salon POS",
+      "beauty salon point of sale",
+      "salon checkout software",
+      "salon POS and marketplace",
+    ],
     problems: [
       {
         title: "Disconnected tills",
@@ -445,7 +461,7 @@ export const COMMERCIAL_PAGES: CommercialPage[] = [
       {
         question: "Is Beautora fully autonomous AI?",
         answer:
-          "No. Beautora is salon management software with AI-assisted help and strong operational automation. Humans still run the floor.",
+          "No. Beautora is Salon Management, POS & Marketplace software with AI-assisted help and strong operational automation. Humans still run the floor.",
       },
     ],
     related: [

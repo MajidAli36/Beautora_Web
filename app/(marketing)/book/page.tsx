@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!org) {
     return buildPageMetadata({
       title: "Book Appointment",
-      description: `Online salon booking powered by ${SYNCOPS.name}, the salon operating system by ${SYNCOPS.builder.name}.`,
+      description: `Online salon booking powered by ${SYNCOPS.name} — Salon Management, POS & Marketplace by ${SYNCOPS.builder.name}.`,
       path: "/book",
     });
   }

@@ -1,5 +1,6 @@
 export const EmailType = {
   SalonWelcomeVerify: "salon_welcome_verify",
+  CustomerWelcomeVerify: "customer_welcome_verify",
   PartnerWelcomeVerify: "partner_welcome_verify",
   PartnerApproved: "partner_approved",
   PartnerRejected: "partner_rejected",

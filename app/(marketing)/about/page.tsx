@@ -7,9 +7,14 @@ import { SYNCOPS } from "@/lib/print/syncops";
 
 export const metadata: Metadata = buildPageMetadata({
   title: `About ${SYNCOPS.name}`,
-  description: `${SYNCOPS.name} is the salon operating system from ${SYNCOPS.builder.name} — online booking, POS, staff, queue, WhatsApp, and reports for modern beauty businesses.`,
+  description: `${SYNCOPS.name} is Salon Management, POS & Marketplace from ${SYNCOPS.builder.name} — online booking, salon POS, staff, queue, WhatsApp, reports, and a product Marketplace for beauty businesses worldwide.`,
   path: "/about",
-  keywords: ["About Beautora", "Beautora SyncOps", "salon operating system"],
+  keywords: [
+    "About Beautora",
+    "Beautora SyncOps",
+    "salon management POS marketplace",
+    "salon POS software",
+  ],
 });
 
 const PRICE = `${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}`;
@@ -44,7 +49,7 @@ export default function AboutPage() {
             name: "What is Beautora?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: `Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and reports — a product of SyncOps (${SYNCOPS.builder.domain}).`,
+              text: `Beautora is Salon Management, POS & Marketplace for bookings, salon checkout, staff, queue, WhatsApp, reports, and online product sales — a product of SyncOps (${SYNCOPS.builder.domain}).`,
             },
           },
           {
@@ -85,24 +90,25 @@ export default function AboutPage() {
       <MarketingDoc
         eyebrow="Company"
         title={`About ${SYNCOPS.name}`}
-        lead={`${SYNCOPS.name} is the operating system for modern salons — built by ${SYNCOPS.builder.name} so owners can run bookings, checkout, staff, and reports from one place.`}
+        lead={`${SYNCOPS.name} is Salon Management, POS & Marketplace — built by ${SYNCOPS.builder.name} so owners can run bookings, checkout, staff, reports, and online product sales from one workspace.`}
       >
         <section>
           <h2>What is Beautora?</h2>
           <p>
-            Beautora is salon management software for beauty businesses. It brings online booking,
-            point of sale, staff attendance, queue management, WhatsApp updates, and operational
-            reports into a single web platform — so the floor, front desk, and back office stay
-            connected.
+            Beautora is AI-powered Salon Management, POS & Marketplace software for beauty
+            businesses. Salon Management covers online booking, point of sale, staff attendance,
+            queue, WhatsApp updates, and operational reports. Marketplace lets you sell products
+            online with COD checkout — separate from salon POS stock and finances.
           </p>
         </section>
 
         <section>
           <h2>What problem does Beautora solve?</h2>
           <p>
-            Many salons juggle WhatsApp chats, paper walk-ins, a separate POS, and spreadsheets for
-            reports. Beautora replaces that patchwork with one system designed for busy salon days —
-            from the first appointment to end-of-day sales.
+            Many salons juggle WhatsApp chats, paper walk-ins, a separate POS, a random online shop,
+            and spreadsheets for reports. Beautora replaces that patchwork with Salon Management for
+            the floor and Marketplace for online retail — from the first appointment to end-of-day
+            sales and COD orders.
           </p>
         </section>
 
@@ -110,11 +116,12 @@ export default function AboutPage() {
           <h2>What can you run on Beautora?</h2>
           <ul>
             <li>Online booking with public store pages</li>
-            <li>POS and sales history</li>
+            <li>Salon POS and sales history</li>
             <li>Staff schedules, attendance, and attribution</li>
             <li>Queue and chair management for walk-ins</li>
             <li>Customer profiles and WhatsApp follow-ups</li>
             <li>Inventory and operational reports</li>
+            <li>Marketplace product listings, COD orders, and shop stock</li>
           </ul>
         </section>
 
@@ -145,8 +152,10 @@ export default function AboutPage() {
           <h2>Frequently asked questions</h2>
           <h3>What is Beautora?</h3>
           <p>
-            Beautora is a salon operating system for bookings, POS, staff, queue, WhatsApp, and
-            reports — a product of SyncOps ({SYNCOPS.builder.domain}).
+            Beautora is Salon Management, POS & Marketplace for bookings, salon checkout, staff,
+            queue, WhatsApp, reports, and online product sales — a product of SyncOps ({
+              SYNCOPS.builder.domain
+            }).
           </p>
           <h3>Who builds Beautora?</h3>
           <p>

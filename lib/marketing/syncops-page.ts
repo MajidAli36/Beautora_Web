@@ -13,11 +13,11 @@ export const SYNCOPS_PAGE = {
   eyebrow: "Product studio",
   headline: "SyncOps builds software that runs real businesses.",
   lead:
-    "We design and ship operating systems for service brands — starting with Beautora, the salon platform for bookings, POS, staff, and growth.",
+    "We design and ship products for service brands — starting with Beautora: Salon Management, POS & Marketplace for bookings, floor checkout, staff, and online retail.",
   points: [
     {
       title: "Beautora",
-      body: "Salon OS for modern stores — online booking, POS, queue, WhatsApp, attendance, and reports.",
+      body: "Salon Management, POS & Marketplace — online booking, salon POS, queue, WhatsApp, attendance, reports, and product commerce.",
       href: "/",
     },
     {

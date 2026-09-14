@@ -52,6 +52,23 @@ const MODULES = [
       },
     ],
   },
+  {
+    group: "Marketplace",
+    items: [
+      {
+        title: "Online product shop",
+        body: "List products and take COD orders on Beautora Marketplace — separate from salon POS stock.",
+      },
+      {
+        title: "Seller tools",
+        body: "Manage marketplace listings, orders, and shop inventory without mixing money into salon finances.",
+      },
+      {
+        title: "Public /shop",
+        body: "Customers browse and order products online while your floor stays on Salon Management.",
+      },
+    ],
+  },
 ];
 
 export function PlatformFeatures() {
@@ -63,11 +80,11 @@ export function PlatformFeatures() {
             The platform
           </p>
           <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
-            The whole salon idea — in one login.
+            Salon Management, POS & Marketplace — one workspace.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-[var(--m-muted)]">
-            Beautora covers the full store: guests arrive, chairs fill, payments clear, and
-            owners see what happened — without juggling apps.
+            Beautora covers the floor and online retail: guests arrive, chairs fill, payments clear,
+            products sell on Marketplace, and owners see what happened — without juggling apps.
           </p>
         </div>
 

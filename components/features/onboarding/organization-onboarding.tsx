@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useEffectEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { notify } from "@/lib/toast";
 import {
   checkSalonNameAvailable,
@@ -13,6 +13,10 @@ import {
   DEFAULT_STORE_COUNTRY,
 } from "@/lib/location/store-location";
 import { CountrySearchSelect } from "@/components/features/location/country-search-select";
+import {
+  PRODUCT_INTENT_OPTIONS,
+  type ProductIntent,
+} from "@/lib/auth/account-types";
 import { cn } from "@/lib/utils";
 
 type OrganizationOnboardingProps = {
@@ -25,6 +29,7 @@ export function OrganizationOnboarding({
   userEmail,
 }: OrganizationOnboardingProps) {
   const router = useRouter();
+  const [productIntent, setProductIntent] = useState<ProductIntent | null>(null);
   const [salonName, setSalonName] = useState(initialSalonName);
   const [city, setCity] = useState("");
   const [country, setCountry] = useState<string>(DEFAULT_STORE_COUNTRY);
@@ -58,6 +63,10 @@ export function OrganizationOnboarding({
   }, [salonName]);
 
   async function finish() {
+    if (!productIntent) {
+      notify.error("Choose Marketplace, Salon POS, or Both");
+      return;
+    }
     const name = salonName.trim();
     if (name.length < 2) {
       notify.error("Enter your salon name");
@@ -81,10 +90,10 @@ export function OrganizationOnboarding({
       salonName: name,
       city,
       country,
-      // Quiet defaults — online booking can be configured later
       bookingSlotMinutes: 30,
       bookingDaysAhead: 14,
       referralCode: partnerRef,
+      productIntent,
     });
     if (result.error) {
       notify.error(result.error);
@@ -94,21 +103,20 @@ export function OrganizationOnboarding({
     notify.success("Salon ready — welcome to Beautora");
     const { markGuideAutoOpen } = await import("@/lib/guide/storage");
     markGuideAutoOpen();
-    router.push("/dashboard");
+    router.push(result.landingPath ?? "/dashboard");
     router.refresh();
   }
 
   return (
-    <div className="auth-card w-full max-w-[420px] border border-[var(--m-line)] bg-white/90 p-7 sm:p-8">
+    <div className="auth-card w-full max-w-[480px] border border-[var(--m-line)] bg-white/90 p-7 sm:p-8">
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
         Quick start
       </p>
       <h2 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-[1.75rem]">
-        Name your salon
+        Configure your Beautora workspace
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-[var(--m-muted)]">
-        Start with POS, staff, and sales. City and country help customers find you — and power
-        store grouping later.
+        Choose what you want to run, then name your store. You can refine settings later.
       </p>
 
       {userEmail && (
@@ -124,7 +132,50 @@ export function OrganizationOnboarding({
         </p>
       ) : null}
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-5">
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-[var(--m-ink-soft)]">
+            What do you want to configure? <span className="text-[var(--m-accent)]">*</span>
+          </legend>
+          <div className="space-y-2">
+            {PRODUCT_INTENT_OPTIONS.map((opt) => {
+              const selected = productIntent === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setProductIntent(opt.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 border px-3 py-3 text-left transition-colors",
+                    selected
+                      ? "border-[var(--m-ink)] bg-[var(--m-mist)]"
+                      : "border-[var(--m-line)] hover:border-[var(--m-accent)]/50"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "mt-0.5 flex size-5 shrink-0 items-center justify-center border",
+                      selected
+                        ? "border-[var(--m-ink)] bg-[var(--m-ink)] text-white"
+                        : "border-[var(--m-line)]"
+                    )}
+                  >
+                    {selected ? <Check className="size-3" /> : null}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-[var(--m-ink)]">
+                      {opt.title}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-[var(--m-muted)]">
+                      {opt.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
         <div className="space-y-2">
           <label htmlFor="salonName" className="text-sm font-medium text-[var(--m-ink-soft)]">
             Salon name <span className="text-[var(--m-accent)]">*</span>
@@ -138,7 +189,6 @@ export function OrganizationOnboarding({
             }}
             placeholder="e.g. Glow Studio"
             className={fieldClassName}
-            autoFocus
             autoComplete="organization"
             required
           />
@@ -185,11 +235,17 @@ export function OrganizationOnboarding({
 
         <button
           type="button"
-          disabled={loading || nameOk === false}
+          disabled={loading || nameOk === false || !productIntent}
           onClick={() => void finish()}
           className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[var(--m-ink)] text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)] disabled:opacity-60"
         >
-          {loading ? "Opening dashboard…" : "Open dashboard"}
+          {loading
+            ? "Opening workspace…"
+            : productIntent === "marketplace"
+              ? "Open Marketplace"
+              : productIntent === "salon_pos"
+                ? "Open Salon POS"
+                : "Open workspace"}
           {!loading && <ArrowRight className="size-4" />}
         </button>
 

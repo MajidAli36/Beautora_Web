@@ -197,6 +197,10 @@ export function canAccessPath(
   pathname: string,
   overrides?: NavPermissionsConfig | null
 ): boolean {
+  // Marketplace seller area is gated by app mode + auth, not salon nav permissions.
+  if (pathname === "/marketplace" || pathname.startsWith("/marketplace/")) {
+    return true;
+  }
   const key = pathnameToNavKey(pathname);
   if (!key) return true;
   if (canAccessNavKey(role, key, overrides)) return true;
