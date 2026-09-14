@@ -15,7 +15,9 @@ export function ManualPaymentForm({ appointmentId }: { appointmentId: string }) 
   const [state, formAction, pending] = useActionState(bound, {} as ActionResult);
   useActionToast(state, {
     successMessage: "Advance recorded",
-    onSuccess: () => router.refresh(),
+    onSuccess: () => {
+      window.setTimeout(() => router.refresh(), 320);
+    },
   });
 
   return (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Link2 } from "lucide-react";
 import { linkInHouseProductToService } from "@/lib/actions/services";
+import { finishDialogSuccess } from "@/hooks/use-action-toast";
 import { notify } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,15 +157,17 @@ function LinkForm({
         notify.error(result.error);
         return;
       }
-      notify.success(
+      const message =
         selected.size === 0
           ? "All service links removed."
           : selected.size === 1
             ? "Linked to 1 service."
-            : `Linked to ${selected.size} services.`
-      );
-      onDone();
-      router.refresh();
+            : `Linked to ${selected.size} services.`;
+      finishDialogSuccess({
+        close: onDone,
+        message,
+        refresh: () => router.refresh(),
+      });
     });
   }
 

@@ -284,7 +284,9 @@ function AddConductForm({
   const [state, action, pending] = useActionState(createStaffNote, {} as ActionResult);
   useActionToast(state, {
     successMessage: "Saved.",
-    onSuccess: () => router.refresh(),
+    onSuccess: () => {
+      window.setTimeout(() => router.refresh(), 320);
+    },
   });
 
   return (

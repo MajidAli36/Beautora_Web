@@ -11,18 +11,42 @@ type ActionLike = {
 type UseActionToastOptions = {
   /** Shown when `state.success` is true. Defaults to "Saved successfully." */
   successMessage?: string;
-  /** Called after a success toast. Use to close dialogs / reset forms. */
+  /**
+   * Called after a successful save — typically close the dialog/drawer.
+   * Prefer closing here; call `router.refresh()` via `scheduleRefresh` so the toast stays visible.
+   */
   onSuccess?: () => void;
   /** Override the error toast body. Defaults to `state.error`. */
   errorMessage?: string | ((error: string) => string);
 };
 
 /**
+ * Close a dialog/drawer, show a success toast on top, then refresh the page.
+ * Keeps the toast visible (not trapped under the drawer, not cleared by an instant refresh).
+ */
+export function finishDialogSuccess(options: {
+  close: () => void;
+  message: string;
+  refresh?: () => void;
+  refreshDelayMs?: number;
+}) {
+  const { close, message, refresh, refreshDelayMs = 320 } = options;
+  close();
+  // Next frame: drawer gone → toast sits above the page
+  requestAnimationFrame(() => {
+    notify.success(message);
+  });
+  if (refresh) {
+    window.setTimeout(refresh, refreshDelayMs);
+  }
+}
+
+/**
  * Turns `useActionState` / ActionResult into Sonner toasts.
  * Dedupes by state object identity so the same result is not toasted twice.
- * Success toasts auto-dismiss via AppToaster duration.
  *
- * Prefer this for every form that uses `useActionState` so saves always feedback.
+ * On success: closes dialog via `onSuccess` first, then shows the toast
+ * (so toasts are not hidden under the right-side drawer).
  */
 export function useActionToast(
   state: ActionLike | null | undefined,
@@ -49,8 +73,11 @@ export function useActionToast(
     }
 
     if (state.success) {
-      notify.success(successMessage ?? "Saved successfully.");
+      // Close drawer/dialog first so the toast is not covered by z-50 panel
       onSuccess?.();
+      requestAnimationFrame(() => {
+        notify.success(successMessage ?? "Saved successfully.");
+      });
     }
   }, [state]);
 }

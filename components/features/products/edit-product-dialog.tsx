@@ -117,7 +117,7 @@ function EditProductForm({
     successMessage: "Product updated.",
     onSuccess: () => {
       onDone();
-      router.refresh();
+      window.setTimeout(() => router.refresh(), 320);
     },
   });
 

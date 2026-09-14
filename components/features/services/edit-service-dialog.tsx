@@ -99,7 +99,7 @@ function EditServiceForm({
     successMessage: "Service updated.",
     onSuccess: () => {
       onDone();
-      router.refresh();
+      window.setTimeout(() => router.refresh(), 320);
     },
   });
 

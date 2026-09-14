@@ -95,7 +95,7 @@ function UseInHouseStockForm({
     successMessage: "In-house stock linked.",
     onSuccess: () => {
       onDone();
-      router.refresh();
+      window.setTimeout(() => router.refresh(), 320);
     },
   });
 

@@ -6,19 +6,20 @@ export function AppToaster() {
   return (
     <Toaster
       theme="light"
-      position="top-right"
+      position="top-center"
       richColors
       closeButton
       expand
       visibleToasts={5}
-      duration={3200}
+      duration={3500}
       gap={12}
-      offset={{ top: 16, right: 16 }}
-      style={{ zIndex: 100000 }}
+      offset={{ top: 20 }}
+      className="!z-[200000]"
+      style={{ zIndex: 200000 }}
       toastOptions={{
         classNames: {
           toast:
-            "group toast !border !border-border/80 !bg-card !text-card-foreground !shadow-lg !shadow-black/5 !rounded-xl !font-[family-name:var(--font-geist-sans)]",
+            "group toast !z-[200000] !border !border-border/80 !bg-card !text-card-foreground !shadow-lg !shadow-black/5 !rounded-xl !font-[family-name:var(--font-geist-sans)]",
           title: "!text-sm !font-semibold !tracking-tight",
           description: "!text-sm !text-muted-foreground",
           actionButton:
