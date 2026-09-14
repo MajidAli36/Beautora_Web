@@ -6,14 +6,14 @@ export function AppToaster() {
   return (
     <Toaster
       theme="light"
-      position="top-center"
+      position="top-right"
       richColors
       closeButton
       expand
       visibleToasts={5}
       duration={3500}
       gap={12}
-      offset={{ top: 20 }}
+      offset={{ top: 16, right: 16 }}
       className="!z-[200000]"
       style={{ zIndex: 200000 }}
       toastOptions={{

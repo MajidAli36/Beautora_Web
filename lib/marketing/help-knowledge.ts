@@ -14,8 +14,7 @@ export type HelpArticle = {
   links?: { label: string; href: string }[];
 };
 
-const PRICE = SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK");
-const CURRENCY = SUBSCRIPTION.currencyLabel;
+const PRICE_LINE = `$${SUBSCRIPTION.asiaAmountUsd} Asia · $${SUBSCRIPTION.usdtAmountUsd} elsewhere`;
 
 export const HELP_SUGGESTIONS = [
   "What is Beautora?",
@@ -71,7 +70,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "tell me everything",
       "overview",
     ],
-    answer: `Beautora includes Salon Management: Dashboard · Customers · Appointments (in-house + online + deposit approvals) · Queue (walk-in tokens) · POS · Sales (amend / void / refund / dues) · Services & packages · Products (retail) · In-house stock (cream/ml recipes) · Chairs · Staff & roles · Attendance (fingerprint kiosk) · Devices (printer, drawer, token, attendance) · Reports · Finances (expenses, staff pay, COGS, advances) · WhatsApp templates · Feedback ratings · Billing (trial / JazzCash) · Settings. Plus Marketplace: product listings, COD shop orders, marketplace stock, and seller tools — separate from salon POS inventory and finances. Guests book on your public store page and shop on /shop. Native mobile/desktop apps are Coming Soon — the web app is live today.`,
+    answer: `Beautora includes Salon Management: Dashboard · Customers · Appointments (in-house + online + deposit approvals) · Queue (walk-in tokens) · POS · Sales (amend / void / refund / dues) · Services & packages · Products (retail) · In-house stock (cream/ml recipes) · Chairs · Staff & roles · Attendance (fingerprint kiosk) · Devices (printer, drawer, token, attendance) · Reports · Finances (expenses, staff pay, COGS, advances) · WhatsApp templates · Feedback ratings · Billing (trial / USDT) · Settings. Plus Marketplace: product listings, COD shop orders, marketplace stock, and seller tools — separate from salon POS inventory and finances. Guests book on your public store page and shop on /shop. Native mobile/desktop apps are Coming Soon — the web app is live today.`,
     links: [
       { label: "Platform modules", href: "/salon-management-software" },
       { label: "Marketplace shop", href: "/shop" },
@@ -115,7 +114,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "free",
       "rs",
       "pkr",
-      "jazzcash",
+      "usdt",
+      "usd",
+      "asia",
       "billing",
       "renew",
       "pay",
@@ -123,7 +124,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "grace",
       "plan",
     ],
-    answer: `New stores get ${SUBSCRIPTION.trialDays} days free — no card required. Pakistan stores renew at Rs ${PRICE}/month via JazzCash (${SUBSCRIPTION.jazzcashDisplay}). International stores renew at $${SUBSCRIPTION.usdtAmountUsd} USDT on BNB Smart Chain (BEP-20). SyncOps can also grant lifetime access from Platform admin. After a paid period ends there is a short ${SUBSCRIPTION.graceDays}-day grace before lock.`,
+    answer: `New stores get ${SUBSCRIPTION.trialDays} days free — no card required. Asia stores renew at $${SUBSCRIPTION.asiaAmountUsd}/month; all other countries renew at $${SUBSCRIPTION.usdtAmountUsd}/month — both via USDT on BNB Smart Chain (BEP-20). SyncOps can also grant lifetime access from Platform admin. After a paid period ends there is a short ${SUBSCRIPTION.graceDays}-day grace before lock.`,
     links: [
       { label: "Pricing", href: "/pricing" },
       { label: "Start free", href: "/signup" },
@@ -582,7 +583,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "commission",
       "earn",
     ],
-    answer: `Partners get a personal referral link. When a referred salon pays its first subscription (${CURRENCY} ${PRICE}), that first month credits the partner (not renewals). Apply with email + username; SyncOps approves before the link goes live. Track stores and earnings in the partner dashboard.`,
+    answer: `Partners get a personal referral link. When a referred salon pays its first subscription (${PRICE_LINE}), that first month credits the partner (not renewals). Apply with email + username; SyncOps approves before the link goes live. Track stores and earnings in the partner dashboard.`,
     links: [{ label: "Become a partner", href: "/partner" }],
   },
   {
@@ -644,7 +645,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "per store",
       "another salon",
     ],
-    answer: `Beautora bills ${CURRENCY} ${PRICE} per store / month after trial. Each salon organization has its own catalog, team, bookings, and finances. Open another store as a separate Beautora organization if you run multiple locations.`,
+    answer: `Beautora bills ${PRICE_LINE} per store / month after trial (USDT). Each salon organization has its own catalog, team, bookings, and finances. Open another store as a separate Beautora organization if you run multiple locations.`,
     links: [{ label: "Pricing", href: "/pricing" }],
   },
   {
@@ -660,7 +661,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "urdu",
     ],
     answer:
-      "During onboarding / Settings you set the store country. Beautora formats money with that country’s currency (unknown countries fall back to PKR). The marketing site and many salons operate in Pakistan with JazzCash billing in Rs.",
+      "During onboarding / Settings you set the store country. Beautora formats money with that country’s currency (unknown countries fall back to PKR). Subscription billing is USDT: $10 for Asia, $15 elsewhere — selected automatically from the store country.",
     links: [{ label: "Start free", href: "/signup" }],
   },
 ];

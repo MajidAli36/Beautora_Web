@@ -48,10 +48,10 @@ export function PlatformPartnersPanel({ partners }: { partners: PartnerRow[] }) 
         <div>
           <h2 className="text-lg font-semibold">Partners</h2>
           <p className="text-sm text-muted-foreground">
-            Approve carefully. Approved partners earn the full first{" "}
-            {SUBSCRIPTION.currencyLabel} {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}{" "}
-            subscription for each referred store (credited when you approve that store&apos;s
-            first JazzCash invoice — manual today).
+            Approve carefully. Approved partners earn the full first subscription ($
+            {SUBSCRIPTION.asiaAmountUsd} Asia · ${SUBSCRIPTION.usdtAmountUsd} elsewhere) for each
+            referred store (credited when you approve that store&apos;s first USDT invoice —
+            manual today).
           </p>
         </div>
         <div className="flex gap-2">

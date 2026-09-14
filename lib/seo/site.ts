@@ -13,7 +13,7 @@ export { absoluteUrl, canonicalPath, getSiteUrl } from "@/lib/seo/urls";
 export { buildPageMetadata, buildRootMetadata } from "@/lib/seo/metadata";
 export { SEO_BRAND, SEO_MARKETS, SEO_LOCALES } from "@/lib/seo/constants";
 
-const PRICE = SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK");
+const PRICE_LINE = `$${SUBSCRIPTION.asiaAmountUsd} Asia · $${SUBSCRIPTION.usdtAmountUsd} elsewhere`;
 
 /** Product SEO — Salon Management (POS) + Marketplace. */
 export const SITE_SEO = {
@@ -51,7 +51,7 @@ export const SITE_FAQ = [
   {
     question: "Does Beautora work outside Pakistan?",
     answer:
-      "Yes. Beautora is built for beauty businesses internationally. Country and currency settings support global stores; local payment options (such as JazzCash in Pakistan) apply where configured.",
+      "Yes. Beautora is built for beauty businesses internationally. Country settings select your subscription rate automatically ($10 Asia · $15 elsewhere, USDT).",
   },
   {
     question: "Who builds Beautora?",
@@ -59,7 +59,7 @@ export const SITE_FAQ = [
   },
   {
     question: "How much does Beautora cost?",
-    answer: `Start with a ${SUBSCRIPTION.trialDays}-day free trial. After trial: Pakistan renews at Rs ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month via JazzCash; other countries renew at $${SUBSCRIPTION.usdtAmountUsd} USDT on BNB Smart Chain (BEP-20). Upload proof in Billing for SyncOps review.`,
+    answer: `Start with a ${SUBSCRIPTION.trialDays}-day free trial. After trial: Asia renews at $${SUBSCRIPTION.asiaAmountUsd}/month; all other countries renew at $${SUBSCRIPTION.usdtAmountUsd}/month — both via USDT on BNB Smart Chain (BEP-20). Upload proof in Billing for SyncOps review.`,
   },
   {
     question: "Can customers book online?",
@@ -203,10 +203,10 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         offers: {
           "@type": "Offer",
           url: absoluteUrl("/pricing"),
-          priceCurrency: "PKR",
-          price: String(SUBSCRIPTION.monthlyAmountPkr),
+          priceCurrency: "USD",
+          price: String(SUBSCRIPTION.usdtAmountUsd),
           availability: "https://schema.org/InStock",
-          description: `${SUBSCRIPTION.trialDays}-day free trial; see pricing for regional payment options`,
+          description: `${SUBSCRIPTION.trialDays}-day free trial; $${SUBSCRIPTION.asiaAmountUsd} Asia / $${SUBSCRIPTION.usdtAmountUsd} elsewhere (USDT)`,
           seller: { "@id": syncOpsOrgId },
         },
         featureList: [
@@ -286,4 +286,4 @@ export function buildBreadcrumbJsonLd(
 }
 
 /** Kept for any legacy import; prefer SUBSCRIPTION display on pricing page. */
-export const SEO_PRICE_LABEL = `Rs ${PRICE}`;
+export const SEO_PRICE_LABEL = PRICE_LINE;

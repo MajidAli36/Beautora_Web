@@ -7,7 +7,7 @@ import { SYNCOPS } from "@/lib/print/syncops";
 
 export const metadata: Metadata = buildPageMetadata({
   title: `Partner program`,
-  description: `Earn the full first ${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr} subscription when you refer a salon to ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
+  description: `Earn the full first subscription ($${SUBSCRIPTION.asiaAmountUsd} Asia · $${SUBSCRIPTION.usdtAmountUsd} elsewhere) when you refer a salon to ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
   path: "/partner",
   keywords: ["Beautora partner", "SyncOps partner", "salon referral program"],
 });
@@ -30,11 +30,9 @@ export default function PartnerLandingPage() {
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--m-muted)] sm:text-lg">
               Share your personal link. When a new salon opens under your username and pays
-              their first subscription (
-              {SUBSCRIPTION.currencyLabel}{" "}
-              {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}
-              ), that full first payment is credited to you — every referred client, tracked
-              in your partner dashboard.
+              their first subscription (${SUBSCRIPTION.asiaAmountUsd}–$
+              {SUBSCRIPTION.usdtAmountUsd} USDT by region), that full first payment is credited
+              to you — every referred client, tracked in your partner dashboard.
             </p>
 
             <ul className="mt-8 space-y-3 text-sm text-[var(--m-ink-soft)]">
@@ -44,9 +42,8 @@ export default function PartnerLandingPage() {
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-[var(--m-accent)]" />
-                First paid subscription only (not renewals) — full{" "}
-                {SUBSCRIPTION.currencyLabel}{" "}
-                {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")} to you
+                First paid subscription only (not renewals) — full first month ($
+                {SUBSCRIPTION.asiaAmountUsd}–${SUBSCRIPTION.usdtAmountUsd}) to you
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-[var(--m-accent)]" />

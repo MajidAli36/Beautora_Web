@@ -26,13 +26,12 @@ export function BillingPaymentForm({ plan }: { plan: BillingPlan }) {
   const [copied, setCopied] = useState(false);
 
   const amountLabel = formatPlanAmount(plan);
-  const isUsdt = plan.method === "usdt_bep20";
 
   async function copyDestination() {
     try {
       await navigator.clipboard.writeText(plan.destination);
       setCopied(true);
-      notify.success(isUsdt ? "USDT wallet copied" : "JazzCash number copied");
+      notify.success("USDT wallet copied");
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       notify.error("Could not copy — select and copy manually");
@@ -74,15 +73,13 @@ export function BillingPaymentForm({ plan }: { plan: BillingPlan }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-        <p className="font-semibold">
-          Send {amountLabel} via {isUsdt ? "USDT" : "JazzCash"}
-        </p>
+        <p className="font-semibold">Send {amountLabel} via USDT</p>
         {plan.networkLabel ? (
           <p className="mt-1 text-xs font-medium text-muted-foreground">{plan.networkLabel}</p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-start gap-2">
           <p className="min-w-0 flex-1 break-all text-muted-foreground">
-            {isUsdt ? "Wallet" : "Number"}:{" "}
+            Wallet:{" "}
             <span className="font-semibold text-foreground">{plan.destinationDisplay}</span>
           </p>
           <Button
@@ -96,15 +93,12 @@ export function BillingPaymentForm({ plan }: { plan: BillingPlan }) {
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
-        {isUsdt ? (
-          <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
-            Send only USDT on BNB Smart Chain (BEP-20). Wrong network can lose funds.
-          </p>
-        ) : null}
+        <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
+          Send only USDT on BNB Smart Chain (BEP-20). Wrong network can lose funds.
+        </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          After sending, enter the {isUsdt ? "transaction hash" : "JazzCash transaction ID"} and
-          upload the receipt screenshot below. A Beautora admin will approve and unlock your store
-          for 30 days.
+          After sending, enter the transaction hash and upload the receipt screenshot below. A
+          Beautora admin will approve and unlock your store for 30 days.
         </p>
       </div>
 
@@ -152,7 +146,7 @@ export function BillingPaymentForm({ plan }: { plan: BillingPlan }) {
           id="payer"
           value={payerName}
           onChange={(e) => setPayerName(e.target.value)}
-          placeholder={isUsdt ? "Name or wallet label" : "Name on JazzCash"}
+          placeholder="Name or wallet label"
         />
       </div>
       <div className="space-y-2">

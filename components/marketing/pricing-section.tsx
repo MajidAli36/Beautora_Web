@@ -1,8 +1,8 @@
 import Link from "next/link";
 import {
+  ASIA_PLAN,
   formatPlanAmount,
-  INTERNATIONAL_PLAN,
-  PAKISTAN_PLAN,
+  STANDARD_PLAN,
   SUBSCRIPTION,
   type BillingPlan,
 } from "@/lib/billing/subscription";
@@ -25,12 +25,11 @@ type PricingSectionProps = {
 };
 
 export function PricingSection({
-  highlightPlan = INTERNATIONAL_PLAN,
+  highlightPlan = STANDARD_PLAN,
   detectedCountry = null,
 }: PricingSectionProps) {
   const primary = highlightPlan;
-  const secondary =
-    primary.method === "jazzcash" ? INTERNATIONAL_PLAN : PAKISTAN_PLAN;
+  const secondary = primary.amount === ASIA_PLAN.amount ? STANDARD_PLAN : ASIA_PLAN;
 
   return (
     <section id="pricing" className="scroll-mt-28 bg-[var(--m-ink)] py-28 text-white sm:py-32">
@@ -45,13 +44,12 @@ export function PricingSection({
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-white/70">
             Every new store gets the full Beautora platform for {SUBSCRIPTION.trialDays} days.
-            After the trial, Pakistan stores renew with JazzCash; all other countries renew with
-            USDT on BNB Smart Chain.
+            After the trial, Asia stores renew at ${SUBSCRIPTION.asiaAmountUsd}; all other
+            countries renew at ${SUBSCRIPTION.usdtAmountUsd} — both via USDT on BNB Smart Chain.
           </p>
           {detectedCountry ? (
             <p className="mt-3 text-sm text-white/50">
-              Showing payment details for your region ({detectedCountry}
-              {primary.method === "jazzcash" ? " · JazzCash" : " · USDT"}).
+              Showing payment details for your region ({detectedCountry} · USDT).
             </p>
           ) : null}
         </div>
@@ -72,7 +70,7 @@ export function PricingSection({
               <p className="mt-3 text-xs text-white/55">{primary.networkLabel}</p>
             ) : null}
             <p className="mt-4 break-all text-sm text-white/80">
-              {primary.method === "jazzcash" ? "JazzCash" : "Wallet"}:{" "}
+              Wallet:{" "}
               <span className="font-semibold text-white">{primary.destinationDisplay}</span>
             </p>
             <Link
@@ -110,8 +108,7 @@ export function PricingSection({
                 <p className="mt-1 text-xs text-white/45">{secondary.networkLabel}</p>
               ) : null}
               <p className="mt-2 break-all text-xs text-white/55">
-                {secondary.method === "jazzcash" ? "JazzCash" : "Wallet"}:{" "}
-                {secondary.destinationDisplay}
+                Wallet: {secondary.destinationDisplay}
               </p>
             </div>
           </div>

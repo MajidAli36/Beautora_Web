@@ -39,7 +39,6 @@ export default async function BillingPage() {
   const { snapshot, orgName } = sub;
   const plan = snapshot.plan;
   const amountLabel = formatPlanAmount(plan);
-  const isUsdt = plan.method === "usdt_bep20";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -54,7 +53,7 @@ export default async function BillingPage() {
             <CardTitle>Store access paused</CardTitle>
             <CardDescription>
               The {SUBSCRIPTION.graceDays}-day caution window has ended. Send{" "}
-              <strong>{amountLabel}</strong> via {isUsdt ? "USDT (BEP-20)" : "JazzCash"} to{" "}
+              <strong>{amountLabel}</strong> USDT (BEP-20) to{" "}
               <strong className="break-all">{plan.destinationDisplay}</strong>
               {plan.networkLabel ? ` · ${plan.networkLabel}` : ""}, then submit proof below. After
               Beautora verifies the payment, your store is re-enabled for{" "}
@@ -83,7 +82,7 @@ export default async function BillingPage() {
             <CardDescription>
               {snapshot.phase === "lifetime"
                 ? "Lifetime / complimentary — monthly fee waived"
-                : `1 month free trial → then ${amountLabel}/month (${isUsdt ? "USDT BEP-20" : "JazzCash"})`}
+                : `1 month free trial → then ${amountLabel}/month (USDT BEP-20)`}
             </CardDescription>
           </div>
           {phaseBadge(snapshot.phase)}
@@ -128,7 +127,7 @@ export default async function BillingPage() {
           {snapshot.phase !== "lifetime" && (
             <div className="space-y-1 text-muted-foreground">
               <p>
-                {isUsdt ? "USDT wallet" : "JazzCash"}:{" "}
+                USDT wallet:{" "}
                 <span className="break-all font-medium text-foreground">
                   {plan.destinationDisplay}
                 </span>
@@ -138,8 +137,8 @@ export default async function BillingPage() {
                 Amount: <span className="font-medium text-foreground">{amountLabel}</span>
               </p>
               <p className="text-xs">
-                Payment method follows your store country in Settings (
-                {isUsdt ? "outside Pakistan → USDT" : "Pakistan → JazzCash"}).
+                Price follows your store country in Settings ($
+                {SUBSCRIPTION.asiaAmountUsd} Asia · ${SUBSCRIPTION.usdtAmountUsd} elsewhere).
               </p>
             </div>
           )}
@@ -149,9 +148,7 @@ export default async function BillingPage() {
       {snapshot.phase !== "lifetime" && (
         <Card>
           <CardHeader>
-            <CardTitle>
-              Submit {isUsdt ? "USDT" : "JazzCash"} payment
-            </CardTitle>
+            <CardTitle>Submit USDT payment</CardTitle>
             <CardDescription>
               Manual verification by Beautora — we re-enable your store after approval. Platform
               admin is notified when you submit proof.

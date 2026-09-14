@@ -77,11 +77,11 @@ export const PUBLISHED_MARKET_PAGES: MarketPageContent[] = [
     slug: "pakistan",
     title: "Salon Management Software in Pakistan",
     description:
-      "Beautora Salon Management, POS & Marketplace for Pakistan — JazzCash-friendly billing, online booking, salon POS, staff, public directory, and Marketplace COD shop.",
+      "Beautora Salon Management, POS & Marketplace for Pakistan — $10/month Asia USDT billing, online booking, salon POS, staff, public directory, and Marketplace COD shop.",
     h1: "Salon Management Software in Pakistan",
-    lead: "Beautora started with strong Pakistan operations in mind — JazzCash subscription flows, Pakistan timezone booking, a public directory, and Marketplace COD — while remaining a global Salon Management, POS & Marketplace product.",
+    lead: "Beautora started with strong Pakistan operations in mind — Asia USDT subscription pricing, Pakistan timezone booking, a public directory, and Marketplace COD — while remaining a global Salon Management, POS & Marketplace product.",
     localNotes: [
-      "Trial and subscription flows support JazzCash where configured.",
+      "Pakistan stores renew at $10/month via USDT (BEP-20) after the free trial.",
       "Booking times follow Pakistan Standard Time for local stores.",
       "Guests can discover salons via the Beautora stores directory.",
     ],
@@ -89,7 +89,7 @@ export const PUBLISHED_MARKET_PAGES: MarketPageContent[] = [
       {
         question: "Is Beautora only for Pakistan?",
         answer:
-          "No. Pakistan is an important market with local payment options, but Beautora serves beauty businesses worldwide.",
+          "No. Pakistan is an important Asia market at the $10 rate, but Beautora serves beauty businesses worldwide ($15 outside Asia).",
       },
     ],
   },

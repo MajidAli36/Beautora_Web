@@ -304,7 +304,7 @@ function platformAdminNotifyEmails(): string[] {
   return [...set];
 }
 
-/** Email SyncOps when a store submits JazzCash or USDT payment proof. */
+/** Email SyncOps when a store submits USDT payment proof. */
 export async function sendPlatformPaymentSubmittedEmail(input: {
   organizationId: string;
   storeName: string;
@@ -317,10 +317,7 @@ export async function sendPlatformPaymentSubmittedEmail(input: {
     return { ok: false as const, error: "No platform admin email", skipped: true };
   }
 
-  const methodLabel =
-    input.plan.method === "usdt_bep20"
-      ? "USDT (BEP-20)"
-      : "JazzCash";
+  const methodLabel = "USDT (BEP-20)";
   const content = platformPaymentSubmittedEmail({
     storeName: input.storeName,
     amountLabel: formatPlanAmount(input.plan),

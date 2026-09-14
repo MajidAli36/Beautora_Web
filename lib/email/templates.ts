@@ -3,7 +3,7 @@ import { escapeHtml } from "@/lib/email/escape";
 import { renderEmailLayout } from "@/lib/email/layout";
 import { SYNCOPS } from "@/lib/print/syncops";
 
-const PRICE = `${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}`;
+const PRICE = `$${SUBSCRIPTION.asiaAmountUsd}–$${SUBSCRIPTION.usdtAmountUsd}`;
 
 export function salonWelcomeVerifyEmail(input: {
   name: string;
@@ -241,7 +241,7 @@ export function subscriptionDeactivatedEmail(input: {
       bodyHtml: `
         <p style="margin:0 0 12px;">Hi ${escapeHtml(input.name)},</p>
         <p style="margin:0 0 12px;">Access for <strong>${escapeHtml(input.storeName)}</strong> is now <strong>${escapeHtml(label)}</strong> (effective ${escapeHtml(input.effectiveAt)}).</p>
-        <p style="margin:0 0 12px;">You can renew from Billing whenever you’re ready — upload your JazzCash or USDT payment proof for review.</p>
+        <p style="margin:0 0 12px;">You can renew from Billing whenever you’re ready — upload your USDT payment proof for review.</p>
       `,
       ctaLabel: "Go to billing",
       ctaUrl: input.billingUrl,

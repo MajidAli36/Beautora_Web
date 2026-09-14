@@ -1,17 +1,20 @@
-/** Beautora store subscription — trial, grace, regional renewals (JazzCash / USDT) */
+/** Beautora store subscription — trial, grace, regional renewals (USDT by country) */
 
 import { isHardcodedPlatformAdminEmail } from "@/lib/platform/admin";
 import {
-  INTERNATIONAL_PLAN,
-  PAKISTAN_PLAN,
-  formatPlanAmount,
+  ASIA_PLAN,
+  STANDARD_PLAN,
   resolveBillingPlanFromCountry,
   type BillingPlan,
 } from "@/lib/billing/plans";
 
 export const SUBSCRIPTION = {
-  /** @deprecated Prefer resolveBillingPlanFromCountry — kept for legacy PKR displays */
-  monthlyAmountPkr: PAKISTAN_PLAN.amount,
+  /** Asia monthly fee (USD) */
+  asiaAmountUsd: ASIA_PLAN.amount,
+  /** Standard / non-Asia monthly fee (USD) */
+  usdtAmountUsd: STANDARD_PLAN.amount,
+  /** @deprecated Use asiaAmountUsd — alias for older partner/marketing imports */
+  monthlyAmountPkr: ASIA_PLAN.amount,
   /** Free trial length after salon creation */
   trialDays: 30,
   /** Paid access length after each approved payment */
@@ -20,23 +23,28 @@ export const SUBSCRIPTION = {
   graceDays: 3,
   /** Caution popup interval during grace (ms) */
   cautionPopupIntervalMs: 60 * 60 * 1000,
-  jazzcashNumber: PAKISTAN_PLAN.destination,
-  jazzcashDisplay: PAKISTAN_PLAN.destinationDisplay,
-  currencyLabel: PAKISTAN_PLAN.currencyLabel,
-  /** International plan constants */
-  usdtAmountUsd: INTERNATIONAL_PLAN.amount,
-  usdtWallet: INTERNATIONAL_PLAN.destination,
-  usdtNetwork: INTERNATIONAL_PLAN.networkLabel!,
+  /** @deprecated JazzCash no longer used for subscription */
+  jazzcashNumber: "",
+  jazzcashDisplay: "",
+  currencyLabel: "$",
+  usdtWallet: STANDARD_PLAN.destination,
+  usdtNetwork: STANDARD_PLAN.networkLabel!,
 } as const;
 
 export type { BillingPlan, BillingMethod } from "@/lib/billing/plans";
 export {
+  ASIA_PLAN,
+  STANDARD_PLAN,
   PAKISTAN_PLAN,
   INTERNATIONAL_PLAN,
   resolveBillingPlanFromCountry,
+  resolveBillingPlanFromCountryCode,
   formatPlanAmount,
   formatStoredPaymentAmount,
+  isAsiaCountry,
+  isAsiaCountryCode,
   isPakistanCountry,
+  subscriptionPriceMarketingLine,
 } from "@/lib/billing/plans";
 
 export type SubscriptionPhase = "trial" | "active" | "grace" | "locked" | "lifetime";
@@ -65,8 +73,9 @@ export type SubscriptionSnapshot = {
   lifetimeAccess: boolean;
   /** Regional payment plan for this store */
   plan: BillingPlan;
-  /** Legacy PKR fields (JazzCash) — prefer `plan` */
+  /** @deprecated Prefer `plan.amount` */
   amountPkr: number;
+  /** @deprecated */
   jazzcashNumber: string;
   jazzcashDisplay: string;
 };
@@ -103,9 +112,9 @@ export function resolveSubscription(
   const base = {
     trialEndsAt,
     plan,
-    amountPkr: PAKISTAN_PLAN.amount,
-    jazzcashNumber: PAKISTAN_PLAN.destination,
-    jazzcashDisplay: PAKISTAN_PLAN.destinationDisplay,
+    amountPkr: plan.amount,
+    jazzcashNumber: "",
+    jazzcashDisplay: "",
     lifetimeAccess: Boolean(org.lifetime_access),
   };
 

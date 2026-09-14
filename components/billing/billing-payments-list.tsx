@@ -28,7 +28,7 @@ export function BillingPaymentsList({ payments }: { payments: BillingPayment[] }
             p.transaction_ref,
             p.status,
             p.payment_method,
-            p.payment_method === "usdt_bep20" ? "usdt" : "jazzcash",
+            p.payment_method === "usdt_bep20" ? "usdt" : "payment",
             String(p.amount),
             p.currency,
           ].join(" "),
@@ -43,7 +43,7 @@ export function BillingPaymentsList({ payments }: { payments: BillingPayment[] }
                 <p className="text-xs text-muted-foreground">
                   {new Date(p.created_at).toLocaleString("en-PK")} ·{" "}
                   {formatStoredPaymentAmount(p.amount, p.currency)}
-                  {p.payment_method === "usdt_bep20" ? " · USDT" : " · JazzCash"}
+                  {p.payment_method === "usdt_bep20" ? " · USDT" : ""}
                 </p>
                 {p.has_invoice && (
                   <div className="mt-2">

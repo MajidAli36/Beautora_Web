@@ -17,7 +17,7 @@ export const metadata: Metadata = buildPageMetadata({
   ],
 });
 
-const PRICE = `${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}`;
+const PRICE = `$${SUBSCRIPTION.asiaAmountUsd}–$${SUBSCRIPTION.usdtAmountUsd}`;
 
 export default function AboutPage() {
   const jsonLd = {
@@ -65,7 +65,7 @@ export default function AboutPage() {
             name: "How much does Beautora cost?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: `First month free, then ${PRICE}/month via JazzCash per store.`,
+              text: `First month free, then ${PRICE}/month via USDT per store (Asia $${SUBSCRIPTION.asiaAmountUsd} · elsewhere $${SUBSCRIPTION.usdtAmountUsd}).`,
             },
           },
           {
@@ -129,7 +129,7 @@ export default function AboutPage() {
           <h2>Pricing, simply</h2>
           <p>
             Start with {SUBSCRIPTION.trialDays} days free, then {PRICE} per store per month via
-            JazzCash. See current pricing on the{" "}
+            USDT. See current pricing on the{" "}
             <Link href="/pricing">pricing page</Link>.
           </p>
         </section>
@@ -167,7 +167,7 @@ export default function AboutPage() {
           </p>
           <h3>How much does Beautora cost?</h3>
           <p>
-            First month free, then {PRICE}/month via JazzCash per store.
+            First month free, then {PRICE}/month via USDT per store.
           </p>
           <h3>Where do I start?</h3>
           <p>

@@ -36,8 +36,6 @@ export function SubscriptionCautionModal({
   const [open, setOpen] = useState(isLocked && !isLifetime);
   const plan = snapshot.plan;
   const amountLabel = formatPlanAmount(plan);
-  const isUsdt = plan.method === "usdt_bep20";
-
   useEffect(() => {
     if (isLifetime) {
       setOpen(false);
@@ -102,8 +100,7 @@ export function SubscriptionCautionModal({
           <SheetDescription className="text-sm leading-relaxed">
             {isLocked ? (
               <>
-                Access is disabled until Beautora confirms your{" "}
-                {isUsdt ? "USDT" : "JazzCash"} payment. Send{" "}
+                Access is disabled until Beautora confirms your USDT payment. Send{" "}
                 <strong className="text-foreground">{amountLabel}</strong> and submit proof
                 below to re-enable the salon for 30 days.
               </>
@@ -125,7 +122,7 @@ export function SubscriptionCautionModal({
             <div className="space-y-2 rounded-xl border border-border bg-muted/40 p-4 text-sm">
               <p className="font-medium text-foreground">Renew: {amountLabel}/month</p>
               <p className="break-all text-muted-foreground">
-                {isUsdt ? "USDT wallet" : "JazzCash"}:{" "}
+                USDT wallet:{" "}
                 <span className="font-semibold text-foreground">{plan.destinationDisplay}</span>
               </p>
               {plan.networkLabel ? (

@@ -31,7 +31,7 @@ export default function PrivacyPage() {
           <li>Account details (name, email, password authentication)</li>
           <li>Salon profile and public store listing content you choose to publish</li>
           <li>Operational data you enter (customers, appointments, sales, staff)</li>
-          <li>Billing and payment review materials you submit (for example JazzCash proofs)</li>
+          <li>Billing and payment review materials you submit (for example USDT transfer proofs)</li>
           <li>Technical logs needed to keep the service secure and reliable</li>
         </ul>
       </section>

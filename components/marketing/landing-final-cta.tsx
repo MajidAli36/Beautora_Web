@@ -14,9 +14,9 @@ export function LandingFinalCta() {
           Ready to run your salon on {SYNCOPS.name}?
         </h2>
         <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-[var(--m-muted)]">
-          Start with the full platform for {SUBSCRIPTION.trialDays} days. Then Rs{" "}
-          {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month in Pakistan (JazzCash) or $
-          {SUBSCRIPTION.usdtAmountUsd} USDT internationally (BEP-20).
+          Start with the full platform for {SUBSCRIPTION.trialDays} days. Then $
+          {SUBSCRIPTION.asiaAmountUsd}/month in Asia or ${SUBSCRIPTION.usdtAmountUsd}/month
+          elsewhere — both via USDT (BEP-20).
         </p>
         <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
           <Link

@@ -150,9 +150,8 @@ export function PlatformAdminPanel({
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Platform admin</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {adminEmail} · Pakistan JazzCash {SUBSCRIPTION.jazzcashDisplay} (Rs{" "}
-            {summary.monthlyFee.toLocaleString("en-PK")}) · International USDT $
-            {SUBSCRIPTION.usdtAmountUsd} BEP-20
+            {adminEmail} · Asia ${SUBSCRIPTION.asiaAmountUsd} · Elsewhere $
+            {SUBSCRIPTION.usdtAmountUsd} (USDT BEP-20)
           </p>
         </div>
         <div className="flex gap-2">
@@ -176,7 +175,7 @@ export function PlatformAdminPanel({
       {summary.pendingInvoices > 0 ? (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
           <strong>{summary.pendingInvoices}</strong> payment proof
-          {summary.pendingInvoices === 1 ? "" : "s"} waiting for review (JazzCash or USDT). Scroll to
+          {summary.pendingInvoices === 1 ? "" : "s"} waiting for review (USDT). Scroll to
           Customer invoices below — an email was also sent to platform admin when each was submitted.
         </div>
       ) : null}
@@ -289,8 +288,9 @@ export function PlatformAdminPanel({
           <div>
             <h2 className="text-lg font-semibold">Customer invoices</h2>
             <p className="text-sm text-muted-foreground">
-              JazzCash (Pakistan) and USDT BEP-20 (international) proofs from store owners —
-              transaction ID + uploaded screenshot/PDF. You get an email when a new proof arrives.
+              USDT BEP-20 proofs from store owners — transaction ID + uploaded screenshot/PDF.
+              You get an email when a new proof arrives. Amount is $
+              {SUBSCRIPTION.asiaAmountUsd} (Asia) or ${SUBSCRIPTION.usdtAmountUsd} (elsewhere).
             </p>
           </div>
           <div className="flex gap-2">
@@ -316,8 +316,11 @@ export function PlatformAdminPanel({
                 will see:
               </p>
               <ul className="mt-2 list-inside list-disc space-y-1">
-                <li>JazzCash or USDT transaction / reference ID</li>
-                <li>Amount (Rs 3,000 or $15 USDT)</li>
+                <li>USDT transaction / reference ID</li>
+                <li>
+                  Amount (${SUBSCRIPTION.asiaAmountUsd} Asia or $
+                  {SUBSCRIPTION.usdtAmountUsd} elsewhere)
+                </li>
                 <li>Payer name & notes</li>
                 <li>Uploaded invoice screenshot or PDF</li>
               </ul>

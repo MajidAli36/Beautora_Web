@@ -702,10 +702,10 @@ function TabMock({ tab }: { tab: TabId }) {
               Trial · 18 days left
             </p>
             <p className="mt-1 text-xs text-[var(--m-muted)]">
-              Then Rs 3,000 / month per store
+              Then $10–$15 / month per store (USDT)
             </p>
           </div>
-          <Row left="Invoice" mid="Upload JazzCash proof" right="Pending" />
+          <Row left="Invoice" mid="Upload USDT proof" right="Pending" />
         </div>
       );
     default:

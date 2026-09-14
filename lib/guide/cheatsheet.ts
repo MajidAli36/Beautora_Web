@@ -266,8 +266,8 @@ const BILLING_SECTION_MONTHLY: CheatsheetSection = {
     },
     {
       title: "Pakistan",
-      body: "After trial: Rs 3,000 per store / month via JazzCash. Upload transfer proof in Billing; SyncOps approves and unlocks 30 days.",
-      formula: "Rs 3,000 / month · JazzCash",
+      body: "After trial: $10/month (Asia) or $15/month (elsewhere) via USDT BEP-20. Upload transfer proof in Billing; SyncOps approves and unlocks 30 days.",
+      formula: "$10 Asia · $15 elsewhere · USDT",
     },
     {
       title: "Other countries",
@@ -281,7 +281,7 @@ const BILLING_SECTION_LIFETIME: CheatsheetSection = {
   id: "billing",
   label: "Beautora billing",
   intro:
-    "This store has lifetime / complimentary access. Monthly JazzCash or USDT renewal does not apply — do not send subscription payments.",
+    "This store has lifetime / complimentary access. Monthly USDT renewal does not apply — do not send subscription payments.",
   items: [
     {
       title: "Lifetime access",

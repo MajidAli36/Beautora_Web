@@ -12,7 +12,7 @@ export const revalidate = 0;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Pricing",
-  description: `${SYNCOPS.name} pricing for Salon Management, POS & Marketplace worldwide — ${SUBSCRIPTION.trialDays} days free trial, then Rs 3,000/month (Pakistan · JazzCash) or $15/month USDT BEP-20 (international).`,
+  description: `${SYNCOPS.name} pricing for Salon Management, POS & Marketplace worldwide — ${SUBSCRIPTION.trialDays} days free trial, then $${SUBSCRIPTION.asiaAmountUsd}/month (Asia) or $${SUBSCRIPTION.usdtAmountUsd}/month (elsewhere) via USDT BEP-20.`,
   path: "/pricing",
   keywords: [
     "Beautora pricing",

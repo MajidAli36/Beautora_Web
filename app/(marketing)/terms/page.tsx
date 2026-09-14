@@ -11,7 +11,7 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/terms",
 });
 
-const PRICE = `${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}`;
+const PRICE = `$${SUBSCRIPTION.asiaAmountUsd}–$${SUBSCRIPTION.usdtAmountUsd}`;
 
 export default function TermsPage() {
   return (

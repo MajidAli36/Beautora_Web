@@ -190,7 +190,7 @@ export async function setPlatformStoreEnabled(input: {
 
 /**
  * Grant or revoke lifetime / complimentary access for a store.
- * When enabled: no monthly JazzCash subscription is required.
+ * When enabled: no monthly USDT subscription is required.
  * When disabled: store returns to normal trial/paid/grace/locked rules.
  * Force-disable (admin_disabled_at) still locks the store even with lifetime.
  */

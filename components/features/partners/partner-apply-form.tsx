@@ -230,10 +230,10 @@ export function PartnerApplyForm() {
       </div>
 
       <p className="rounded-lg border border-[var(--m-line)] bg-[var(--m-paper)] px-3 py-2 text-xs leading-relaxed text-[var(--m-muted)]">
-        When a salon you refer pays their first monthly subscription (
-        {SUBSCRIPTION.currencyLabel} {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}
-        ), that full first payment is credited to you. Applications are reviewed by SyncOps
-        before your referral link goes live.
+        When a salon you refer pays their first monthly subscription ($
+        {SUBSCRIPTION.asiaAmountUsd}–${SUBSCRIPTION.usdtAmountUsd} by region), that full first
+        payment is credited to you. Applications are reviewed by SyncOps before your referral
+        link goes live.
       </p>
 
       <button

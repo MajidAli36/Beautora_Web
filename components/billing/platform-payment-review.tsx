@@ -39,7 +39,7 @@ export function PlatformPaymentReview({
   return (
     <PaginatedList
       items={payments}
-      empty={<p className="text-sm text-muted-foreground">No pending JazzCash payments.</p>}
+      empty={<p className="text-sm text-muted-foreground">No pending USDT payments.</p>}
       search={{
         placeholder: "Search store, ref, payer…",
         getText: (p) =>
@@ -66,9 +66,9 @@ export function PlatformPaymentReview({
                     <p className="mt-1 text-sm text-muted-foreground">
                       Ref <span className="font-medium text-foreground">{p.transaction_ref}</span>
                       {" · "}
-                      {SUBSCRIPTION.currencyLabel} {Number(p.amount).toLocaleString("en-PK")}
+                      ${Number(p.amount).toLocaleString("en-US")} USDT
                       {" · "}
-                      JazzCash {p.jazzcash_number}
+                      Wallet {p.jazzcash_number || SUBSCRIPTION.usdtWallet}
                     </p>
                     {p.payer_name && (
                       <p className="text-sm text-muted-foreground">Payer: {p.payer_name}</p>

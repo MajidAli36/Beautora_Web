@@ -510,16 +510,11 @@ export async function reviewSubscriptionPayment(input: {
   // First approved subscription for a referred store → full amount to partner
   try {
     const { creditPartnerFirstSubscription } = await import("@/lib/actions/partners");
-    // Partner program is PKR-based — use JazzCash plan amount for USDT renewals.
-    const commissionPkr =
-      payment.payment_method === "usdt_bep20" ||
-      String(payment.currency ?? "").toUpperCase() === "USD"
-        ? SUBSCRIPTION.monthlyAmountPkr
-        : Number(payment.amount);
+    const commissionAmount = Number(payment.amount);
     await creditPartnerFirstSubscription({
       organizationId: org.id,
       paymentId: payment.id,
-      amountPkr: commissionPkr,
+      amountPkr: commissionAmount,
     });
   } catch (err) {
     console.error("partner commission failed", err);

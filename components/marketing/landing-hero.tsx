@@ -1,11 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { HeroProductWidget } from "@/components/marketing/hero-product-widget";
-
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=2400&q=80";
+import { LandingHeroBackground } from "@/components/marketing/landing-hero-background";
 
 export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
   return (
@@ -13,18 +10,7 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
       id="top"
       className="relative min-h-[100svh] overflow-hidden bg-[var(--m-ink)] text-white"
     >
-      <div className="absolute inset-0">
-        <Image
-          src={HERO_IMAGE}
-          alt="Modern salon interior with styling stations — Beautora Salon Management, POS & Marketplace"
-          fill
-          priority
-          sizes="100vw"
-          className="m-ken object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(6,33,29,0.94)_0%,rgba(6,33,29,0.72)_46%,rgba(6,33,29,0.42)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(6,33,29,0.78)_0%,transparent_45%)]" />
-      </div>
+      <LandingHeroBackground />
 
       <div className="relative mx-auto grid min-h-[100svh] max-w-6xl items-end gap-10 px-6 pb-16 pt-[calc(var(--m-chrome)+2.5rem)] sm:pb-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-24 lg:pt-[calc(var(--m-chrome)+3rem)]">
         <div className="max-w-xl">
@@ -57,9 +43,9 @@ export function LandingHero({ storeCount = 0 }: { storeCount?: number }) {
             </Link>
           </div>
           <p className="m-fade-up m-fade-up-delay-3 mt-5 text-xs tracking-wide text-white/55">
-            No card required · {SUBSCRIPTION.trialDays} days free · Rs{" "}
-            {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")} (PK) or $
-            {SUBSCRIPTION.usdtAmountUsd} USDT (intl)
+            No card required · {SUBSCRIPTION.trialDays} days free · $
+            {SUBSCRIPTION.asiaAmountUsd} Asia or ${SUBSCRIPTION.usdtAmountUsd} elsewhere
+            (USDT)
             {` · ${
               storeCount > 100
                 ? `${storeCount} live salons`

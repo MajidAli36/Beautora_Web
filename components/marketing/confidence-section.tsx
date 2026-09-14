@@ -14,7 +14,7 @@ export function ConfidenceSection() {
     },
     {
       title: "Per-store pricing",
-      body: `${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/month after trial — clear and predictable.`,
+      body: `$${SUBSCRIPTION.asiaAmountUsd} Asia / $${SUBSCRIPTION.usdtAmountUsd} elsewhere per month after trial — clear and predictable.`,
     },
     {
       title: "Built for salon operations",

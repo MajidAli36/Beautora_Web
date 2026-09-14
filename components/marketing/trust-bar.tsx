@@ -30,7 +30,7 @@ export function TrustBar({ storeCount }: TrustBarProps) {
       label: "days free to start",
     },
     {
-      value: `${SUBSCRIPTION.currencyLabel} ${SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}`,
+      value: `$${SUBSCRIPTION.asiaAmountUsd}–$${SUBSCRIPTION.usdtAmountUsd}`,
       label: "per store / month after",
     },
   ];

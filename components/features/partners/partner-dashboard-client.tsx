@@ -68,7 +68,7 @@ function phaseLabel(store: PartnerReferredStore) {
 }
 
 function formatMoney(amount: number) {
-  return `${SUBSCRIPTION.currencyLabel} ${amount.toLocaleString("en-PK")}`;
+  return `$${amount.toLocaleString("en-US")}`;
 }
 
 export function PartnerDashboardClient({
@@ -161,10 +161,10 @@ export function PartnerDashboardClient({
                 {formatMoney(totals.earnedPkr)}
               </p>
               <p className="mt-2 max-w-xl text-sm text-[#6B7280]">
-                When a salon you refer pays their first month (
-                {formatMoney(SUBSCRIPTION.monthlyAmountPkr)}
-                ), that full amount is credited here after SyncOps manually approves their
-                JazzCash invoice. Renewals are not shared.
+                When a salon you refer pays their first month ($
+                {SUBSCRIPTION.asiaAmountUsd}–${SUBSCRIPTION.usdtAmountUsd} by region), that full
+                amount is credited here after SyncOps manually approves their USDT invoice.
+                Renewals are not shared.
               </p>
             </div>
             <div className="grid w-full gap-2 sm:w-auto sm:min-w-[220px]">
@@ -181,7 +181,7 @@ export function PartnerDashboardClient({
             </div>
           </div>
           <p className="mt-4 rounded-lg bg-[#FAFAFA] px-3 py-2 text-xs text-[#6B7280]">
-            Payments are manual today (JazzCash + SyncOps review). Automated payouts can be
+            Payments are manual today (USDT + SyncOps review). Automated payouts can be
             added later without changing how referrals are tracked.
           </p>
         </section>
@@ -340,7 +340,7 @@ export function PartnerDashboardClient({
         {/* Earnings ledger */}
         <section className="space-y-3">
           <div>
-            <h2 className="text-lg font-semibold text-[#111827]">Rupees earned</h2>
+            <h2 className="text-lg font-semibold text-[#111827]">USD earned</h2>
             <p className="text-sm text-[#6B7280]">
               One row per first paid subscription credited on your behalf.
             </p>
@@ -348,8 +348,9 @@ export function PartnerDashboardClient({
           <ul className="divide-y divide-[#EAEAEA] rounded-xl border border-[#EAEAEA] bg-white">
             {commissions.length === 0 ? (
               <li className="p-4 text-sm text-[#6B7280]">
-                No earnings yet. When SyncOps approves a referred store&apos;s first JazzCash
-                payment, {formatMoney(SUBSCRIPTION.monthlyAmountPkr)} appears here.
+                No earnings yet. When SyncOps approves a referred store&apos;s first USDT
+                payment, ${SUBSCRIPTION.asiaAmountUsd}–${SUBSCRIPTION.usdtAmountUsd} appears
+                here.
               </li>
             ) : (
               commissions.map((c) => (

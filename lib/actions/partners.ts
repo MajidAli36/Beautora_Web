@@ -625,7 +625,7 @@ export async function reviewPartnerApplication(input: {
 /**
  * Credit partner with the full first approved subscription for a referred store.
  * Safe to call multiple times — unique constraints prevent double credit.
- * Source of truth today: manual JazzCash approval in reviewSubscriptionPayment.
+ * Source of truth today: manual USDT approval in reviewSubscriptionPayment.
  * Future gateways can call this same helper after a successful charge.
  */
 export async function creditPartnerFirstSubscription(input: {
@@ -698,7 +698,7 @@ export async function creditPartnerFirstSubscription(input: {
     organization_id: org.id,
     subscription_payment_id: input.paymentId,
     amount_pkr: amount,
-    currency: "PKR",
+    currency: "USD",
     status: "earned",
     notes: `First subscription for ${org.name} — full amount credited to partner`,
   });

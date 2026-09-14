@@ -18,9 +18,9 @@ export function SiteFooter() {
             {SYNCOPS.builder.label}
           </p>
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/45">
-            {SUBSCRIPTION.trialDays} days free, then Rs{" "}
-            {SUBSCRIPTION.monthlyAmountPkr.toLocaleString("en-PK")}/mo (Pakistan) or $
-            {SUBSCRIPTION.usdtAmountUsd} USDT/mo (international).
+            {SUBSCRIPTION.trialDays} days free, then $
+            {SUBSCRIPTION.asiaAmountUsd}/mo (Asia) or ${SUBSCRIPTION.usdtAmountUsd}/mo
+            (elsewhere) via USDT.
           </p>
         </div>
 
