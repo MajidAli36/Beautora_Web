@@ -30,3 +30,27 @@ export const notify = {
   },
   promise: toast.promise,
 };
+
+type ActionLike = { error?: string; success?: boolean } | void;
+
+/**
+ * Run a mutation and always surface a toast (error or success).
+ * Use from button onClick / startTransition handlers.
+ */
+export async function runWithToast(
+  action: () => Promise<ActionLike>,
+  successMessage = "Saved successfully."
+): Promise<boolean> {
+  try {
+    const result = await action();
+    if (result && typeof result === "object" && result.error) {
+      notify.error(result.error);
+      return false;
+    }
+    if (successMessage) notify.success(successMessage);
+    return true;
+  } catch (e) {
+    notify.error(e instanceof Error ? e.message : "Something went wrong");
+    return false;
+  }
+}

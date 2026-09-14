@@ -47,6 +47,11 @@ export function AppModeSwitcherItems({
         notify.error(res.error);
         return;
       }
+      notify.success(
+        next === "marketplace"
+          ? `Switched to ${BEAUTORA_PRODUCTS.marketplace.name}.`
+          : `Switched to ${BEAUTORA_PRODUCTS.saas.name}.`
+      );
       router.push(next === "marketplace" ? "/marketplace" : "/dashboard");
       router.refresh();
     });

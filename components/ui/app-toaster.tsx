@@ -14,6 +14,7 @@ export function AppToaster() {
       duration={3200}
       gap={12}
       offset={{ top: 16, right: 16 }}
+      style={{ zIndex: 100000 }}
       toastOptions={{
         classNames: {
           toast:

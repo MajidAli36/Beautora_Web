@@ -125,7 +125,10 @@ export function PlatformMarketplacePanel({
                           const r = await setMarketplaceSellerStatus(s.id, "approved");
                           setBusy(null);
                           if (r.error) notify.error(r.error);
-                          else refresh();
+                          else {
+                            notify.success("Seller re-approved");
+                            refresh();
+                          }
                         });
                       }}
                     >
@@ -199,12 +202,10 @@ export function PlatformMarketplacePanel({
                               "Does not meet guidelines"
                             );
                             if (r.error) notify.error(r.error);
-                            else refresh();
-                          });
-                        }}
-                      >
-                        Reject
-                      </Button>
+                            else {
+                              notify.success("Product rejected");
+                              refresh();
+                            }
                     ) : null}
                   </div>
                 </li>
@@ -313,7 +314,10 @@ export function PlatformMarketplacePanel({
                       startTransition(async () => {
                         const res = await setMarketplaceReviewHidden(r.id, !r.is_hidden);
                         if (res.error) notify.error(res.error);
-                        else refresh();
+                        else {
+                          notify.success(r.is_hidden ? "Review unhidden." : "Review hidden.");
+                          refresh();
+                        }
                       });
                     }}
                   >

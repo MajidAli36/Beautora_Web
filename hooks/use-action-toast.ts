@@ -21,6 +21,8 @@ type UseActionToastOptions = {
  * Turns `useActionState` / ActionResult into Sonner toasts.
  * Dedupes by state object identity so the same result is not toasted twice.
  * Success toasts auto-dismiss via AppToaster duration.
+ *
+ * Prefer this for every form that uses `useActionState` so saves always feedback.
  */
 export function useActionToast(
   state: ActionLike | null | undefined,

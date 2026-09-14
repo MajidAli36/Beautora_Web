@@ -199,7 +199,12 @@ export function QueueBoard({
             disabled={drawerPending}
             onClick={() =>
               startDrawer(async () => {
-                await openDrawer("queue");
+                const result = await openDrawer("queue");
+                if (result.error) {
+                  notify.error(result.error);
+                  return;
+                }
+                notify.success("Drawer open signal sent");
               })
             }
           >

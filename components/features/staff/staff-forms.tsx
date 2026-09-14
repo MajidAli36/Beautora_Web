@@ -59,6 +59,7 @@ export function AttendanceButtons({
         notify.error(result.error);
         return;
       }
+      notify.success(action === "in" ? "Checked in." : "Checked out.");
       router.refresh();
     });
   }

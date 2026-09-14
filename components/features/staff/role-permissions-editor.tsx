@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 import {
   updateRoleActionPermission,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/actions/role-permissions";
 import type { RolePermissionMatrix } from "@/lib/actions/role-permissions";
 import { useActionToast } from "@/hooks/use-action-toast";
+import { runWithToast } from "@/lib/toast";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
 import type { ActionKey } from "@/lib/permissions/actions";
 import type { MemberRole } from "@/types";
@@ -69,6 +71,7 @@ function RoleFeatureTable({
   role: MemberRole;
   features: RolePermissionMatrix["features"];
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   return (
@@ -84,7 +87,11 @@ function RoleFeatureTable({
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              await resetRoleNavPermissions(role);
+              const ok = await runWithToast(
+                () => resetRoleNavPermissions(role),
+                `${ROLE_LABELS[role]} permissions reset to defaults.`
+              );
+              if (ok) router.refresh();
             })
           }
         >

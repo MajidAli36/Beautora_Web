@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { getSaleReceiptHtml } from "@/lib/actions/print";
 import { printThermalHtml } from "@/lib/print/browser";
+import { notify } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 
 export function PrintReceiptButton({ saleId }: { saleId: string }) {
@@ -16,10 +17,11 @@ export function PrintReceiptButton({ saleId }: { saleId: string }) {
         startTransition(async () => {
           const html = await getSaleReceiptHtml(saleId);
           if (!html) {
-            alert("Could not load receipt.");
+            notify.error("Could not load receipt.");
             return;
           }
           printThermalHtml(html);
+          notify.success("Receipt sent to printer.");
         })
       }
     >

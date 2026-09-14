@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { CalendarClock, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/toast";
 
 function shiftMonth(yearMonth: string, delta: number): string {
   const [y, m] = yearMonth.split("-").map(Number);
@@ -408,7 +409,12 @@ export function StaffMonthlyDetailView({
     setDeletingId(noteId);
     const result = await deleteStaffNote(noteId, data.staffId);
     setDeletingId(null);
-    if (!result.error) router.refresh();
+    if (result.error) {
+      notify.error(result.error);
+      return;
+    }
+    notify.success("Note deleted.");
+    router.refresh();
   }
 
   return (

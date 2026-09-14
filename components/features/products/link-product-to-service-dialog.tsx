@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Link2 } from "lucide-react";
 import { linkInHouseProductToService } from "@/lib/actions/services";
-import { useActionToast } from "@/hooks/use-action-toast";
+import { notify } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import type { ActionResult } from "@/types/commerce";
 
 type ServiceOption = { id: string; name: string; is_active: boolean };
 
@@ -101,20 +100,7 @@ function LinkForm({
   onDone: () => void;
 }) {
   const router = useRouter();
-  const action = useMemo(
-    () =>
-      async (_prev: ActionResult, formData: FormData) =>
-        linkInHouseProductToService(productId, _prev, formData),
-    [productId]
-  );
-  const [state, formAction, pending] = useActionState(action, {} as ActionResult);
-  useActionToast(state, {
-    successMessage: "Service links saved.",
-    onSuccess: () => {
-      onDone();
-      router.refresh();
-    },
-  });
+  const [pending, startTransition] = useTransition();
 
   const active = services.filter((s) => s.is_active);
   const [selected, setSelected] = useState<Set<string>>(
@@ -156,6 +142,32 @@ function LinkForm({
     });
   }
 
+  function save() {
+    if (!canSave || pending) return;
+
+    const fd = new FormData();
+    fd.set("quantity", String(qtyNum));
+    for (const id of active) fd.append("available_service_id", id.id);
+    for (const id of selected) fd.append("service_id", id);
+
+    startTransition(async () => {
+      const result = await linkInHouseProductToService(productId, {}, fd);
+      if (result.error) {
+        notify.error(result.error);
+        return;
+      }
+      notify.success(
+        selected.size === 0
+          ? "All service links removed."
+          : selected.size === 1
+            ? "Linked to 1 service."
+            : `Linked to ${selected.size} services.`
+      );
+      onDone();
+      router.refresh();
+    });
+  }
+
   if (!services.length) {
     return (
       <div className="space-y-4">
@@ -194,15 +206,7 @@ function LinkForm({
   }
 
   return (
-    <form action={formAction} className="grid gap-4">
-      <input type="hidden" name="quantity" value={qtyNum > 0 ? String(qtyNum) : ""} />
-      {active.map((s) => (
-        <input key={`avail-${s.id}`} type="hidden" name="available_service_id" value={s.id} />
-      ))}
-      {[...selected].map((id) => (
-        <input key={`sel-${id}`} type="hidden" name="service_id" value={id} />
-      ))}
-
+    <div className="grid gap-4">
       <div className="rounded-lg border bg-muted/40 px-3 py-3">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Qty used per client
@@ -304,13 +308,13 @@ function LinkForm({
       </div>
 
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onDone}>
+        <Button type="button" variant="outline" onClick={onDone} disabled={pending}>
           Cancel
         </Button>
-        <Button type="submit" disabled={pending || !canSave}>
+        <Button type="button" disabled={pending || !canSave} onClick={save}>
           {pending ? "Saving…" : "Save links"}
         </Button>
       </DialogFooter>
-    </form>
+    </div>
   );
 }
