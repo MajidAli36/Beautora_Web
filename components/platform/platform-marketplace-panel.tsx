@@ -206,6 +206,11 @@ export function PlatformMarketplacePanel({
                               notify.success("Product rejected");
                               refresh();
                             }
+                          });
+                        }}
+                      >
+                        Reject
+                      </Button>
                     ) : null}
                   </div>
                 </li>
