@@ -89,6 +89,13 @@ export function TeamManagement({
           <PaginatedList
             items={members}
             empty={<p className="text-sm text-muted-foreground">No app logins yet.</p>}
+            search={{
+              placeholder: "Search email or role…",
+              getText: (member) => [member.email, member.roleLabel, member.role].join(" "),
+              emptyFiltered: (
+                <p className="text-sm text-muted-foreground">No logins match your search.</p>
+              ),
+            }}
           >
             {(slice) => (
               <div className="rounded-lg border">

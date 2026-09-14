@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { downloadCsv } from "@/lib/reports/export-csv";
 import type { StaffReport } from "@/lib/actions/reports";
@@ -8,10 +9,17 @@ import { ReportSection } from "@/components/features/reports/ui/report-section";
 import { ReportBarChart } from "@/components/features/reports/ui/report-charts";
 import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 
 export function StaffTab({ data }: { data: StaffReport }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return data.ranking;
+    return data.ranking.filter((r) => r.name.toLowerCase().includes(term));
+  }, [data.ranking, q]);
   const k = data.kpis;
   return (
     <div className="space-y-4">
@@ -46,7 +54,7 @@ export function StaffTab({ data }: { data: StaffReport }) {
               downloadCsv(
                 `staff-${data.from}-${data.to}.csv`,
                 ["Staff", "Appts", "Completed", "Cancelled", "No-show", "Completion %", "Linked revenue", "Customers"],
-                data.ranking.map((r) => [
+                filtered.map((r) => [
                   r.name,
                   r.appointments,
                   r.completed,
@@ -67,6 +75,15 @@ export function StaffTab({ data }: { data: StaffReport }) {
           <ReportEmpty message="No active staff found." />
         ) : (
           <div className="overflow-x-auto">
+            <Input
+              placeholder="Search staff…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="mb-3 max-w-sm print:hidden"
+            />
+            {!filtered.length ? (
+              <ReportEmpty message="No staff match your search." />
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -80,7 +97,7 @@ export function StaffTab({ data }: { data: StaffReport }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.ranking.map((r) => (
+                {filtered.map((r) => (
                   <TableRow key={r.staffId ?? r.name}>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell className="text-right">{r.appointments}</TableCell>
@@ -99,6 +116,7 @@ export function StaffTab({ data }: { data: StaffReport }) {
                 ))}
               </TableBody>
             </Table>
+            )}
           </div>
         )}
       </ReportSection>

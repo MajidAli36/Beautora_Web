@@ -170,6 +170,23 @@ export function StaffPaymentsLog({
           or widen the date range above.
         </p>
       }
+      search={{
+        placeholder: "Search staff, type, method, notes…",
+        getText: (p) =>
+          [
+            p.staff_name,
+            STAFF_PAYMENT_TYPE_LABELS[p.payment_type],
+            p.payment_method,
+            p.payment_date,
+            p.period_start ?? "",
+            p.period_end ?? "",
+            p.notes ?? "",
+            String(p.amount),
+          ].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No payments match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="space-y-2">

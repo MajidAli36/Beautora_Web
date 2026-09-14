@@ -1,8 +1,12 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { FinancialSummary } from "@/lib/actions/finances";
 import { formatCurrency } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -18,7 +22,18 @@ type InventoryFinancesPanelProps = {
 };
 
 export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps) {
+  const [q, setQ] = useState("");
+  const filteredRows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return summary.productSaleRows;
+    return summary.productSaleRows.filter(
+      (row) =>
+        row.name.toLowerCase().includes(term) ||
+        (row.sku ?? "").toLowerCase().includes(term)
+    );
+  }, [summary.productSaleRows, q]);
   const hasSales = summary.productUnitsSold > 0;
+  const showTotalRow = !q.trim();
 
   return (
     <Card className="border-primary/25">
@@ -123,6 +138,15 @@ export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps)
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border">
+            <Input
+              placeholder="Search product or SKU…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="m-3 max-w-sm"
+            />
+            {!filteredRows.length ? (
+              <p className="px-3 pb-3 text-sm text-muted-foreground">No products match your search.</p>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -134,7 +158,7 @@ export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps)
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {summary.productSaleRows.map((row) => (
+                {filteredRows.map((row) => (
                   <TableRow key={row.productId}>
                     <TableCell>
                       <span className="font-medium">{row.name}</span>
@@ -157,6 +181,7 @@ export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps)
                     </TableCell>
                   </TableRow>
                 ))}
+                {showTotalRow ? (
                 <TableRow className="bg-muted/40 font-semibold">
                   <TableCell>Total stock sold</TableCell>
                   <TableCell className="text-right">{summary.productUnitsSold}</TableCell>
@@ -170,8 +195,10 @@ export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps)
                     {formatCurrency(summary.productGrossProfit)}
                   </TableCell>
                 </TableRow>
+                ) : null}
               </TableBody>
             </Table>
+            )}
           </div>
         )}
       </CardContent>

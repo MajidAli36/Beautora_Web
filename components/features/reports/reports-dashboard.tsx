@@ -189,7 +189,19 @@ export function ReportsDashboard({ report, from, to }: ReportsDashboardProps) {
               </p>
             </div>
           ) : (
-            <PaginatedList items={report.productSaleRows}>
+            <PaginatedList
+              items={report.productSaleRows}
+              search={{
+                placeholder: "Search product, SKU…",
+                getText: (row) =>
+                  [row.name, row.sku ?? "", String(row.qtySold), String(row.marginPercent)].join(
+                    " "
+                  ),
+                emptyFiltered: (
+                  <p className="text-sm text-muted-foreground">No products match your search.</p>
+                ),
+              }}
+            >
               {(slice) => (
                 <div className="overflow-x-auto rounded-lg border">
                   <Table>
@@ -286,7 +298,16 @@ export function ReportsDashboard({ report, from, to }: ReportsDashboardProps) {
           {report.revenueByDay.length === 0 ? (
             <p className="text-sm text-muted-foreground">No sales in this period.</p>
           ) : (
-            <PaginatedList items={report.revenueByDay}>
+            <PaginatedList
+              items={report.revenueByDay}
+              search={{
+                placeholder: "Search date…",
+                getText: (row) => [row.date, String(row.revenue)].join(" "),
+                emptyFiltered: (
+                  <p className="text-sm text-muted-foreground">No days match your search.</p>
+                ),
+              }}
+            >
               {(slice) => (
                 <div className="rounded-lg border">
                   <Table>
@@ -349,7 +370,17 @@ export function ReportsDashboard({ report, from, to }: ReportsDashboardProps) {
           {report.topItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">No data yet.</p>
           ) : (
-            <PaginatedList items={report.topItems}>
+            <PaginatedList
+              items={report.topItems}
+              search={{
+                placeholder: "Search item, type…",
+                getText: (item) =>
+                  [item.name, item.itemType ?? "", String(item.qty), String(item.revenue)].join(" "),
+                emptyFiltered: (
+                  <p className="text-sm text-muted-foreground">No items match your search.</p>
+                ),
+              }}
+            >
               {(slice) => (
                 <div className="rounded-lg border">
                   <Table>
@@ -384,7 +415,16 @@ export function ReportsDashboard({ report, from, to }: ReportsDashboardProps) {
 
 function ItemTable({ items }: { items: { name: string; qty: number; revenue: number }[] }) {
   return (
-    <PaginatedList items={items}>
+    <PaginatedList
+      items={items}
+      search={{
+        placeholder: "Search item…",
+        getText: (item) => [item.name, String(item.qty), String(item.revenue)].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No items match your search.</p>
+        ),
+      }}
+    >
       {(slice) => (
         <div className="rounded-lg border">
           <Table>

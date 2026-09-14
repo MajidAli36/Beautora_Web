@@ -21,6 +21,19 @@ export function DeletedRecordsPanel({ records }: { records: DeletedRecordRow[] }
       empty={
         <p className="text-sm text-muted-foreground">No soft-deleted records yet.</p>
       }
+      search={{
+        placeholder: "Search type, record, deleted by…",
+        getText: (row) =>
+          [
+            row.entityType,
+            row.label,
+            row.deleted_by_email ?? "",
+            row.deleted_by_role ?? "",
+          ].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No records match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="rounded-lg border">

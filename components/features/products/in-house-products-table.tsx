@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
 import {
   DeleteProductButton,
 } from "@/components/features/products/product-actions";
@@ -9,7 +8,6 @@ import { EditProductButton } from "@/components/features/products/edit-product-d
 import { LinkProductToServiceButton } from "@/components/features/products/link-product-to-service-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import {
   Table,
@@ -38,6 +36,20 @@ type ServiceOption = { id: string; name: string; is_active: boolean };
 
 type ServiceLink = { serviceId: string; serviceName: string; quantity: number };
 
+function inHouseProductSearchText(
+  p: ProductRow,
+  links: ServiceLink[]
+): string {
+  return [
+    p.name,
+    p.sku ?? "",
+    p.category?.name ?? "",
+    p.unit_label ?? "",
+    p.is_active ? "active" : "inactive",
+    ...links.map((l) => l.serviceName),
+  ].join(" ");
+}
+
 export function InHouseProductsTable({
   products,
   categories,
@@ -51,53 +63,26 @@ export function InHouseProductsTable({
   linksByProduct: Record<string, ServiceLink[]>;
   canManage: boolean;
 }) {
-  const [query, setQuery] = useState("");
-
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return products;
-    return products.filter((p) => {
-      const links = linksByProduct[p.id] ?? [];
-      const haystack = [
-        p.name,
-        p.sku ?? "",
-        p.category?.name ?? "",
-        p.unit_label ?? "",
-        p.is_active ? "active" : "inactive",
-        ...links.map((l) => l.serviceName),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(term);
-    });
-  }, [products, linksByProduct, query]);
-
   return (
-    <div className="space-y-3">
-      <Input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search name, SKU, category, or linked service…"
-        className="max-w-sm"
-        aria-label="Search in-house products"
-      />
-      <PaginatedList
-        items={filtered}
-        empty={
-          <p className="text-sm text-muted-foreground">
-            {products.length === 0
-              ? "No in-house products yet."
-              : "No products match your search."}
-          </p>
-        }
-      >
+    <PaginatedList
+      items={products}
+      empty={<p className="text-sm text-muted-foreground">No in-house products yet.</p>}
+      search={{
+        placeholder: "Search name, SKU, category, or linked service…",
+        label: "Search in-house products",
+        getText: (p) => inHouseProductSearchText(p, linksByProduct[p.id] ?? []),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No products match your search.</p>
+        ),
+      }}
+    >
       {(slice) => (
         <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead>Each bottle</TableHead>
                 <TableHead>Use / client</TableHead>
                 <TableHead className="text-right">Stock</TableHead>
@@ -133,6 +118,9 @@ export function InHouseProductsTable({
                       {p.sku ? (
                         <div className="text-xs text-muted-foreground">{p.sku}</div>
                       ) : null}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {p.category?.name ?? "—"}
                     </TableCell>
                     <TableCell>
                       {pack > 0 ? (
@@ -241,6 +229,5 @@ export function InHouseProductsTable({
         </div>
       )}
     </PaginatedList>
-    </div>
   );
 }

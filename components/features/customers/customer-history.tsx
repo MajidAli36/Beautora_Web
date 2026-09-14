@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CustomerHistory } from "@/lib/actions/customers";
 import { AccountReceivePaymentDialog } from "@/components/features/customers/account-receive-payment-dialog";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
@@ -9,6 +9,7 @@ import { isDeletedSaleStatus, saleStatusLabel } from "@/lib/sales/lifecycle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,8 @@ export function CustomerHistoryPanel({
   showDueOnly = false,
 }: CustomerHistoryPanelProps) {
   const [payOpen, setPayOpen] = useState(false);
+  const [salesQ, setSalesQ] = useState("");
+  const [apptQ, setApptQ] = useState("");
 
   const sales = showDueOnly
     ? history.sales.filter(
@@ -47,6 +50,36 @@ export function CustomerHistoryPanel({
           Number((s as { amount_due?: number }).amount_due ?? 0) > 0
       )
     : history.sales;
+
+  const filteredSales = useMemo(() => {
+    const term = salesQ.trim().toLowerCase();
+    if (!term) return sales;
+    return sales.filter((sale) => {
+      const inv = Array.isArray(sale.invoice) ? sale.invoice[0] : sale.invoice;
+      const items = sale.items?.map((i) => i.name).join(" ") ?? "";
+      const payment = (sale as { payment_status?: string }).payment_status ?? "";
+      return (
+        (inv?.invoice_number ?? "").toLowerCase().includes(term) ||
+        items.toLowerCase().includes(term) ||
+        saleStatusLabel(sale.status).toLowerCase().includes(term) ||
+        payment.replaceAll("_", " ").toLowerCase().includes(term) ||
+        String(sale.total).includes(term)
+      );
+    });
+  }, [sales, salesQ]);
+
+  const filteredAppointments = useMemo(() => {
+    const term = apptQ.trim().toLowerCase();
+    if (!term) return history.appointments;
+    return history.appointments.filter((a) => {
+      const services = a.services?.map((s) => s.service_name).join(" ") ?? "";
+      return (
+        (a.staff?.full_name ?? "").toLowerCase().includes(term) ||
+        services.toLowerCase().includes(term) ||
+        a.status.toLowerCase().includes(term)
+      );
+    });
+  }, [history.appointments, apptQ]);
 
   return (
     <div className="space-y-6">
@@ -165,6 +198,16 @@ export function CustomerHistoryPanel({
               {showDueOnly ? "No outstanding invoices." : "No sales yet."}
             </p>
           ) : (
+            <>
+            <Input
+              placeholder="Search invoice, items, status…"
+              value={salesQ}
+              onChange={(e) => setSalesQ(e.target.value)}
+              className="mb-3 max-w-sm"
+            />
+            {filteredSales.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No sales match your search.</p>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -179,7 +222,7 @@ export function CustomerHistoryPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales.map((sale) => {
+                {filteredSales.map((sale) => {
                   const inv = Array.isArray(sale.invoice) ? sale.invoice[0] : sale.invoice;
                   const s = sale as typeof sale & {
                     amount_paid?: number;
@@ -262,6 +305,8 @@ export function CustomerHistoryPanel({
                 })}
               </TableBody>
             </Table>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -274,6 +319,16 @@ export function CustomerHistoryPanel({
           {history.appointments.length === 0 ? (
             <p className="text-sm text-muted-foreground">No appointments yet.</p>
           ) : (
+            <>
+            <Input
+              placeholder="Search staff, services, status…"
+              value={apptQ}
+              onChange={(e) => setApptQ(e.target.value)}
+              className="mb-3 max-w-sm"
+            />
+            {filteredAppointments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No appointments match your search.</p>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -284,7 +339,7 @@ export function CustomerHistoryPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {history.appointments.map((a) => (
+                {filteredAppointments.map((a) => (
                   <TableRow key={a.id}>
                     <TableCell>{formatDateTime(a.scheduled_at)}</TableCell>
                     <TableCell>{a.staff?.full_name ?? "—"}</TableCell>
@@ -298,6 +353,8 @@ export function CustomerHistoryPanel({
                 ))}
               </TableBody>
             </Table>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

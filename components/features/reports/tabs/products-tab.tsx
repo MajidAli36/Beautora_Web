@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { downloadCsv } from "@/lib/reports/export-csv";
 import type { ProductsReport } from "@/lib/actions/reports";
@@ -12,10 +13,23 @@ import {
 import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 export function ProductsTab({ data }: { data: ProductsReport }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return data.detail;
+    return data.detail.filter(
+      (r) =>
+        r.name.toLowerCase().includes(term) ||
+        (r.sku ?? "").toLowerCase().includes(term) ||
+        (r.category ?? "").toLowerCase().includes(term) ||
+        (r.belowCost ? "below cost" : "").includes(term)
+    );
+  }, [data.detail, q]);
   const k = data.kpis;
   return (
     <div className="space-y-4">
@@ -54,7 +68,7 @@ export function ProductsTab({ data }: { data: ProductsReport }) {
               downloadCsv(
                 `products-${data.from}-${data.to}.csv`,
                 ["Product", "SKU", "Category", "Qty", "Revenue", "COGS", "Profit", "Margin %", "Stock", "Below cost"],
-                data.detail.map((r) => [
+                filtered.map((r) => [
                   r.name,
                   r.sku ?? "",
                   r.category ?? "",
@@ -77,6 +91,15 @@ export function ProductsTab({ data }: { data: ProductsReport }) {
           <ReportEmpty message="No product sales found for the selected period." />
         ) : (
           <div className="overflow-x-auto">
+            <Input
+              placeholder="Search product, SKU, category…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="mb-3 max-w-sm print:hidden"
+            />
+            {!filtered.length ? (
+              <ReportEmpty message="No products match your search." />
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -90,7 +113,7 @@ export function ProductsTab({ data }: { data: ProductsReport }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.detail.map((r) => (
+                {filtered.map((r) => (
                   <TableRow key={r.productId} className={cn(r.belowCost && "bg-destructive/5")}>
                     <TableCell>
                       <div className="font-medium">{r.name}</div>
@@ -119,6 +142,7 @@ export function ProductsTab({ data }: { data: ProductsReport }) {
                 ))}
               </TableBody>
             </Table>
+            )}
           </div>
         )}
       </ReportSection>

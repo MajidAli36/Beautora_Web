@@ -257,7 +257,23 @@ export function AttendanceDashboard({
             <CardDescription>Working days and hours for selected period</CardDescription>
           </CardHeader>
           <CardContent>
-            <PaginatedList items={report.summaries}>
+            <PaginatedList
+              items={report.summaries}
+              search={{
+                placeholder: "Search staff…",
+                getText: (s) =>
+                  [
+                    s.staffName,
+                    String(s.sessions),
+                    String(s.workingDays),
+                    String(s.totalHours),
+                    String(s.avgHoursPerDay),
+                  ].join(" "),
+                emptyFiltered: (
+                  <p className="text-sm text-muted-foreground">No staff match your search.</p>
+                ),
+              }}
+            >
               {(slice) => (
                 <Table>
                   <TableHeader>
@@ -298,6 +314,19 @@ export function AttendanceDashboard({
             empty={
               <p className="text-sm text-muted-foreground">No attendance records for this period.</p>
             }
+            search={{
+              placeholder: "Search staff, method…",
+              getText: (a) =>
+                [
+                  a.staff?.full_name ?? "",
+                  a.method,
+                  attendanceMethodLabel(a.method),
+                  a.check_out_at ? "checked out" : "on duty",
+                ].join(" "),
+              emptyFiltered: (
+                <p className="text-sm text-muted-foreground">No records match your search.</p>
+              ),
+            }}
           >
             {(slice) => (
               <Table>

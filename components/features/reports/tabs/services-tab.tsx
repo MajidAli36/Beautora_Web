@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { downloadCsv } from "@/lib/reports/export-csv";
 import type { ServicesReport } from "@/lib/actions/reports";
@@ -11,9 +12,20 @@ import {
 } from "@/components/features/reports/ui/report-charts";
 import { ReportEmpty, ReportUnavailable } from "@/components/features/reports/ui/report-states";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function ServicesTab({ data }: { data: ServicesReport }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return data.detail;
+    return data.detail.filter(
+      (r) =>
+        r.name.toLowerCase().includes(term) ||
+        (r.category ?? "").toLowerCase().includes(term)
+    );
+  }, [data.detail, q]);
   const k = data.kpis;
   return (
     <div className="space-y-4">
@@ -72,7 +84,7 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
                   "Avg price",
                   "% of service revenue",
                 ],
-                data.detail.map((r) => [
+                filtered.map((r) => [
                   r.name,
                   r.category ?? "",
                   r.qty,
@@ -94,6 +106,15 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
           <ReportEmpty message="No service sales found for the selected period." />
         ) : (
           <div className="overflow-x-auto">
+            <Input
+              placeholder="Search service or category…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="mb-3 max-w-sm print:hidden"
+            />
+            {!filtered.length ? (
+              <ReportEmpty message="No services match your search." />
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -108,7 +129,7 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.detail.map((r) => (
+                {filtered.map((r) => (
                   <TableRow key={r.serviceId}>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell>{r.category ?? "—"}</TableCell>
@@ -122,6 +143,7 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
                 ))}
               </TableBody>
             </Table>
+            )}
           </div>
         )}
       </ReportSection>
@@ -136,9 +158,24 @@ function ServiceMini({
   rows: ServicesReport["top10"];
   empty: string;
 }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((r) => r.name.toLowerCase().includes(term));
+  }, [rows, q]);
   if (!rows.length) return <ReportEmpty message={empty} />;
   return (
     <div className="overflow-x-auto">
+      <Input
+        placeholder="Search service…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        className="mb-3 max-w-sm print:hidden"
+      />
+      {!filtered.length ? (
+        <ReportEmpty message="No services match your search." />
+      ) : (
       <Table>
         <TableHeader>
           <TableRow>
@@ -149,7 +186,7 @@ function ServiceMini({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
+          {filtered.map((r) => (
             <TableRow key={r.serviceId + r.name}>
               <TableCell className="font-medium">{r.name}</TableCell>
               <TableCell className="text-right">{r.qty}</TableCell>
@@ -159,6 +196,7 @@ function ServiceMini({
           ))}
         </TableBody>
       </Table>
+      )}
     </div>
   );
 }

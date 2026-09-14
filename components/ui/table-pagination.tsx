@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export const DEFAULT_PAGE_SIZE = 10;
@@ -103,30 +104,82 @@ export function usePagination<T>(items: T[], pageSize: number = DEFAULT_PAGE_SIZ
   };
 }
 
+export type PaginatedListSearch<T> = {
+  /** Build a searchable string for each row. */
+  getText: (item: T) => string;
+  placeholder?: string;
+  label?: string;
+  /** Shown when the source list has rows but none match the query. */
+  emptyFiltered?: React.ReactNode;
+};
+
 type PaginatedListProps<T> = {
   items: T[];
   pageSize?: number;
   className?: string;
   empty?: React.ReactNode;
+  /** When set, shows a search box and filters items client-side. */
+  search?: PaginatedListSearch<T>;
   children: (slice: T[]) => React.ReactNode;
 };
 
-/** Wraps any list/table body with Prev/Next pagination (default 10). */
+function matchesSearch(haystack: string, term: string) {
+  return haystack.toLowerCase().includes(term);
+}
+
+/** Wraps any list/table body with optional search + Prev/Next pagination (default 10). */
 export function PaginatedList<T>({
   items,
   pageSize = DEFAULT_PAGE_SIZE,
   className,
   empty,
+  search,
   children,
 }: PaginatedListProps<T>) {
-  const { page, setPage, slice, total } = usePagination(items, pageSize);
+  const [query, setQuery] = useState("");
+  const term = query.trim().toLowerCase();
+
+  const filtered = useMemo(() => {
+    if (!search || !term) return items;
+    return items.filter((item) => matchesSearch(search.getText(item), term));
+  }, [items, search, term]);
+
+  const { page, setPage, slice, total } = usePagination(filtered, pageSize);
+
+  const searchBox = search ? (
+    <Input
+      type="search"
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder={search.placeholder ?? "Search…"}
+      className="max-w-sm"
+      aria-label={search.label ?? search.placeholder ?? "Search list"}
+    />
+  ) : null;
 
   if (items.length === 0) {
-    return <>{empty ?? null}</>;
+    return (
+      <div className={className ? `space-y-3 ${className}` : "space-y-3"}>
+        {searchBox}
+        {empty ?? null}
+      </div>
+    );
+  }
+
+  if (filtered.length === 0) {
+    return (
+      <div className={className ? `space-y-3 ${className}` : "space-y-3"}>
+        {searchBox}
+        {search?.emptyFiltered ?? (
+          <p className="text-sm text-muted-foreground">No results match your search.</p>
+        )}
+      </div>
+    );
   }
 
   return (
-    <div className={className}>
+    <div className={className ? `space-y-3 ${className}` : "space-y-3"}>
+      {searchBox}
       {children(slice)}
       <TablePagination
         page={page}

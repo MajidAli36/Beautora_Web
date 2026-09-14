@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAction } from "@/lib/auth/permissions";
+import { checkAction, requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/actions/customers";
@@ -201,74 +201,133 @@ export async function updateServiceUsageRecipe(
   return { success: true };
 }
 
-/** From In-house listing: attach this product to a service recipe (upsert). */
+/** From In-house listing: sync this product’s service links (multi-select). */
 export async function linkInHouseProductToService(
   productId: string,
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireAction("services.edit");
-  const serviceId = String(formData.get("service_id") ?? "").trim();
-  if (!serviceId) return { error: "Choose a service" };
+  try {
+    // Linking touches both catalogs — allow either products.edit or services.edit.
+    const canProducts = await checkAction("products.edit");
+    const canServices = await checkAction("services.edit");
+    if (!canProducts && !canServices) {
+      return { error: "You don't have permission to link products to services" };
+    }
+    const org = canServices
+      ? await requireAction("services.edit")
+      : await requireAction("products.edit");
 
-  const supabase = await createClient();
-  const [{ data: product }, { data: service }] = await Promise.all([
-    supabase
+    const selectedIds = [
+      ...new Set(
+        formData
+          .getAll("service_id")
+          .map((v) => String(v).trim())
+          .filter(Boolean)
+      ),
+    ];
+    // Services shown in the dialog (so we only remove unchecked ones from this set).
+    const availableIds = [
+      ...new Set(
+        formData
+          .getAll("available_service_id")
+          .map((v) => String(v).trim())
+          .filter(Boolean)
+      ),
+    ];
+
+    const supabase = await createClient();
+    const { data: product } = await supabase
       .from("products")
       .select("id, product_kind, is_active, deleted_at, default_usage_qty")
       .eq("id", productId)
       .eq("organization_id", org.organizationId)
-      .maybeSingle(),
-    supabase
-      .from("services")
-      .select("id")
-      .eq("id", serviceId)
-      .eq("organization_id", org.organizationId)
-      .is("deleted_at", null)
-      .maybeSingle(),
-  ]);
+      .maybeSingle();
 
-  if (!product || product.deleted_at || !product.is_active) {
-    return { error: "In-house product not found or inactive" };
+    if (!product || product.deleted_at || !product.is_active) {
+      return { error: "In-house product not found or inactive" };
+    }
+    if (product.product_kind !== "IN_HOUSE" && product.product_kind !== "BOTH") {
+      return { error: "Only in-house products can be linked to services" };
+    }
+
+    const fromForm = Number(formData.get("quantity"));
+    const fromProduct = Number(product.default_usage_qty);
+    const quantity =
+      Number.isFinite(fromForm) && fromForm > 0
+        ? fromForm
+        : Number.isFinite(fromProduct) && fromProduct > 0
+          ? fromProduct
+          : 0;
+    if (!(quantity > 0)) {
+      return { error: "Set use per client (e.g. 5 ml) before linking" };
+    }
+
+    if (selectedIds.length) {
+      const { data: services, error: svcErr } = await supabase
+        .from("services")
+        .select("id, is_active")
+        .eq("organization_id", org.organizationId)
+        .is("deleted_at", null)
+        .in("id", selectedIds);
+      if (svcErr) return { error: svcErr.message };
+      if ((services ?? []).length !== selectedIds.length) {
+        return { error: "One or more services were not found" };
+      }
+      if ((services ?? []).some((s) => !s.is_active)) {
+        return { error: "One or more selected services are inactive" };
+      }
+    }
+
+    // Keep product default in sync when linking with an explicit qty.
+    if (!(fromProduct > 0) || (fromForm > 0 && fromForm !== fromProduct)) {
+      await supabase
+        .from("products")
+        .update({ default_usage_qty: quantity })
+        .eq("id", productId)
+        .eq("organization_id", org.organizationId);
+    }
+
+    const scopeIds = availableIds.length ? availableIds : selectedIds;
+    if (scopeIds.length) {
+      const removeIds = scopeIds.filter((id) => !selectedIds.includes(id));
+      if (removeIds.length) {
+        const { error: delErr } = await supabase
+          .from("service_product_usage")
+          .delete()
+          .eq("organization_id", org.organizationId)
+          .eq("product_id", productId)
+          .in("service_id", removeIds);
+        if (delErr) return { error: delErr.message };
+      }
+    }
+
+    if (selectedIds.length) {
+      const { error } = await supabase.from("service_product_usage").upsert(
+        selectedIds.map((serviceId) => ({
+          organization_id: org.organizationId,
+          service_id: serviceId,
+          product_id: productId,
+          quantity_per_service: quantity,
+        })),
+        { onConflict: "service_id,product_id" }
+      );
+      if (error) return { error: error.message };
+    }
+
+    revalidatePath("/services");
+    revalidatePath("/in-house");
+    revalidatePath(`/in-house/${productId}`);
+    return { success: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Could not link product";
+    return {
+      error:
+        message === "Insufficient permissions"
+          ? "You don't have permission to link products to services"
+          : message,
+    };
   }
-  if (product.product_kind !== "IN_HOUSE" && product.product_kind !== "BOTH") {
-    return { error: "Only in-house products can be linked to services" };
-  }
-  if (!service) return { error: "Service not found" };
-
-  const quantity = Number(product.default_usage_qty);
-  if (!(quantity > 0)) {
-    return { error: "Set use per client on the product (Edit) before linking" };
-  }
-
-  const { data: existing } = await supabase
-    .from("service_product_usage")
-    .select("id")
-    .eq("organization_id", org.organizationId)
-    .eq("service_id", serviceId)
-    .eq("product_id", productId)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from("service_product_usage")
-      .update({ quantity_per_service: quantity })
-      .eq("id", existing.id)
-      .eq("organization_id", org.organizationId);
-    if (error) return { error: error.message };
-  } else {
-    const { error } = await supabase.from("service_product_usage").insert({
-      organization_id: org.organizationId,
-      service_id: serviceId,
-      product_id: productId,
-      quantity_per_service: quantity,
-    });
-    if (error) return { error: error.message };
-  }
-
-  revalidatePath("/services");
-  revalidatePath("/in-house");
-  return { success: true };
 }
 
 export async function getActiveServicesForLinking() {
@@ -290,21 +349,37 @@ export async function getServiceLinksByProduct() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("service_product_usage")
-    .select("product_id, quantity_per_service, service:services(id, name, deleted_at)")
+    .select("product_id, service_id, quantity_per_service")
     .eq("organization_id", org.organizationId);
   if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  const serviceIds = [...new Set(rows.map((r) => r.service_id).filter(Boolean))];
+  const serviceNameById = new Map<string, string>();
+  if (serviceIds.length) {
+    const { data: services, error: svcErr } = await supabase
+      .from("services")
+      .select("id, name, deleted_at")
+      .eq("organization_id", org.organizationId)
+      .in("id", serviceIds);
+    if (svcErr) throw new Error(svcErr.message);
+    for (const s of services ?? []) {
+      if (s.deleted_at) continue;
+      serviceNameById.set(s.id, s.name);
+    }
+  }
 
   const map = new Map<
     string,
     { serviceId: string; serviceName: string; quantity: number }[]
   >();
-  for (const row of data ?? []) {
-    const service = row.service as { id: string; name: string; deleted_at: string | null } | null;
-    if (!service || service.deleted_at) continue;
+  for (const row of rows) {
+    const serviceName = serviceNameById.get(row.service_id);
+    if (!serviceName) continue;
     const list = map.get(row.product_id) ?? [];
     list.push({
-      serviceId: service.id,
-      serviceName: service.name,
+      serviceId: row.service_id,
+      serviceName,
       quantity: Number(row.quantity_per_service),
     });
     map.set(row.product_id, list);

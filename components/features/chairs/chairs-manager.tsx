@@ -117,6 +117,14 @@ export function ChairsManager({ chairs, canManage }: Props) {
                 {canManage ? "Add your first chair above." : "Ask a manager to add chairs."}
               </p>
             }
+            search={{
+              placeholder: "Search chair name or status…",
+              getText: (chair) =>
+                [chair.name, chair.is_active ? "active" : "inactive"].join(" "),
+              emptyFiltered: (
+                <p className="text-sm text-muted-foreground">No chairs match your search.</p>
+              ),
+            }}
           >
             {(slice) => (
               <div className="rounded-lg border">

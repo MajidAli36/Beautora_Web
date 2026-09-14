@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { downloadCsv } from "@/lib/reports/export-csv";
 import type { PaymentsReport } from "@/lib/actions/reports";
@@ -12,9 +13,41 @@ import {
 } from "@/components/features/reports/ui/report-charts";
 import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function PaymentsTab({ data }: { data: PaymentsReport }) {
+  const [discountQ, setDiscountQ] = useState("");
+  const [refundQ, setRefundQ] = useState("");
+  const [ledgerQ, setLedgerQ] = useState("");
+  const filteredDiscountSales = useMemo(() => {
+    const term = discountQ.trim().toLowerCase();
+    if (!term) return data.discountSales;
+    return data.discountSales.filter(
+      (r) =>
+        String(r.discount).includes(term) ||
+        String(r.total).includes(term)
+    );
+  }, [data.discountSales, discountQ]);
+  const filteredDepositRefunds = useMemo(() => {
+    const term = refundQ.trim().toLowerCase();
+    if (!term) return data.depositRefunds;
+    return data.depositRefunds.filter(
+      (r) =>
+        (r.method ?? "").toLowerCase().includes(term) ||
+        String(r.amount).includes(term)
+    );
+  }, [data.depositRefunds, refundQ]);
+  const filteredLedger = useMemo(() => {
+    const term = ledgerQ.trim().toLowerCase();
+    if (!term) return data.ledger;
+    return data.ledger.filter(
+      (r) =>
+        r.method.toLowerCase().includes(term) ||
+        (r.reference ?? "").toLowerCase().includes(term) ||
+        String(r.amount).includes(term)
+    );
+  }, [data.ledger, ledgerQ]);
   const k = data.kpis;
   return (
     <div className="space-y-4">
@@ -56,6 +89,15 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
             <ReportEmpty message="No discounted sales in this period." />
           ) : (
             <div className="overflow-x-auto">
+              <Input
+                placeholder="Search discount or total…"
+                value={discountQ}
+                onChange={(e) => setDiscountQ(e.target.value)}
+                className="mb-3 max-w-sm print:hidden"
+              />
+              {!filteredDiscountSales.length ? (
+                <ReportEmpty message="No discounted sales match your search." />
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -65,7 +107,7 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.discountSales.slice(0, 50).map((r) => (
+                  {filteredDiscountSales.slice(0, 50).map((r) => (
                     <TableRow key={r.saleId}>
                       <TableCell className="text-xs">
                         {r.completedAt ? formatDateTime(r.completedAt) : "—"}
@@ -78,6 +120,7 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                   ))}
                 </TableBody>
               </Table>
+              )}
             </div>
           )}
         </ReportSection>
@@ -86,6 +129,15 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
             <ReportEmpty message="No deposit refunds in this period." />
           ) : (
             <div className="overflow-x-auto">
+              <Input
+                placeholder="Search method or amount…"
+                value={refundQ}
+                onChange={(e) => setRefundQ(e.target.value)}
+                className="mb-3 max-w-sm print:hidden"
+              />
+              {!filteredDepositRefunds.length ? (
+                <ReportEmpty message="No deposit refunds match your search." />
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -95,7 +147,7 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.depositRefunds.map((r) => (
+                  {filteredDepositRefunds.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="text-xs">
                         {r.refundedAt ? formatDateTime(r.refundedAt) : "—"}
@@ -106,6 +158,7 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                   ))}
                 </TableBody>
               </Table>
+              )}
             </div>
           )}
         </ReportSection>
@@ -123,7 +176,7 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
               downloadCsv(
                 `payments-${data.from}-${data.to}.csv`,
                 ["When", "Sale", "Method", "Amount", "Reference"],
-                data.ledger.map((r) => [r.paidAt, r.saleId, r.method, r.amount, r.reference ?? ""])
+                filteredLedger.map((r) => [r.paidAt, r.saleId, r.method, r.amount, r.reference ?? ""])
               )
             }
           >
@@ -135,6 +188,15 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
           <ReportEmpty message="No payments found for the selected period." />
         ) : (
           <div className="overflow-x-auto">
+            <Input
+              placeholder="Search method, reference, amount…"
+              value={ledgerQ}
+              onChange={(e) => setLedgerQ(e.target.value)}
+              className="mb-3 max-w-sm print:hidden"
+            />
+            {!filteredLedger.length ? (
+              <ReportEmpty message="No payments match your search." />
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -145,7 +207,7 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.ledger.slice(0, 250).map((r) => (
+                {filteredLedger.slice(0, 250).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap text-xs">
                       {formatDateTime(r.paidAt)}
@@ -157,6 +219,7 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                 ))}
               </TableBody>
             </Table>
+            )}
           </div>
         )}
       </ReportSection>

@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { SaleStockMovement } from "@/lib/inventory/service-usage";
 import Link from "next/link";
@@ -44,6 +46,19 @@ export function InvoiceHistoryPanel({
   refunds: RefundRow[];
   stockMovements?: SaleStockMovement[];
 }) {
+  const [movementQ, setMovementQ] = useState("");
+  const filteredMovements = useMemo(() => {
+    const term = movementQ.trim().toLowerCase();
+    if (!term) return stockMovements;
+    return stockMovements.filter(
+      (m) =>
+        m.productName.toLowerCase().includes(term) ||
+        m.label.toLowerCase().includes(term) ||
+        (m.kind === "in_house" ? "in-house" : "retail").includes(term) ||
+        String(m.quantity).includes(term)
+    );
+  }, [stockMovements, movementQ]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -140,6 +155,16 @@ export function InvoiceHistoryPanel({
           {!stockMovements.length ? (
             <p className="text-sm text-muted-foreground">No inventory movements for this invoice.</p>
           ) : (
+            <>
+            <Input
+              placeholder="Search product, event, type…"
+              value={movementQ}
+              onChange={(e) => setMovementQ(e.target.value)}
+              className="mb-3 max-w-sm"
+            />
+            {!filteredMovements.length ? (
+              <p className="text-sm text-muted-foreground">No movements match your search.</p>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -150,7 +175,7 @@ export function InvoiceHistoryPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stockMovements.map((m) => (
+                {filteredMovements.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {formatDateTime(m.createdAt)}
@@ -179,6 +204,8 @@ export function InvoiceHistoryPanel({
                 ))}
               </TableBody>
             </Table>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

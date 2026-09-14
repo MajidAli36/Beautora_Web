@@ -13,7 +13,11 @@ import { canManageRecords } from "@/lib/auth/permissions";
 import { InventoryAdjustForm } from "@/components/features/products/product-actions";
 import { InHouseProductForm } from "@/components/features/products/in-house-product-form";
 import { InHouseProductsTable } from "@/components/features/products/in-house-products-table";
-import { InventoryTransactionsTable } from "@/components/features/products/products-lists";
+import { ProductCategoryForm } from "@/components/features/products/product-forms";
+import {
+  InventoryTransactionsTable,
+  ProductCategoriesTable,
+} from "@/components/features/products/products-lists";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -172,6 +176,30 @@ export default async function InHousePage() {
         </CardHeader>
         <CardContent>
           <InventoryTransactionsTable transactions={usageTxns.length ? usageTxns : transactions} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Categories</CardTitle>
+          <CardDescription>
+            Organize in-house stock (e.g. Creams, Wax, Sprays). Same category list as Products —
+            pick one when adding or editing an in-house item.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {canManage && (
+            <div>
+              <p className="mb-2 text-sm font-medium">Add category</p>
+              <ProductCategoryForm />
+            </div>
+          )}
+          <div>
+            <p className="mb-2 text-sm font-medium">
+              All categories ({categories.length})
+            </p>
+            <ProductCategoriesTable categories={categories} canManage={canManage} />
+          </div>
         </CardContent>
       </Card>
     </div>

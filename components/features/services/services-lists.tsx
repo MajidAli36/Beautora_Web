@@ -58,6 +58,21 @@ export function ServicesTable({
     <PaginatedList
       items={services}
       empty={<p className="text-sm text-muted-foreground">No services yet.</p>}
+      search={{
+        placeholder: "Search name, category, or status…",
+        label: "Search services",
+        getText: (service) =>
+          [
+            service.name,
+            service.description ?? "",
+            service.category?.name ?? "",
+            service.is_active ? "active" : "inactive",
+            (service.usageCount ?? 0) > 0 ? "in-house" : "",
+          ].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No services match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="overflow-x-auto rounded-lg border">
@@ -122,6 +137,14 @@ export function ServiceCategoriesTable({
     <PaginatedList
       items={categories}
       empty={<p className="text-sm text-muted-foreground">No categories yet.</p>}
+      search={{
+        placeholder: "Search category…",
+        label: "Search service categories",
+        getText: (cat) => cat.name,
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No categories match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="rounded-lg border">
@@ -164,6 +187,22 @@ export function PackagesList({
     <PaginatedList
       items={packages}
       empty={<p className="text-sm text-muted-foreground">No packages yet.</p>}
+      search={{
+        placeholder: "Search package or included service…",
+        label: "Search packages",
+        getText: (pkg) => {
+          const itemNames = (pkg.items ?? []).map((item) => item.service?.name ?? "").join(" ");
+          return [
+            pkg.name,
+            pkg.description ?? "",
+            pkg.is_active ? "active" : "inactive",
+            itemNames,
+          ].join(" ");
+        },
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No packages match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="space-y-4">

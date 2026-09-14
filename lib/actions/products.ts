@@ -76,6 +76,7 @@ export async function createProductCategory(
   });
   if (error) return { error: error.message };
   revalidatePath("/products");
+  revalidatePath("/in-house");
   return { success: true };
 }
 
@@ -105,6 +106,7 @@ export async function deleteProductCategory(id: string): Promise<ActionResult> {
   });
   if (result.error) return { error: result.error };
   revalidatePath("/products");
+  revalidatePath("/in-house");
   return { success: true };
 }
 

@@ -1,14 +1,30 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { DuesReport } from "@/lib/actions/reports/dues";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { KpiCard } from "@/components/features/reports/ui/kpi-card";
 import { ReportSection } from "@/components/features/reports/ui/report-section";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function DuesTab({ data }: { data: DuesReport }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return data.ledger;
+    return data.ledger.filter(
+      (row) =>
+        row.customerName.toLowerCase().includes(term) ||
+        (row.phone ?? "").toLowerCase().includes(term) ||
+        (row.invoiceNumber ?? "").toLowerCase().includes(term) ||
+        row.status.toLowerCase().includes(term) ||
+        String(row.daysOutstanding).includes(term)
+    );
+  }, [data.ledger, q]);
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -38,6 +54,16 @@ export function DuesTab({ data }: { data: DuesReport }) {
         {data.ledger.length === 0 ? (
           <p className="text-sm text-muted-foreground">No outstanding invoices.</p>
         ) : (
+          <>
+          <Input
+            placeholder="Search customer, phone, invoice, status…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="mb-3 max-w-sm print:hidden"
+          />
+          {!filtered.length ? (
+            <ReportEmpty message="No invoices match your search." />
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -54,7 +80,7 @@ export function DuesTab({ data }: { data: DuesReport }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.ledger.map((row) => (
+              {filtered.map((row) => (
                 <TableRow key={row.saleId}>
                   <TableCell>
                     {row.customerId ? (
@@ -95,6 +121,8 @@ export function DuesTab({ data }: { data: DuesReport }) {
               ))}
             </TableBody>
           </Table>
+          )}
+          </>
         )}
       </ReportSection>
 

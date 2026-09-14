@@ -1,8 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { getMyMarketplaceSeller, listSellerProducts } from "@/lib/marketplace/actions";
-import { InventoryAdjustForm } from "@/components/marketplace/inventory-adjust-form";
+import { MarketplaceInventoryList } from "@/components/marketplace/seller-searchable-lists";
 import { redirect } from "next/navigation";
-import { formatCurrency } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -17,23 +16,7 @@ export default async function MarketplaceInventoryPage() {
         title="Marketplace inventory"
         description="Online shop stock only — never mixed with Salon Management in-house or POS inventory."
       />
-      <ul className="divide-y rounded-lg border">
-        {products.length === 0 ? (
-          <li className="p-4 text-sm text-muted-foreground">No products.</li>
-        ) : (
-          products.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <p className="font-medium">{p.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCurrency(Number(p.price))} · status {p.status}
-                </p>
-              </div>
-              <InventoryAdjustForm productId={p.id} stock={p.stock} />
-            </li>
-          ))
-        )}
-      </ul>
+      <MarketplaceInventoryList products={products} />
     </div>
   );
 }

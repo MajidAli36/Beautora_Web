@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatDateTime } from "@/lib/format";
 import { downloadCsv } from "@/lib/reports/export-csv";
 import type { AppointmentsReport } from "@/lib/actions/reports";
@@ -13,12 +14,26 @@ import {
 import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function AppointmentsTab({ data }: { data: AppointmentsReport }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return data.ledger;
+    return data.ledger.filter(
+      (r) =>
+        r.customerName.toLowerCase().includes(term) ||
+        (r.staffName ?? "").toLowerCase().includes(term) ||
+        r.status.toLowerCase().includes(term) ||
+        r.services.toLowerCase().includes(term) ||
+        r.source.toLowerCase().includes(term)
+    );
+  }, [data.ledger, q]);
   const k = data.kpis;
   const maxHeat = Math.max(1, ...data.heatmap.map((h) => h.count));
 
@@ -123,7 +138,7 @@ export function AppointmentsTab({ data }: { data: AppointmentsReport }) {
               downloadCsv(
                 `appointments-${data.from}-${data.to}.csv`,
                 ["When", "Customer", "Staff", "Status", "Services", "Source"],
-                data.ledger.map((r) => [
+                filtered.map((r) => [
                   r.scheduledAt,
                   r.customerName,
                   r.staffName ?? "",
@@ -142,6 +157,15 @@ export function AppointmentsTab({ data }: { data: AppointmentsReport }) {
           <ReportEmpty message="No appointments found for the selected period." />
         ) : (
           <div className="overflow-x-auto">
+            <Input
+              placeholder="Search customer, staff, services, status…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="mb-3 max-w-sm print:hidden"
+            />
+            {!filtered.length ? (
+              <ReportEmpty message="No appointments match your search." />
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -153,7 +177,7 @@ export function AppointmentsTab({ data }: { data: AppointmentsReport }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.ledger.slice(0, 200).map((r) => (
+                {filtered.slice(0, 200).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap text-xs">
                       {formatDateTime(r.scheduledAt)}
@@ -168,6 +192,7 @@ export function AppointmentsTab({ data }: { data: AppointmentsReport }) {
                 ))}
               </TableBody>
             </Table>
+            )}
           </div>
         )}
       </ReportSection>

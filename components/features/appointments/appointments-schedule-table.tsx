@@ -68,6 +68,40 @@ type Props = {
   canCollectPayment?: boolean;
 };
 
+function appointmentSearchText(a: AppointmentRow): string {
+  const customer = a.customer;
+  const services = (a.services ?? []).map((s) => s.service_name).join(" ");
+  const bookingNo = displayBookingNumber(a.booking_number, a.id);
+  const sourceLabel =
+    (a.source ?? "").toUpperCase() === "ONLINE"
+      ? "Online"
+      : (a.source ?? "").toUpperCase() === "STAFF"
+        ? "In-house"
+        : (a.source ?? "").toUpperCase() === "PHONE"
+          ? "Phone"
+          : (a.source ?? "").toUpperCase() === "WALK_IN"
+            ? "Walk-in"
+            : (a.source ?? "");
+  const statusLabel =
+    a.status === "NO_SHOW"
+      ? "No-show"
+      : a.status === "COMPLETED"
+        ? "Completed"
+        : a.status === "CANCELLED"
+          ? "Cancelled"
+          : a.status;
+  return [
+    bookingNo,
+    formatCustomerName(customer.first_name, customer.last_name),
+    customer.phone ?? "",
+    customer.email ?? "",
+    a.staff?.full_name ?? "",
+    services,
+    statusLabel,
+    sourceLabel,
+  ].join(" ");
+}
+
 export function AppointmentsScheduleTable({
   appointments,
   mode,
@@ -99,6 +133,13 @@ export function AppointmentsScheduleTable({
           )}
         </div>
       }
+      search={{
+        placeholder: "Search customer, staff, services, booking #…",
+        getText: appointmentSearchText,
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No appointments match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="space-y-4">

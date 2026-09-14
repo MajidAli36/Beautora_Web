@@ -6,10 +6,9 @@ import {
   listMySubscriptionPayments,
 } from "@/lib/actions/billing";
 import { BillingPaymentForm } from "@/components/billing/billing-payment-form";
-import { ViewSubscriptionInvoiceButton } from "@/components/billing/view-subscription-invoice-button";
+import { BillingPaymentsList } from "@/components/billing/billing-payments-list";
 import {
   formatPlanAmount,
-  formatStoredPaymentAmount,
   SUBSCRIPTION,
 } from "@/lib/billing/subscription";
 import {
@@ -169,40 +168,7 @@ export default async function BillingPage() {
           <CardTitle>Payment history</CardTitle>
         </CardHeader>
         <CardContent>
-          {payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No payments submitted yet.</p>
-          ) : (
-            <ul className="divide-y text-sm">
-              {payments.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-                  <div>
-                    <p className="font-medium">Ref {p.transaction_ref}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(p.created_at).toLocaleString("en-PK")} ·{" "}
-                      {formatStoredPaymentAmount(p.amount, p.currency)}
-                      {p.payment_method === "usdt_bep20" ? " · USDT" : " · JazzCash"}
-                    </p>
-                    {p.has_invoice && (
-                      <div className="mt-2">
-                        <ViewSubscriptionInvoiceButton paymentId={p.id} />
-                      </div>
-                    )}
-                  </div>
-                  <Badge
-                    variant={
-                      p.status === "approved"
-                        ? "default"
-                        : p.status === "rejected"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
-                    {p.status}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+          <BillingPaymentsList payments={payments} />
         </CardContent>
       </Card>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { downloadExportDocument } from "@/lib/reports/export-formats";
 import { buildReportExportDocument } from "@/lib/reports/build-report-export";
@@ -11,6 +12,7 @@ import {
   ReportLineChart,
 } from "@/components/features/reports/ui/report-charts";
 import { ReportEmpty } from "@/components/features/reports/ui/report-states";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function OverallTab({ data }: { data: OverallReport }) {
@@ -69,9 +71,24 @@ function TopTable({
   rows: { name: string; qty: number; revenue: number }[];
   empty: string;
 }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((r) => r.name.toLowerCase().includes(term));
+  }, [rows, q]);
   if (!rows.length) return <ReportEmpty message={empty} />;
   return (
     <div className="overflow-x-auto">
+      <Input
+        placeholder="Search name…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        className="mb-3 max-w-sm print:hidden"
+      />
+      {!filtered.length ? (
+        <ReportEmpty message="No items match your search." />
+      ) : (
       <Table>
         <TableHeader>
           <TableRow>
@@ -81,7 +98,7 @@ function TopTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
+          {filtered.map((r) => (
             <TableRow key={r.name}>
               <TableCell className="font-medium">{r.name}</TableCell>
               <TableCell className="text-right">{r.qty}</TableCell>
@@ -90,6 +107,7 @@ function TopTable({
           ))}
         </TableBody>
       </Table>
+      )}
     </div>
   );
 }

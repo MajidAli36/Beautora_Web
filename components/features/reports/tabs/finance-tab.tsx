@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/format";
 import type { FinanceReport } from "@/lib/actions/reports";
@@ -7,10 +8,18 @@ import { KpiCard } from "@/components/features/reports/ui/kpi-card";
 import { ReportSection } from "@/components/features/reports/ui/report-section";
 import { ReportBarChart, ReportDonutChart } from "@/components/features/reports/ui/report-charts";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 export function FinanceTab({ data }: { data: FinanceReport }) {
+  const [q, setQ] = useState("");
+  const filteredWaterfall = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return data.waterfall;
+    return data.waterfall.filter((row) => row.label.toLowerCase().includes(term));
+  }, [data.waterfall, q]);
   const k = data.kpis;
   return (
     <div className="space-y-4">
@@ -38,6 +47,15 @@ export function FinanceTab({ data }: { data: FinanceReport }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ReportSection title="Financial waterfall" defaultOpen>
+          <Input
+            placeholder="Search step…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="mb-3 max-w-sm print:hidden"
+          />
+          {!filteredWaterfall.length ? (
+            <ReportEmpty message="No steps match your search." />
+          ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -47,7 +65,7 @@ export function FinanceTab({ data }: { data: FinanceReport }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.waterfall.map((row) => (
+                {filteredWaterfall.map((row) => (
                   <TableRow key={row.label}>
                     <TableCell className="font-medium">{row.label}</TableCell>
                     <TableCell
@@ -63,6 +81,7 @@ export function FinanceTab({ data }: { data: FinanceReport }) {
               </TableBody>
             </Table>
           </div>
+          )}
         </ReportSection>
         <ReportSection title="Expenses by category" defaultOpen>
           <ReportDonutChart

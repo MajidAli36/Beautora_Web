@@ -333,6 +333,20 @@ export function FinancesDashboard({
                 or widen the date range above.
               </p>
             }
+            search={{
+              placeholder: "Search category, description, method…",
+              getText: (expense) =>
+                [
+                  expense.expense_date,
+                  EXPENSE_CATEGORY_LABELS[expense.category],
+                  expense.description ?? "",
+                  expense.payment_method,
+                  String(expense.amount),
+                ].join(" "),
+              emptyFiltered: (
+                <p className="text-sm text-muted-foreground">No expenses match your search.</p>
+              ),
+            }}
           >
             {(slice) => (
               <div className="rounded-lg border">

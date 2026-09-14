@@ -50,6 +50,20 @@ export function DevicesTable({
     <PaginatedList
       items={devices}
       empty={<p className="text-sm text-muted-foreground">No devices registered yet.</p>}
+      search={{
+        placeholder: "Search name, type, location, status…",
+        getText: (d) =>
+          [
+            d.name,
+            d.type,
+            d.location ?? "",
+            d.is_active !== false ? "active" : "inactive",
+            d.auto_registered ? "auto registered" : "",
+          ].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No devices match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="rounded-lg border">
@@ -138,6 +152,14 @@ export function DeviceCommandsTable({ commands }: { commands: CommandRow[] }) {
     <PaginatedList
       items={commands}
       empty={<p className="text-sm text-muted-foreground">No commands yet.</p>}
+      search={{
+        placeholder: "Search device, command, status…",
+        getText: (c) =>
+          [c.device?.name ?? "", c.device?.type ?? "", c.command, c.status].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No commands match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="rounded-lg border">

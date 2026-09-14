@@ -2,10 +2,12 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Link2 } from "lucide-react";
 import { linkInHouseProductToService } from "@/lib/actions/services";
 import { useActionToast } from "@/hooks/use-action-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -15,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import type { ActionResult } from "@/types/commerce";
 
 type ServiceOption = { id: string; name: string; is_active: boolean };
@@ -38,6 +41,7 @@ export function LinkProductToServiceButton({
   const [open, setOpen] = useState(false);
   const unit = product.unit_label?.trim() || "unit";
   const usePerClient = Number(product.default_usage_qty) || 0;
+  const linkedCount = linkedServiceIds.length;
 
   return (
     <>
@@ -49,21 +53,21 @@ export function LinkProductToServiceButton({
         onClick={() => setOpen(true)}
       >
         <Link2 className="size-3.5" />
-        Link to service
+        {linkedCount > 0 ? `Services (${linkedCount})` : "Link services"}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Link to service</DialogTitle>
+            <DialogTitle>Link services</DialogTitle>
             <DialogDescription>
-              When <strong>{product.name}</strong> is used on a service, POS deducts the amount
-              below each time. Customers still pay only the service price — this stock is tracked
-              internally. Change use-per-client only in <strong>Edit</strong> on this product.
+              Check every service that should use <strong>{product.name}</strong>. The same
+              product can link to many services. POS deducts this qty each time — customers still
+              pay only the service price.
             </DialogDescription>
           </DialogHeader>
           {open ? (
             <LinkForm
-              key={`${product.id}-${usePerClient}-${unit}`}
+              key={`${product.id}-${usePerClient}-${unit}-${linkedServiceIds.join(",")}`}
               productId={product.id}
               productName={product.name}
               services={services}
@@ -105,7 +109,7 @@ function LinkForm({
   );
   const [state, formAction, pending] = useActionState(action, {} as ActionResult);
   useActionToast(state, {
-    successMessage: "Linked to service.",
+    successMessage: "Service links saved.",
     onSuccess: () => {
       onDone();
       router.refresh();
@@ -113,59 +117,198 @@ function LinkForm({
   });
 
   const active = services.filter((s) => s.is_active);
-  const defaultService =
-    active.find((s) => !linkedServiceIds.includes(s.id))?.id ?? active[0]?.id ?? "";
-  const hasUseQty = usePerClient > 0;
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(linkedServiceIds.filter((id) => active.some((s) => s.id === id)))
+  );
+  const [filter, setFilter] = useState("");
+  const [qty, setQty] = useState(usePerClient > 0 ? String(usePerClient) : "");
+  const qtyNum = Number(qty) || 0;
+  const canSave = qtyNum > 0 && active.length > 0;
+
+  const filtered = useMemo(() => {
+    const term = filter.trim().toLowerCase();
+    if (!term) return active;
+    return active.filter((s) => s.name.toLowerCase().includes(term));
+  }, [active, filter]);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllVisible() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const s of filtered) next.add(s.id);
+      return next;
+    });
+  }
+
+  function clearVisible() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const s of filtered) next.delete(s.id);
+      return next;
+    });
+  }
+
+  if (!services.length) {
+    return (
+      <div className="space-y-4">
+        <p className="rounded-lg border border-dashed px-3 py-3 text-sm text-muted-foreground">
+          No services yet. Create a service first, then come back to link{" "}
+          <strong className="text-foreground">{productName}</strong>.
+        </p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="button" render={<Link href="/services" />}>
+            Go to Services
+          </Button>
+        </DialogFooter>
+      </div>
+    );
+  }
+
+  if (!active.length) {
+    return (
+      <div className="space-y-4">
+        <p className="rounded-lg border border-dashed px-3 py-3 text-sm text-muted-foreground">
+          All services are inactive. Activate a service on the Services page, then link here.
+        </p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="button" render={<Link href="/services" />}>
+            Go to Services
+          </Button>
+        </DialogFooter>
+      </div>
+    );
+  }
 
   return (
     <form action={formAction} className="grid gap-4">
-      <input type="hidden" name="quantity" value={hasUseQty ? String(usePerClient) : ""} />
+      <input type="hidden" name="quantity" value={qtyNum > 0 ? String(qtyNum) : ""} />
+      {active.map((s) => (
+        <input key={`avail-${s.id}`} type="hidden" name="available_service_id" value={s.id} />
+      ))}
+      {[...selected].map((id) => (
+        <input key={`sel-${id}`} type="hidden" name="service_id" value={id} />
+      ))}
 
       <div className="rounded-lg border bg-muted/40 px-3 py-3">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Qty used per client
         </p>
-        {hasUseQty ? (
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-            {usePerClient}{" "}
-            <span className="text-base font-medium text-muted-foreground">{unit}</span>
-          </p>
+        {usePerClient > 0 ? (
+          <>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+              {usePerClient}{" "}
+              <span className="text-base font-medium text-muted-foreground">{unit}</span>
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Applied to every checked service. Change it in <strong>Edit</strong> if needed.
+            </p>
+          </>
         ) : (
-          <p className="mt-1 text-sm text-destructive">
-            Not set yet. Open <strong>Edit</strong> on {productName}, set Use per client (e.g. 5{" "}
-            {unit}), save, then link here.
-          </p>
+          <div className="mt-2 space-y-2">
+            <Label htmlFor={`link_qty_${productId}`}>Set use per client *</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id={`link_qty_${productId}`}
+                type="number"
+                min={0.001}
+                step="any"
+                inputMode="decimal"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                placeholder="e.g. 5"
+                className="max-w-[8rem]"
+                required
+              />
+              <span className="text-sm text-muted-foreground">{unit}</span>
+            </div>
+          </div>
         )}
-        <p className="mt-1 text-xs text-muted-foreground">
-          Locked here — deducted automatically at POS, never billed as a separate line.
-        </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor={`link_svc_${productId}`}>Service *</Label>
-        <select
-          id={`link_svc_${productId}`}
-          name="service_id"
-          required
-          defaultValue={defaultService}
-          className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label>Services</Label>
+          <p className="text-xs text-muted-foreground">
+            {selected.size} selected
+            {active.length ? ` · ${active.length} available` : ""}
+          </p>
+        </div>
+        <Input
+          type="search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Search services…"
+          aria-label="Search services"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={selectAllVisible}>
+            Check all{filter.trim() ? " shown" : ""}
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={clearVisible}>
+            Uncheck all{filter.trim() ? " shown" : ""}
+          </Button>
+        </div>
+        <div
+          className="max-h-[min(18rem,45vh)] space-y-1 overflow-y-auto rounded-lg border p-2"
+          role="group"
+          aria-label="Services to link"
         >
-          <option value="">Select service…</option>
-          {active.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-              {linkedServiceIds.includes(s.id) ? " (already linked)" : ""}
-            </option>
-          ))}
-        </select>
+          {filtered.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-muted-foreground">No services match.</p>
+          ) : (
+            filtered.map((s) => {
+              const checked = selected.has(s.id);
+              return (
+                <label
+                  key={s.id}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors",
+                    checked ? "bg-primary/10" : "hover:bg-muted/60"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 shrink-0 rounded border-input accent-primary"
+                    checked={checked}
+                    onChange={() => toggle(s.id)}
+                  />
+                  <span className="min-w-0 flex-1 font-medium">{s.name}</span>
+                  {linkedServiceIds.includes(s.id) && !checked ? (
+                    <span className="text-xs text-amber-700">will unlink</span>
+                  ) : null}
+                  {checked && linkedServiceIds.includes(s.id) ? (
+                    <span className="text-xs text-muted-foreground">linked</span>
+                  ) : null}
+                </label>
+              );
+            })
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Uncheck a service to remove this product from that service&apos;s recipe.
+        </p>
       </div>
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel
         </Button>
-        <Button type="submit" disabled={pending || !active.length || !hasUseQty}>
-          {pending ? "Saving…" : "Save link"}
+        <Button type="submit" disabled={pending || !canSave}>
+          {pending ? "Saving…" : "Save links"}
         </Button>
       </DialogFooter>
     </form>

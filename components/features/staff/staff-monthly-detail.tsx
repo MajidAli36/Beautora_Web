@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import type { StaffAppointmentItem, StaffMonthlyDetail } from "@/lib/actions/reports";
 import { createStaffNote, deleteStaffNote } from "@/lib/actions/staff-notes";
 import { useActionToast } from "@/hooks/use-action-toast";
@@ -361,6 +361,42 @@ export function StaffMonthlyDetailView({
   const prev = shiftMonth(data.yearMonth, -1);
   const next = shiftMonth(data.yearMonth, 1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sessionQ, setSessionQ] = useState("");
+  const [conductQ, setConductQ] = useState("");
+  const [paymentQ, setPaymentQ] = useState("");
+
+  const filteredSessions = useMemo(() => {
+    const term = sessionQ.trim().toLowerCase();
+    if (!term) return data.attendance.recentSessions;
+    return data.attendance.recentSessions.filter(
+      (s) =>
+        attendanceMethodLabel(s.method).toLowerCase().includes(term) ||
+        s.method.toLowerCase().includes(term) ||
+        (s.checkOutAt ? "checked out" : "on duty").includes(term)
+    );
+  }, [data.attendance.recentSessions, sessionQ]);
+
+  const filteredConduct = useMemo(() => {
+    const term = conductQ.trim().toLowerCase();
+    if (!term) return data.conduct.entries;
+    return data.conduct.entries.filter(
+      (e) =>
+        noteTypeLabel(e.noteType).toLowerCase().includes(term) ||
+        e.title.toLowerCase().includes(term) ||
+        (e.details ?? "").toLowerCase().includes(term)
+    );
+  }, [data.conduct.entries, conductQ]);
+
+  const filteredPayments = useMemo(() => {
+    const term = paymentQ.trim().toLowerCase();
+    if (!term) return data.payments;
+    return data.payments.filter(
+      (p) =>
+        p.paymentType.toLowerCase().includes(term) ||
+        (p.notes ?? "").toLowerCase().includes(term) ||
+        String(p.amount).includes(term)
+    );
+  }, [data.payments, paymentQ]);
 
   const attendanceHref = `/attendance?from=${data.from}&to=${data.to}&staff=${data.staffId}`;
   const defaultNoteDate =
@@ -562,6 +598,16 @@ export function StaffMonthlyDetailView({
               No attendance sessions this month. Record check-ins on the Attendance page.
             </p>
           ) : (
+            <>
+            <Input
+              placeholder="Search method…"
+              value={sessionQ}
+              onChange={(e) => setSessionQ(e.target.value)}
+              className="mb-3 max-w-sm"
+            />
+            {filteredSessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No sessions match your search.</p>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -572,7 +618,7 @@ export function StaffMonthlyDetailView({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.attendance.recentSessions.map((s) => (
+                {filteredSessions.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="whitespace-nowrap text-sm">
                       {formatDateTime(s.checkInAt)}
@@ -590,6 +636,8 @@ export function StaffMonthlyDetailView({
                 ))}
               </TableBody>
             </Table>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -636,6 +684,16 @@ export function StaffMonthlyDetailView({
               No warnings, complaints, praise, or notes recorded this month.
             </p>
           ) : (
+            <>
+            <Input
+              placeholder="Search type, title, details…"
+              value={conductQ}
+              onChange={(e) => setConductQ(e.target.value)}
+              className="mb-3 max-w-sm"
+            />
+            {filteredConduct.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No entries match your search.</p>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -647,7 +705,7 @@ export function StaffMonthlyDetailView({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.conduct.entries.map((e) => (
+                {filteredConduct.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="whitespace-nowrap text-sm">
                       {formatDate(e.occurredOn)}
@@ -679,6 +737,8 @@ export function StaffMonthlyDetailView({
                 ))}
               </TableBody>
             </Table>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -695,6 +755,16 @@ export function StaffMonthlyDetailView({
           {!data.payments.length ? (
             <p className="text-sm text-muted-foreground">No staff payments recorded this month.</p>
           ) : (
+            <>
+            <Input
+              placeholder="Search type, notes, amount…"
+              value={paymentQ}
+              onChange={(e) => setPaymentQ(e.target.value)}
+              className="mb-3 max-w-sm"
+            />
+            {filteredPayments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No payments match your search.</p>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -705,7 +775,7 @@ export function StaffMonthlyDetailView({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.payments.map((p) => (
+                {filteredPayments.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{formatDate(p.paymentDate)}</TableCell>
                     <TableCell>{p.paymentType}</TableCell>
@@ -715,6 +785,8 @@ export function StaffMonthlyDetailView({
                 ))}
               </TableBody>
             </Table>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -127,6 +127,25 @@ export function StaffHub({
                   No staff profiles yet. Add your first team member above.
                 </p>
               }
+              search={{
+                placeholder: "Search name, title, phone, email, status…",
+                getText: (s) => {
+                  const login = s.email ? logins.get(s.email.toLowerCase()) : undefined;
+                  return [
+                    s.full_name,
+                    s.job_title ?? "",
+                    s.phone ?? "",
+                    s.email ?? "",
+                    s.is_active ? "active" : "inactive",
+                    s.thumb_id ? "enrolled" : "not enrolled",
+                    login?.roleLabel ?? "no login",
+                    s.online_booking_enabled ? "visible on book" : "hidden",
+                  ].join(" ");
+                },
+                emptyFiltered: (
+                  <p className="text-sm text-muted-foreground">No staff match your search.</p>
+                ),
+              }}
             >
               {(slice) => (
                 <div className="rounded-lg border">

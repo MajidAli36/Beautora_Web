@@ -1,9 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { setStaffOnlineBooking } from "@/lib/actions/scheduling";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { notify } from "@/lib/toast";
 
@@ -20,7 +21,18 @@ type StaffOnlineToggleProps = {
 };
 
 export function StaffOnlineToggle({ staff, onStaffChange }: StaffOnlineToggleProps) {
+  const [q, setQ] = useState("");
   const [pending, startTransition] = useTransition();
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return staff;
+    return staff.filter(
+      (s) =>
+        s.full_name.toLowerCase().includes(term) ||
+        (s.job_title ?? "").toLowerCase().includes(term) ||
+        (s.online_booking_enabled ? "enabled" : "disabled").includes(term)
+    );
+  }, [staff, q]);
 
   function toggle(staffId: string, enabled: boolean) {
     const previous = staff;
@@ -45,6 +57,16 @@ export function StaffOnlineToggle({ staff, onStaffChange }: StaffOnlineTogglePro
   }
 
   return (
+    <div className="space-y-3">
+      <Input
+        placeholder="Search name, title, status…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        className="max-w-sm"
+      />
+      {!filtered.length ? (
+        <p className="text-sm text-muted-foreground">No staff match your search.</p>
+      ) : (
     <Table>
       <TableHeader>
         <TableRow>
@@ -55,7 +77,7 @@ export function StaffOnlineToggle({ staff, onStaffChange }: StaffOnlineTogglePro
         </TableRow>
       </TableHeader>
       <TableBody>
-        {staff.map((s) => (
+        {filtered.map((s) => (
           <TableRow key={s.id}>
             <TableCell className="font-medium">{s.full_name}</TableCell>
             <TableCell>{s.job_title ?? "—"}</TableCell>
@@ -79,5 +101,7 @@ export function StaffOnlineToggle({ staff, onStaffChange }: StaffOnlineTogglePro
         ))}
       </TableBody>
     </Table>
+      )}
+    </div>
   );
 }

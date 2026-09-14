@@ -74,6 +74,25 @@ export function ProductsTable({
     <PaginatedList
       items={products}
       empty={<p className="text-sm text-muted-foreground">No products yet.</p>}
+      search={{
+        placeholder: "Search name, SKU, category, status…",
+        getText: (p) => {
+          const v = getProductValuation(p);
+          return [
+            p.name,
+            p.sku ?? "",
+            p.category?.name ?? "",
+            showKind ? productKindLabel(p.product_kind) : "",
+            String(v.costPrice),
+            String(v.retailPrice),
+            String(v.stock),
+            p.is_active ? "active" : "inactive",
+          ].join(" ");
+        },
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No products match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="overflow-x-auto rounded-lg border">
@@ -174,6 +193,13 @@ export function ProductCategoriesTable({
     <PaginatedList
       items={categories}
       empty={<p className="text-sm text-muted-foreground">No categories yet.</p>}
+      search={{
+        placeholder: "Search category…",
+        getText: (c) => [c.name, String(c.sort_order)].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No categories match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="rounded-lg border">
@@ -210,6 +236,18 @@ export function InventoryValuationTable({ products }: { products: ProductRow[] }
     <PaginatedList
       items={products}
       empty={<p className="text-sm text-muted-foreground">No products yet.</p>}
+      search={{
+        placeholder: "Search product…",
+        getText: (p) => {
+          const v = getProductValuation(p);
+          return [p.name, String(v.stock), String(v.stockValueAtCost), String(v.stockValueAtRetail)].join(
+            " "
+          );
+        },
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No products match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="overflow-x-auto rounded-lg border">
@@ -259,6 +297,21 @@ export function InventoryTransactionsTable({
     <PaginatedList
       items={transactions}
       empty={<p className="text-sm text-muted-foreground">No transactions yet.</p>}
+      search={{
+        placeholder: "Search product, type, reference…",
+        getText: (t) =>
+          [
+            t.product?.name ?? "",
+            t.product?.sku ?? "",
+            t.type,
+            inventoryMovementLabel(t.type, t.reference_type),
+            t.reference_type ?? "",
+            String(t.quantity),
+          ].join(" "),
+        emptyFiltered: (
+          <p className="text-sm text-muted-foreground">No transactions match your search.</p>
+        ),
+      }}
     >
       {(slice) => (
         <div className="overflow-x-auto rounded-lg border">

@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export function InventoryTab({ data }: { data: InventoryReport }) {
   const [q, setQ] = useState("");
+  const [txQ, setTxQ] = useState("");
   const k = data.kpis;
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -26,6 +27,17 @@ export function InventoryTab({ data }: { data: InventoryReport }) {
         p.status.includes(term)
     );
   }, [data.products, q]);
+  const filteredTransactions = useMemo(() => {
+    const term = txQ.trim().toLowerCase();
+    if (!term) return data.transactions;
+    return data.transactions.filter(
+      (t) =>
+        t.productName.toLowerCase().includes(term) ||
+        t.type.toLowerCase().includes(term) ||
+        (t.referenceType ?? "").toLowerCase().includes(term) ||
+        String(t.quantity).includes(term)
+    );
+  }, [data.transactions, txQ]);
 
   return (
     <div className="space-y-4">
@@ -120,6 +132,15 @@ export function InventoryTab({ data }: { data: InventoryReport }) {
           <ReportEmpty message="No inventory transactions in this period." />
         ) : (
           <div className="overflow-x-auto">
+            <Input
+              placeholder="Search product, type, reference…"
+              value={txQ}
+              onChange={(e) => setTxQ(e.target.value)}
+              className="mb-3 max-w-sm print:hidden"
+            />
+            {!filteredTransactions.length ? (
+              <ReportEmpty message="No transactions match your search." />
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -131,7 +152,7 @@ export function InventoryTab({ data }: { data: InventoryReport }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.transactions.slice(0, 200).map((t) => (
+                {filteredTransactions.slice(0, 200).map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="whitespace-nowrap text-xs">
                       {formatDateTime(t.createdAt)}
@@ -144,6 +165,7 @@ export function InventoryTab({ data }: { data: InventoryReport }) {
                 ))}
               </TableBody>
             </Table>
+            )}
           </div>
         )}
       </ReportSection>

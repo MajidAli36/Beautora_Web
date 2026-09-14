@@ -75,6 +75,17 @@ export function SendWhatsAppForm({
     () => templates.find((t) => t.id === templateId) ?? templates[0],
     [templateId, templates]
   );
+  const [templateQ, setTemplateQ] = useState("");
+  const filteredTemplates = useMemo(() => {
+    const term = templateQ.trim().toLowerCase();
+    if (!term) return templates;
+    return templates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(term) ||
+        t.body.toLowerCase().includes(term) ||
+        (t.is_default ? "default" : "").includes(term)
+    );
+  }, [templates, templateQ]);
 
   const renderedMessage = useMemo(() => {
     if (!selectedTemplate) return "";
@@ -154,8 +165,19 @@ export function SendWhatsAppForm({
           </Button>
         </div>
 
+        <Input
+          type="search"
+          placeholder="Search templates…"
+          value={templateQ}
+          onChange={(e) => setTemplateQ(e.target.value)}
+          className="max-w-sm"
+          aria-label="Search WhatsApp templates"
+        />
         <div className="space-y-2">
-          {templates.map((template) => (
+          {!filteredTemplates.length ? (
+            <p className="text-sm text-muted-foreground">No templates match your search.</p>
+          ) : null}
+          {filteredTemplates.map((template) => (
             <div
               key={template.id}
               className={cn(
