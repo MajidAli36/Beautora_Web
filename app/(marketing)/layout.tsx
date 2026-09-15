@@ -23,7 +23,7 @@ const sans = Outfit({
   display: "swap",
 });
 
-/** Shared marketing chrome only — page-level metadata sets its own canonical. */
+/** Shared marketing chrome only — page-level metadata sets its own canonical + images. */
 export const metadata: Metadata = {
   title: {
     default: SITE_SEO.titleDefault,
@@ -43,11 +43,20 @@ export const metadata: Metadata = {
     siteName: `${SITE_SEO.product} · ${SITE_SEO.builder}`,
     title: SITE_SEO.titleDefault,
     description: SITE_SEO.description,
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: SITE_SEO.titleDefault,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: SITE_SEO.titleDefault,
     description: SITE_SEO.description,
+    images: ["/opengraph-image"],
   },
 };
 

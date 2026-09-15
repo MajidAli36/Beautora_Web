@@ -1,4 +1,5 @@
 import type { PublicStoreDetail } from "@/lib/actions/stores";
+import { currencyFromCountry } from "@/lib/currency/from-country";
 import { absoluteUrl, getSiteUrl } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -18,6 +19,21 @@ type LocalStoreInput = {
   publicBookingEnabled?: boolean;
 };
 
+function countryCodeFromLocale(locale: string): string | undefined {
+  const parts = locale.split("-");
+  if (parts.length >= 2 && parts[1]) return parts[1].toUpperCase();
+  return undefined;
+}
+
+function priceRangeSymbol(currencyCode: string): string {
+  if (currencyCode === "PKR") return "₨";
+  if (currencyCode === "USD") return "$$";
+  if (currencyCode === "GBP") return "££";
+  if (currencyCode === "EUR") return "€€";
+  if (currencyCode === "AED" || currencyCode === "SAR") return "$$";
+  return "$$";
+}
+
 /** HairSalon / LocalBusiness JSON-LD for public store + book pages. */
 export function buildLocalBusinessJsonLd(store: LocalStoreInput) {
   const siteUrl = getSiteUrl();
@@ -32,7 +48,11 @@ export function buildLocalBusinessJsonLd(store: LocalStoreInput) {
         : absoluteUrl("/opengraph-image"));
   const telephone = store.phone?.trim() || store.whatsappPhone?.trim() || undefined;
   const city = store.city?.trim() || undefined;
-  const country = store.country?.trim() || "Pakistan";
+  const countryName = store.country?.trim() || undefined;
+  const currency = currencyFromCountry(countryName);
+  const addressCountry =
+    countryCodeFromLocale(currency.locale) ||
+    (countryName === "Pakistan" || countryName === "PK" ? "PK" : countryName);
 
   const graph: Record<string, unknown>[] = [
     {
@@ -50,7 +70,7 @@ export function buildLocalBusinessJsonLd(store: LocalStoreInput) {
         "@type": "PostalAddress",
         streetAddress: store.address?.trim() || undefined,
         addressLocality: city,
-        addressCountry: country === "Pakistan" || country === "PK" ? "PK" : country,
+        addressCountry: addressCountry || undefined,
       },
       areaServed: city
         ? {
@@ -58,7 +78,7 @@ export function buildLocalBusinessJsonLd(store: LocalStoreInput) {
             name: city,
           }
         : undefined,
-      priceRange: "₨",
+      priceRange: priceRangeSymbol(currency.code),
       parentOrganization: {
         "@type": "Organization",
         name: SYNCOPS.name,
@@ -93,7 +113,7 @@ export function buildLocalBusinessJsonLd(store: LocalStoreInput) {
           provider: { "@id": `${storeUrl}#business` },
           offers: {
             "@type": "Offer",
-            priceCurrency: "PKR",
+            priceCurrency: currency.code,
             price: String(service.price),
             url: store.publicBookingEnabled === false ? storeUrl : bookUrl,
           },

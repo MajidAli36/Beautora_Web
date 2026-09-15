@@ -74,7 +74,7 @@ export function buildSyncOpsPageJsonLd() {
         isPartOf: { "@id": `${siteUrl}/#website` },
         about: { "@id": orgId },
         primaryImageOfPage: absoluteUrl(SYNCOPS.ceo.photo),
-        inLanguage: "en-PK",
+        inLanguage: "en",
       },
       {
         "@type": "BreadcrumbList",
@@ -116,7 +116,7 @@ export function buildCeoPageJsonLd() {
         mainEntity: { "@id": personId },
         isPartOf: { "@id": `${siteUrl}/#website` },
         about: { "@id": personId },
-        inLanguage: "en-PK",
+        inLanguage: "en",
       },
       {
         "@type": "Person",

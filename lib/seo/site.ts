@@ -73,6 +73,32 @@ export const SITE_FAQ = [
   },
 ] as const;
 
+/** Pricing-page FAQ only — avoid duplicating full SITE_FAQ rich results on /pricing. */
+export const PRICING_FAQ = [
+  {
+    question: "How much does Beautora cost?",
+    answer: `Start with a ${SUBSCRIPTION.trialDays}-day free trial (no card required). After trial, Asia stores renew at $${SUBSCRIPTION.asiaAmountUsd}/month and all other countries at $${SUBSCRIPTION.usdtAmountUsd}/month — both via USDT on BNB Smart Chain (BEP-20).`,
+  },
+  {
+    question: "Is pricing the same worldwide?",
+    answer: `No. Beautora uses regional USDT pricing: $${SUBSCRIPTION.asiaAmountUsd}/month for Asia (including Pakistan, India, UAE, and other Asian countries) and $${SUBSCRIPTION.usdtAmountUsd}/month everywhere else. Your store country in Settings selects the rate automatically.`,
+  },
+  {
+    question: "What payment method do you accept?",
+    answer:
+      "Subscription renewals are paid with USDT on BNB Smart Chain (BEP-20). Upload transfer proof in Billing; SyncOps reviews and unlocks your store for 30 days.",
+  },
+  {
+    question: "Do I need a card to start?",
+    answer: `No. New stores get ${SUBSCRIPTION.trialDays} days free with full access. Pay only when you renew after the trial.`,
+  },
+  {
+    question: "Is Marketplace included?",
+    answer:
+      "Yes. One Beautora subscription covers Salon Management, POS, and Marketplace tools for that store.",
+  },
+] as const;
+
 export function cityToSlug(city: string): string {
   return city
     .trim()
@@ -201,13 +227,35 @@ export function buildSiteJsonLd(siteUrl = getSiteUrl()) {
         creator: { "@id": syncOpsOrgId },
         brand: { "@id": beautoraOrgId },
         offers: {
-          "@type": "Offer",
+          "@type": "AggregateOffer",
           url: absoluteUrl("/pricing"),
           priceCurrency: "USD",
-          price: String(SUBSCRIPTION.usdtAmountUsd),
+          lowPrice: String(SUBSCRIPTION.asiaAmountUsd),
+          highPrice: String(SUBSCRIPTION.usdtAmountUsd),
+          offerCount: 2,
           availability: "https://schema.org/InStock",
-          description: `${SUBSCRIPTION.trialDays}-day free trial; $${SUBSCRIPTION.asiaAmountUsd} Asia / $${SUBSCRIPTION.usdtAmountUsd} elsewhere (USDT)`,
+          description: `${SUBSCRIPTION.trialDays}-day free trial; $${SUBSCRIPTION.asiaAmountUsd}/mo Asia · $${SUBSCRIPTION.usdtAmountUsd}/mo elsewhere (USDT BEP-20)`,
           seller: { "@id": syncOpsOrgId },
+          offers: [
+            {
+              "@type": "Offer",
+              name: "Asia plan",
+              price: String(SUBSCRIPTION.asiaAmountUsd),
+              priceCurrency: "USD",
+              url: absoluteUrl("/pricing"),
+              availability: "https://schema.org/InStock",
+              description: `$${SUBSCRIPTION.asiaAmountUsd}/month USDT for Asia stores`,
+            },
+            {
+              "@type": "Offer",
+              name: "International plan",
+              price: String(SUBSCRIPTION.usdtAmountUsd),
+              priceCurrency: "USD",
+              url: absoluteUrl("/pricing"),
+              availability: "https://schema.org/InStock",
+              description: `$${SUBSCRIPTION.usdtAmountUsd}/month USDT outside Asia`,
+            },
+          ],
         },
         featureList: [
           "Online salon booking",

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { HowItWorksSection } from "@/components/marketing/how-it-works-section";
 import { LandingFinalCta } from "@/components/marketing/landing-final-cta";
 import { ConfidenceSection } from "@/components/marketing/confidence-section";
+import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { buildPageMetadata, SITE_SEO } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -26,7 +27,13 @@ export default function HowItWorksPage() {
     <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
+          <Breadcrumbs
+            items={[
+              { name: "Home", path: "/" },
+              { name: "How it works", path: "/how-it-works" },
+            ]}
+          />
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
             How it works
           </p>
           <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl lg:text-6xl">

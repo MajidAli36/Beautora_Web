@@ -109,7 +109,14 @@ export function buildRootMetadata(): Metadata {
       siteName: `${SEO_BRAND.product} · ${SEO_BRAND.builder}`,
       title: SEO_BRAND.titleDefault,
       description: `${SEO_BRAND.product} — ${SEO_BRAND.tagline}. Salon POS, booking, and Marketplace in one workspace.`,
-      images: [{ url: absoluteUrl("/opengraph-image"), width: 1200, height: 630 }],
+      images: [
+        {
+          url: absoluteUrl("/opengraph-image"),
+          width: 1200,
+          height: 630,
+          alt: `${SEO_BRAND.product} — ${SEO_BRAND.tagline}`,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",

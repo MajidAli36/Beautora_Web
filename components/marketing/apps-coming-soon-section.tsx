@@ -139,9 +139,15 @@ export function AppsComingSoonSection({
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
             Native apps
           </p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
-            Beautora, wherever your team works.
-          </h2>
+          {isPage ? (
+            <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
+              Beautora, wherever your team works.
+            </h1>
+          ) : (
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
+              Beautora, wherever your team works.
+            </h2>
+          )}
           <p className="mt-4 text-lg leading-relaxed text-[var(--m-muted)]">
             Native mobile and desktop apps are coming soon. The web platform is available today —
             same salon, same login.

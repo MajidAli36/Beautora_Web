@@ -19,8 +19,9 @@ export const metadata: Metadata = {
       "Beautora founder",
       "majidali.tech",
       "MajidAli36",
-      "salon software founder Pakistan",
+      "salon software founder",
     ],
+    image: CEO_PAGE.ceo.photo,
   }),
   authors: [
     { name: SYNCOPS.ceo.name, url: SYNCOPS.ceo.links.website },
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     type: "profile",
-    locale: "en_PK",
+    locale: "en_US",
     url: absoluteUrl("/ceo"),
     siteName: `${SYNCOPS.name} · ${SYNCOPS.builder.name}`,
     title: `${CEO_PAGE.ceo.name} — Founder & CEO of SyncOps`,
@@ -46,6 +47,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${CEO_PAGE.ceo.name} — Founder & CEO of SyncOps`,
     description: CEO_PAGE.ceo.headline,
+    images: [absoluteUrl(CEO_PAGE.ceo.photo)],
   },
 };
 

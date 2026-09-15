@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { listPublicStores, listPublicStoreCities } from "@/lib/actions/stores";
 import { StoresDirectory } from "@/components/marketing/stores-directory";
+import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { buildPageMetadata, cityToSlug } from "@/lib/seo/site";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -28,7 +29,13 @@ export default async function StoresPage() {
     <div className="pt-[var(--m-chrome)]">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
+          <Breadcrumbs
+            items={[
+              { name: "Home", path: "/" },
+              { name: "Stores", path: "/stores" },
+            ]}
+          />
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
             Directory
           </p>
           <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl lg:text-6xl">

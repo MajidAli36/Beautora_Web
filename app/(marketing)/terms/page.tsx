@@ -19,6 +19,10 @@ export default function TermsPage() {
       eyebrow="Legal"
       title="Terms of Service"
       lead={`These terms govern use of ${SYNCOPS.name} at ${SYNCOPS.domain}, a product of ${SYNCOPS.builder.name}.`}
+      breadcrumbs={[
+        { name: "Home", path: "/" },
+        { name: "Terms", path: "/terms" },
+      ]}
     >
       <section>
         <h2>The service</h2>

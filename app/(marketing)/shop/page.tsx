@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MarketplaceShop } from "@/components/marketplace/marketplace-shop";
+import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import {
   listMarketplaceCategories,
   listPublicMarketplaceProducts,
@@ -37,7 +38,13 @@ export default async function ShopPage() {
     <div className="pt-[var(--m-chrome)]">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
         <div className="mx-auto max-w-6xl px-6 py-10 sm:py-14">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
+          <Breadcrumbs
+            items={[
+              { name: "Home", path: "/" },
+              { name: "Shop", path: "/shop" },
+            ]}
+          />
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
             Marketplace
           </p>
           <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">

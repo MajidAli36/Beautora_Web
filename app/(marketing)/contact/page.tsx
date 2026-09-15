@@ -41,6 +41,10 @@ export default function ContactPage() {
         eyebrow="Support"
         title="Contact Beautora"
         lead="Questions about opening a store, billing, or partners? Reach the Beautora team directly."
+        breadcrumbs={[
+          { name: "Home", path: "/" },
+          { name: "Contact", path: "/contact" },
+        ]}
       >
         <section>
           <h2>Email</h2>

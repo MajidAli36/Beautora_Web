@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PricingSection } from "@/components/marketing/pricing-section";
 import { LandingFinalCta } from "@/components/marketing/landing-final-cta";
+import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { FaqSection } from "@/components/seo/faq-section";
-import { buildPageMetadata, SITE_FAQ, SITE_SEO } from "@/lib/seo/site";
+import { buildPageMetadata, PRICING_FAQ, SITE_SEO } from "@/lib/seo/site";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { resolveVisitorBillingPlan } from "@/lib/billing/visitor-plan";
 import { SYNCOPS } from "@/lib/print/syncops";
@@ -19,6 +20,7 @@ export const metadata: Metadata = buildPageMetadata({
     "salon software pricing",
     "salon POS subscription",
     "salon marketplace pricing",
+    "Beautora USDT pricing",
   ],
 });
 
@@ -29,7 +31,13 @@ export default async function PricingPage() {
     <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
+          <Breadcrumbs
+            items={[
+              { name: "Home", path: "/" },
+              { name: "Pricing", path: "/pricing" },
+            ]}
+          />
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
             Pricing
           </p>
           <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl lg:text-6xl">
@@ -38,7 +46,8 @@ export default async function PricingPage() {
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
             {SITE_SEO.product} includes Salon Management, POS & Marketplace — booking, floor
             checkout, staff, queue, WhatsApp tools, reports, and online product selling — with
-            regional payment options.
+            regional USDT pricing (${SUBSCRIPTION.asiaAmountUsd} Asia · $
+            {SUBSCRIPTION.usdtAmountUsd} elsewhere).
           </p>
           <p className="mt-6 text-sm text-[var(--m-muted)]">
             Looking for features first?{" "}
@@ -56,7 +65,7 @@ export default async function PricingPage() {
         highlightPlan={visitor.plan}
         detectedCountry={visitor.detected ? visitor.countryCode : null}
       />
-      <FaqSection path="/pricing" faqs={SITE_FAQ} />
+      <FaqSection path="/pricing" faqs={PRICING_FAQ} />
       <LandingFinalCta />
     </div>
   );

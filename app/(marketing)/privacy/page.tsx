@@ -16,6 +16,10 @@ export default function PrivacyPage() {
       eyebrow="Legal"
       title="Privacy Policy"
       lead={`This policy explains how ${SYNCOPS.name} (${SYNCOPS.domain}), a product of ${SYNCOPS.builder.name}, handles information when you use our salon software.`}
+      breadcrumbs={[
+        { name: "Home", path: "/" },
+        { name: "Privacy", path: "/privacy" },
+      ]}
     >
       <section>
         <h2>Who we are</h2>

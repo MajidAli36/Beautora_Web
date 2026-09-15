@@ -91,6 +91,10 @@ export default function AboutPage() {
         eyebrow="Company"
         title={`About ${SYNCOPS.name}`}
         lead={`${SYNCOPS.name} is Salon Management, POS & Marketplace — built by ${SYNCOPS.builder.name} so owners can run bookings, checkout, staff, reports, and online product sales from one workspace.`}
+        breadcrumbs={[
+          { name: "Home", path: "/" },
+          { name: "About", path: "/about" },
+        ]}
       >
         <section>
           <h2>What is Beautora?</h2>
