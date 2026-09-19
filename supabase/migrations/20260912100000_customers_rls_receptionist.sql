@@ -4,6 +4,8 @@
 
 drop policy if exists "managers_insert_customers" on public.customers;
 drop policy if exists "managers_update_customers" on public.customers;
+drop policy if exists "members_insert_customers" on public.customers;
+drop policy if exists "members_update_customers" on public.customers;
 
 create policy "members_insert_customers"
   on public.customers
