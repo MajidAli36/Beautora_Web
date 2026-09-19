@@ -4,7 +4,7 @@ import { HowItWorksSection } from "@/components/marketing/how-it-works-section";
 import { LandingFinalCta } from "@/components/marketing/landing-final-cta";
 import { ConfidenceSection } from "@/components/marketing/confidence-section";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
-import { buildPageMetadata, SITE_SEO } from "@/lib/seo/site";
+import { buildPageMetadata } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
 export const revalidate = 3600;
@@ -40,9 +40,8 @@ export default function HowItWorksPage() {
             From signup to a live salon floor
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
-            {SITE_SEO.product} is built for beauty businesses worldwide — a clear path from empty
-            store to daily bookings, salon POS, team ops, and Marketplace product sales. Built by{" "}
-            {SYNCOPS.builder.name}.
+            Watch the product walkthrough below — then open bookings, salon POS, team ops, and
+            Marketplace from one Beautora workspace. Built by {SYNCOPS.builder.name}.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
