@@ -1,8 +1,24 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import Image from "next/image";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import {
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+  RotateCcw,
+  RotateCw,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import type { HowItWorksVideoSource } from "@/lib/marketing/how-it-works-video";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +29,8 @@ type HowItWorksVideoProps = {
   sourceKey: string;
 };
 
+const SKIP_SECONDS = 10;
+
 function pickSrc(source: HowItWorksVideoSource) {
   if (typeof window === "undefined") return source.mp4;
   return window.matchMedia("(max-width: 640px)").matches
@@ -20,11 +38,18 @@ function pickSrc(source: HowItWorksVideoSource) {
     : source.mp4;
 }
 
+function formatTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 /**
- * Fast-loading walkthrough player:
- * - Poster paints immediately (no video bytes)
- * - Source attaches only when near viewport
- * - Reloads cleanly when language tab changes
+ * Fast-loading walkthrough player with seek + fullscreen:
+ * - Poster first, video loads near viewport
+ * - Scrub bar + ±10s so guests can jump anytime
+ * - Fullscreen on the player stage
  */
 export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVideoProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -34,6 +59,11 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [buffered, setBuffered] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
 
   const onIntersect = useEffectEvent((near: boolean) => {
     if (near) setShouldLoad(true);
@@ -52,12 +82,14 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
     return () => io.disconnect();
   }, []);
 
-  // Reset playback state when switching language
   useEffect(() => {
     setReady(false);
     setPlaying(false);
     setFailed(false);
     setMuted(true);
+    setCurrentTime(0);
+    setDuration(0);
+    setBuffered(0);
     const video = videoRef.current;
     if (video) {
       video.pause();
@@ -89,9 +121,20 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
     const video = videoRef.current;
     if (!video || !shouldLoad) return;
 
+    const syncBuffer = () => {
+      try {
+        if (video.buffered.length > 0) {
+          setBuffered(video.buffered.end(video.buffered.length - 1));
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
     const onCanPlay = () => {
       setReady(true);
       setFailed(false);
+      if (Number.isFinite(video.duration)) setDuration(video.duration);
       video.muted = true;
       setMuted(true);
       void video
@@ -102,26 +145,62 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onError = () => setFailed(true);
+    const onTime = () => {
+      if (!scrubbing) setCurrentTime(video.currentTime);
+      syncBuffer();
+    };
+    const onMeta = () => {
+      if (Number.isFinite(video.duration)) setDuration(video.duration);
+      syncBuffer();
+    };
 
     video.addEventListener("canplay", onCanPlay, { once: true });
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("error", onError);
+    video.addEventListener("timeupdate", onTime);
+    video.addEventListener("loadedmetadata", onMeta);
+    video.addEventListener("progress", syncBuffer);
+    video.addEventListener("durationchange", onMeta);
     return () => {
       video.removeEventListener("canplay", onCanPlay);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("error", onError);
+      video.removeEventListener("timeupdate", onTime);
+      video.removeEventListener("loadedmetadata", onMeta);
+      video.removeEventListener("progress", syncBuffer);
+      video.removeEventListener("durationchange", onMeta);
     };
-  }, [shouldLoad, sourceKey]);
+  }, [shouldLoad, sourceKey, scrubbing]);
+
+  useEffect(() => {
+    const onFs = () => {
+      const node = rootRef.current;
+      const active =
+        document.fullscreenElement === node ||
+        // Safari
+        (document as Document & { webkitFullscreenElement?: Element })
+          .webkitFullscreenElement === node;
+      setIsFullscreen(Boolean(active));
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    document.addEventListener("webkitfullscreenchange", onFs as EventListener);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      document.removeEventListener("webkitfullscreenchange", onFs as EventListener);
+    };
+  }, []);
+
+  function ensureLoaded() {
+    if (!shouldLoad) setShouldLoad(true);
+  }
 
   function togglePlay() {
     const video = videoRef.current;
     if (!video) return;
-    if (!shouldLoad) {
-      setShouldLoad(true);
-      return;
-    }
+    ensureLoaded();
+    if (!shouldLoad) return;
     if (video.paused) void video.play();
     else video.pause();
   }
@@ -134,11 +213,102 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
     setMuted(video.muted);
   }
 
+  function seekBy(delta: number, e?: MouseEvent) {
+    e?.stopPropagation();
+    const video = videoRef.current;
+    if (!video || !ready) {
+      ensureLoaded();
+      return;
+    }
+    const next = Math.min(
+      Math.max(0, video.currentTime + delta),
+      Number.isFinite(video.duration) ? video.duration : video.currentTime + delta
+    );
+    video.currentTime = next;
+    setCurrentTime(next);
+  }
+
+  function seekToRatio(ratio: number) {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    const next = Math.min(Math.max(0, ratio), 1) * video.duration;
+    video.currentTime = next;
+    setCurrentTime(next);
+  }
+
+  function onScrubPointer(e: ReactPointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    e.preventDefault();
+    const track = e.currentTarget;
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = (e.clientX - rect.left) / rect.width;
+    seekToRatio(ratio);
+  }
+
+  function onScrubDown(e: ReactPointerEvent<HTMLDivElement>) {
+    ensureLoaded();
+    setScrubbing(true);
+    onScrubPointer(e);
+    const track = e.currentTarget;
+    track.setPointerCapture(e.pointerId);
+  }
+
+  function onScrubMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!scrubbing) return;
+    onScrubPointer(e);
+  }
+
+  function onScrubUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!scrubbing) return;
+    setScrubbing(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function toggleFullscreen(e: MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    const node = rootRef.current;
+    if (!node) return;
+
+    type FsEl = HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+    const doc = document as Document & {
+      webkitExitFullscreen?: () => Promise<void> | void;
+      webkitFullscreenElement?: Element;
+    };
+
+    const active =
+      document.fullscreenElement === node || doc.webkitFullscreenElement === node;
+
+    try {
+      if (active) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+      } else {
+        const el = node as FsEl;
+        if (el.requestFullscreen) await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+      }
+    } catch {
+      /* browser blocked fullscreen */
+    }
+  }
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
+
   return (
     <div
       ref={rootRef}
       className={cn(
         "group relative aspect-video w-full overflow-hidden bg-[var(--m-ink)]",
+        isFullscreen && "aspect-auto h-full min-h-[100dvh] rounded-none",
         className
       )}
       lang={source.lang}
@@ -152,7 +322,7 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
         sizes="(max-width: 1024px) 100vw, 1120px"
         className={cn(
           "object-cover transition-opacity duration-500",
-          ready && playing ? "opacity-0" : "opacity-100"
+          ready && (playing || currentTime > 0.2) ? "opacity-0" : "opacity-100"
         )}
         priority={false}
       />
@@ -161,22 +331,22 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
         ref={videoRef}
         key={`video-${sourceKey}`}
         className={cn(
-          "absolute inset-0 size-full object-cover transition-opacity duration-500",
+          "absolute inset-0 size-full object-contain bg-black transition-opacity duration-500",
           ready ? "opacity-100" : "opacity-0"
         )}
         playsInline
         muted
-        loop
         preload="none"
         poster={source.poster}
         aria-label={source.title}
       />
 
       <div
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(6,33,29,0.15)_0%,transparent_35%,transparent_65%,rgba(6,33,29,0.55)_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(6,33,29,0.2)_0%,transparent_28%,transparent_55%,rgba(6,33,29,0.75)_100%)]"
         aria-hidden
       />
 
+      {/* Center play — only toggles play, not seeking */}
       <button
         type="button"
         onClick={togglePlay}
@@ -199,18 +369,113 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
         </span>
       </button>
 
-      <div className="absolute bottom-4 left-4 right-4 z-[2] flex items-end justify-between gap-3 sm:bottom-5 sm:left-5 sm:right-5">
-        <p className="max-w-[18rem] text-[11px] font-medium uppercase tracking-[0.18em] text-white/80 sm:max-w-xs">
-          {source.nativeLabel ?? source.label} · Beautora
-        </p>
-        <button
-          type="button"
-          onClick={toggleMute}
-          className="inline-flex size-10 items-center justify-center border border-white/25 bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/50"
-          aria-label={muted ? "Unmute" : "Mute"}
+      {/* Control bar — always interactive for scrub / fullscreen */}
+      <div
+        className="absolute inset-x-0 bottom-0 z-[3] space-y-2 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-3 pb-3 pt-10 sm:px-4 sm:pb-4"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {/* Seek track */}
+        <div
+          role="slider"
+          aria-label="Seek video"
+          aria-valuemin={0}
+          aria-valuemax={Math.round(duration || 0)}
+          aria-valuenow={Math.round(currentTime)}
+          tabIndex={0}
+          className="group/seek relative h-2 cursor-pointer touch-none rounded-full bg-white/20"
+          onPointerDown={onScrubDown}
+          onPointerMove={onScrubMove}
+          onPointerUp={onScrubUp}
+          onPointerCancel={onScrubUp}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight") seekBy(SKIP_SECONDS);
+            if (e.key === "ArrowLeft") seekBy(-SKIP_SECONDS);
+          }}
         >
-          {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-        </button>
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-white/35"
+            style={{ width: `${Math.min(bufferedPct, 100)}%` }}
+          />
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-[var(--m-accent-soft)]"
+            style={{ width: `${Math.min(progress, 100)}%` }}
+          />
+          <div
+            className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow opacity-100 sm:opacity-0 sm:group-hover/seek:opacity-100"
+            style={{ left: `${Math.min(progress, 100)}%` }}
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePlay();
+            }}
+            className="inline-flex size-9 items-center justify-center text-white transition-colors hover:bg-white/10 sm:size-10"
+            aria-label={playing ? "Pause" : "Play"}
+          >
+            {playing ? (
+              <Pause className="size-4 fill-current" />
+            ) : (
+              <Play className="size-4 fill-current translate-x-px" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => seekBy(-SKIP_SECONDS, e)}
+            className="inline-flex size-9 items-center justify-center text-white transition-colors hover:bg-white/10 sm:size-10"
+            aria-label={`Back ${SKIP_SECONDS} seconds`}
+            title={`−${SKIP_SECONDS}s`}
+          >
+            <RotateCcw className="size-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => seekBy(SKIP_SECONDS, e)}
+            className="inline-flex size-9 items-center justify-center text-white transition-colors hover:bg-white/10 sm:size-10"
+            aria-label={`Forward ${SKIP_SECONDS} seconds`}
+            title={`+${SKIP_SECONDS}s`}
+          >
+            <RotateCw className="size-4" />
+          </button>
+
+          <p className="ml-1 min-w-[5.5rem] text-[11px] tabular-nums tracking-wide text-white/85 sm:text-xs">
+            {formatTime(currentTime)}
+            <span className="text-white/45"> / </span>
+            {formatTime(duration)}
+          </p>
+
+          <p className="ml-auto hidden max-w-[12rem] truncate text-[10px] font-medium uppercase tracking-[0.16em] text-white/70 sm:block">
+            {source.nativeLabel ?? source.label}
+          </p>
+
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="inline-flex size-9 items-center justify-center text-white transition-colors hover:bg-white/10 sm:size-10"
+            aria-label={muted ? "Unmute" : "Mute"}
+          >
+            {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="inline-flex size-9 items-center justify-center text-white transition-colors hover:bg-white/10 sm:size-10"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="size-4" />
+            ) : (
+              <Maximize2 className="size-4" />
+            )}
+          </button>
+        </div>
       </div>
 
       {!ready && shouldLoad && !failed ? (
@@ -220,7 +485,7 @@ export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVide
       ) : null}
 
       {failed ? (
-        <p className="absolute inset-x-0 bottom-16 z-[2] px-4 text-center text-sm text-white/80">
+        <p className="absolute inset-x-0 bottom-24 z-[2] px-4 text-center text-sm text-white/80">
           Video couldn&apos;t load. Tap play to retry.
         </p>
       ) : null}

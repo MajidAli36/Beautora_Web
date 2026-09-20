@@ -28,11 +28,27 @@ export type PlatformStoreRow = {
   name: string;
   slug: string;
   city: string | null;
+  country: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  whatsappPhone: string | null;
+  tagline: string | null;
   phase: SubscriptionPhase;
   adminDisabled: boolean;
   lifetimeAccess: boolean;
   trialEndsAt: string | null;
   subscriptionEndsAt: string | null;
+  subscriptionLockedAt: string | null;
+  subscriptionStatus: string;
+  adminDisabledAt: string | null;
+  lifetimeAccessAt: string | null;
+  publicBookingEnabled: boolean;
+  publicListingEnabled: boolean;
+  referralCodeUsed: string | null;
+  referredByPartnerId: string | null;
+  createdAt: string;
+  updatedAt: string;
   pendingPayments: number;
   daysLeftInTrial: number | null;
   hoursLeftInGrace: number | null;
@@ -41,9 +57,22 @@ export type PlatformStoreRow = {
     status: string;
     transaction_ref: string;
     amount: number;
+    currency: string;
     created_at: string;
     has_invoice: boolean;
   } | null;
+};
+
+export type PlatformStoreDetails = PlatformStoreRow & {
+  ownerEmail: string | null;
+  ownerName: string | null;
+  ownerUserId: string | null;
+  memberCount: number;
+  staffCount: number;
+  customerCount: number;
+  saleCount: number;
+  appointmentCount: number;
+  payments: BillingPaymentRow[];
 };
 
 export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
@@ -53,7 +82,7 @@ export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
   const { data: orgs } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, city, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
+      "id, name, slug, city, country, address, phone, email, whatsapp_phone, tagline, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, lifetime_access_at, public_booking_enabled, public_listing_enabled, referred_by_partner_id, referral_code_used, created_at, updated_at"
     )
     .order("name");
 
@@ -64,9 +93,11 @@ export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
 
   const { data: latestPayments } = await admin
     .from("subscription_payments")
-    .select("id, organization_id, status, transaction_ref, amount, created_at, invoice_path")
+    .select(
+      "id, organization_id, status, transaction_ref, amount, currency, created_at, invoice_path"
+    )
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(400);
 
   const pendingByOrg = new Map<string, number>();
   for (const row of pending ?? []) {
@@ -84,6 +115,7 @@ export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
       status: string;
       transaction_ref: string;
       amount: number;
+      currency: string | null;
       created_at: string;
       invoice_path: string | null;
     }
@@ -102,11 +134,27 @@ export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
       name: org.name,
       slug: org.slug,
       city: org.city,
+      country: org.country,
+      address: org.address,
+      phone: org.phone,
+      email: org.email,
+      whatsappPhone: org.whatsapp_phone,
+      tagline: org.tagline,
       phase: snapshot.phase,
       adminDisabled: Boolean(org.admin_disabled_at),
       lifetimeAccess: Boolean(org.lifetime_access),
       trialEndsAt: org.trial_ends_at,
       subscriptionEndsAt: org.subscription_ends_at,
+      subscriptionLockedAt: org.subscription_locked_at,
+      subscriptionStatus: org.subscription_status,
+      adminDisabledAt: org.admin_disabled_at,
+      lifetimeAccessAt: org.lifetime_access_at,
+      publicBookingEnabled: Boolean(org.public_booking_enabled),
+      publicListingEnabled: Boolean(org.public_listing_enabled),
+      referralCodeUsed: org.referral_code_used,
+      referredByPartnerId: org.referred_by_partner_id,
+      createdAt: org.created_at,
+      updatedAt: org.updated_at,
       pendingPayments: pendingByOrg.get(org.id) ?? 0,
       daysLeftInTrial: snapshot.daysLeftInTrial,
       hoursLeftInGrace: snapshot.hoursLeftInGrace,
@@ -116,12 +164,200 @@ export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
             status: last.status,
             transaction_ref: last.transaction_ref,
             amount: Number(last.amount),
+            currency: String(last.currency ?? "USD").toUpperCase(),
             created_at: last.created_at,
             has_invoice: Boolean(last.invoice_path),
           }
         : null,
     };
   });
+}
+
+/** Full salon dossier for platform admin expand panel. */
+export async function getPlatformStoreDetails(
+  organizationId: string
+): Promise<PlatformStoreDetails | null> {
+  await requirePlatformAdmin();
+  const admin = createAdminClient();
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select(
+      "id, name, slug, city, country, address, phone, email, whatsapp_phone, tagline, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, lifetime_access_at, public_booking_enabled, public_listing_enabled, referred_by_partner_id, referral_code_used, created_at, updated_at"
+    )
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  if (!org) return null;
+
+  const snapshot = resolveSubscription(org);
+
+  const [
+    membersRes,
+    staffRes,
+    customersRes,
+    salesRes,
+    appointmentsRes,
+    paymentsRes,
+    lastPaymentRes,
+    pendingRes,
+    ownerMemberRes,
+  ] = await Promise.all([
+    admin
+      .from("organization_members")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId),
+    admin
+      .from("staff")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+    admin
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+    admin
+      .from("sales")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+    admin
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+    admin
+      .from("subscription_payments")
+      .select(
+        "id, organization_id, amount, currency, payment_method, transaction_ref, payer_name, notes, status, jazzcash_number, created_at, reviewed_at, review_notes, invoice_path, invoice_mime"
+      )
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    admin
+      .from("subscription_payments")
+      .select(
+        "id, organization_id, status, transaction_ref, amount, currency, created_at, invoice_path"
+      )
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("subscription_payments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "pending"),
+    admin
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("role", "OWNER")
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  let ownerEmail: string | null = null;
+  let ownerName: string | null = null;
+  const ownerUserId = ownerMemberRes.data?.user_id ?? null;
+  if (ownerUserId) {
+    try {
+      const { data: authUser } = await admin.auth.admin.getUserById(ownerUserId);
+      ownerEmail = authUser.user?.email ?? null;
+      const meta = authUser.user?.user_metadata as
+        | { full_name?: string; name?: string }
+        | undefined;
+      ownerName =
+        (typeof meta?.full_name === "string" && meta.full_name) ||
+        (typeof meta?.name === "string" && meta.name) ||
+        null;
+    } catch {
+      /* auth lookup optional */
+    }
+  }
+
+  const last = lastPaymentRes.data;
+  const store: PlatformStoreRow = {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    city: org.city,
+    country: org.country,
+    address: org.address,
+    phone: org.phone,
+    email: org.email,
+    whatsappPhone: org.whatsapp_phone,
+    tagline: org.tagline,
+    phase: snapshot.phase,
+    adminDisabled: Boolean(org.admin_disabled_at),
+    lifetimeAccess: Boolean(org.lifetime_access),
+    trialEndsAt: org.trial_ends_at,
+    subscriptionEndsAt: org.subscription_ends_at,
+    subscriptionLockedAt: org.subscription_locked_at,
+    subscriptionStatus: org.subscription_status,
+    adminDisabledAt: org.admin_disabled_at,
+    lifetimeAccessAt: org.lifetime_access_at,
+    publicBookingEnabled: Boolean(org.public_booking_enabled),
+    publicListingEnabled: Boolean(org.public_listing_enabled),
+    referralCodeUsed: org.referral_code_used,
+    referredByPartnerId: org.referred_by_partner_id,
+    createdAt: org.created_at,
+    updatedAt: org.updated_at,
+    pendingPayments: pendingRes.count ?? 0,
+    daysLeftInTrial: snapshot.daysLeftInTrial,
+    hoursLeftInGrace: snapshot.hoursLeftInGrace,
+    lastPayment: last
+      ? {
+          id: last.id,
+          status: last.status,
+          transaction_ref: last.transaction_ref,
+          amount: Number(last.amount),
+          currency: String(last.currency ?? "USD").toUpperCase(),
+          created_at: last.created_at,
+          has_invoice: Boolean(last.invoice_path),
+        }
+      : null,
+  };
+
+  const payments: BillingPaymentRow[] = (paymentsRes.data ?? []).map((row) => {
+    const method =
+      row.payment_method === "usdt_bep20" ? ("usdt_bep20" as const) : ("jazzcash" as const);
+    return {
+      id: row.id,
+      amount: Number(row.amount),
+      currency: String(row.currency ?? (method === "usdt_bep20" ? "USD" : "PKR")).toUpperCase(),
+      payment_method: method,
+      transaction_ref: row.transaction_ref,
+      payer_name: row.payer_name,
+      notes: row.notes,
+      status: row.status as BillingPaymentRow["status"],
+      jazzcash_number: row.jazzcash_number,
+      created_at: row.created_at,
+      reviewed_at: row.reviewed_at,
+      review_notes: row.review_notes,
+      has_invoice: Boolean(row.invoice_path),
+      invoice_mime: row.invoice_mime ?? null,
+      organization_id: row.organization_id,
+      organization_name: store.name,
+      organization_slug: store.slug,
+      organization_city: store.city,
+      organization_country: store.country,
+    };
+  });
+
+  return {
+    ...store,
+    ownerEmail,
+    ownerName,
+    ownerUserId,
+    memberCount: membersRes.count ?? 0,
+    staffCount: staffRes.count ?? 0,
+    customerCount: customersRes.count ?? 0,
+    saleCount: salesRes.count ?? 0,
+    appointmentCount: appointmentsRes.count ?? 0,
+    payments,
+  };
 }
 
 /** Enable or disable a store from the platform admin panel. */
