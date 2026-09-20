@@ -19,9 +19,11 @@ import { DashboardStockPanel } from "@/components/dashboard/dashboard-stock-pane
 import { InventoryAlerts } from "@/components/dashboard/inventory-alerts";
 
 export default async function DashboardPage() {
-  const user = await requireAuth();
-  const org = await getActiveOrganization();
-  const data = await getDashboardData().catch(() => null);
+  const [user, org, data] = await Promise.all([
+    requireAuth(),
+    getActiveOrganization(),
+    getDashboardData().catch(() => null),
+  ]);
 
   const revenueChange = data
     ? formatPercentChange(data.todayRevenue, data.yesterdayRevenue)

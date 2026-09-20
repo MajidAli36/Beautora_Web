@@ -93,6 +93,7 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     { data: staffPay },
     { data: salePayments },
     { data: periodRefunds },
+    inventory,
   ] = await Promise.all([
     supabase
       .from("sales")
@@ -139,6 +140,7 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
         .eq("organization_id", org.organizationId)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString()),
+    getInventoryMoneySnapshot(org.organizationId, fromLabel, toLabel),
     ]);
 
   const salesRevenue = roundMoney((sales ?? []).reduce((sum, s) => sum + Number(s.total), 0));
@@ -230,11 +232,6 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     (periodRefunds ?? []).reduce((sum, r) => sum + Number(r.amount), 0)
   );
 
-  const inventory = await getInventoryMoneySnapshot(
-    org.organizationId,
-    fromLabel,
-    toLabel
-  );
   const [productSaleRows, revenueSplit, serviceUsageCogs] = await Promise.all([
     getProductSalesBreakdown(org.organizationId, fromLabel, toLabel),
     getRevenueSplit(org.organizationId, fromLabel, toLabel),

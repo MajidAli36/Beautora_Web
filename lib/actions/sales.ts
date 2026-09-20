@@ -1051,9 +1051,12 @@ export async function getSales(
 
   if (status) query = query.eq("status", status);
   if (paymentStatus) query = query.eq("payment_status", paymentStatus);
-  if (saleIds) query = query.in("id", saleIds);
+  if (saleIds) {
+    // Cap IN list to keep PostgREST payloads bounded
+    query = query.in("id", saleIds.slice(0, 500));
+  }
 
-  const { data, error } = await query;
+  const { data, error } = await query.limit(100);
   if (error) throw new Error(error.message);
   return data as unknown as (Sale & {
     customer: {

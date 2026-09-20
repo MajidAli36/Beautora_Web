@@ -63,16 +63,38 @@ export type PlatformStoreRow = {
   } | null;
 };
 
+export type PlatformPaymentAccount = {
+  id: string;
+  accountType: string;
+  label: string;
+  accountTitle: string | null;
+  accountNumber: string;
+  bankName: string | null;
+  extraNote: string | null;
+  isActive: boolean;
+};
+
 export type PlatformStoreDetails = PlatformStoreRow & {
   ownerEmail: string | null;
   ownerName: string | null;
   ownerUserId: string | null;
+  ownerPhone: string | null;
   memberCount: number;
   staffCount: number;
   customerCount: number;
   saleCount: number;
   appointmentCount: number;
   payments: BillingPaymentRow[];
+  paymentAccounts: PlatformPaymentAccount[];
+  /** Best-available contact for admin (fills empty profile fields). */
+  displayAddress: string | null;
+  displayAddressNote: string | null;
+  displayPhone: string | null;
+  displayPhoneNote: string | null;
+  displayWhatsapp: string | null;
+  displayWhatsappNote: string | null;
+  displayEmail: string | null;
+  displayEmailNote: string | null;
 };
 
 export async function listPlatformStores(): Promise<PlatformStoreRow[]> {
@@ -202,6 +224,7 @@ export async function getPlatformStoreDetails(
     lastPaymentRes,
     pendingRes,
     ownerMemberRes,
+    paymentAccountsRes,
   ] = await Promise.all([
     admin
       .from("organization_members")
@@ -256,21 +279,32 @@ export async function getPlatformStoreDetails(
       .eq("role", "OWNER")
       .limit(1)
       .maybeSingle(),
+    admin
+      .from("organization_payment_accounts")
+      .select(
+        "id, account_type, label, account_title, account_number, bank_name, extra_note, is_active"
+      )
+      .eq("organization_id", organizationId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
 
   let ownerEmail: string | null = null;
   let ownerName: string | null = null;
+  let ownerPhone: string | null = null;
   const ownerUserId = ownerMemberRes.data?.user_id ?? null;
   if (ownerUserId) {
     try {
       const { data: authUser } = await admin.auth.admin.getUserById(ownerUserId);
-      ownerEmail = authUser.user?.email ?? null;
-      const meta = authUser.user?.user_metadata as
-        | { full_name?: string; name?: string }
+      const user = authUser.user;
+      ownerEmail = user?.email ?? null;
+      ownerPhone = user?.phone?.trim() || null;
+      const meta = user?.user_metadata as
+        | { full_name?: string; name?: string; salon_name?: string }
         | undefined;
       ownerName =
-        (typeof meta?.full_name === "string" && meta.full_name) ||
-        (typeof meta?.name === "string" && meta.name) ||
+        (typeof meta?.full_name === "string" && meta.full_name.trim()) ||
+        (typeof meta?.name === "string" && meta.name.trim()) ||
         null;
     } catch {
       /* auth lookup optional */
@@ -346,17 +380,77 @@ export async function getPlatformStoreDetails(
     };
   });
 
+  const paymentAccounts: PlatformPaymentAccount[] = (paymentAccountsRes.data ?? []).map(
+    (row) => ({
+      id: row.id,
+      accountType: row.account_type,
+      label: row.label,
+      accountTitle: row.account_title,
+      accountNumber: row.account_number,
+      bankName: row.bank_name,
+      extraNote: row.extra_note,
+      isActive: row.is_active,
+    })
+  );
+
+  const locationLine = [org.city?.trim(), org.country?.trim()].filter(Boolean).join(", ") || null;
+  const profileAddress = org.address?.trim() || null;
+  const profilePhone = org.phone?.trim() || null;
+  const profileWhatsapp = org.whatsapp_phone?.trim() || null;
+  const profileEmail = org.email?.trim() || null;
+
+  let displayAddress = profileAddress;
+  let displayAddressNote: string | null = null;
+  if (!displayAddress && locationLine) {
+    displayAddress = locationLine;
+    displayAddressNote = "From city / country (street address not set yet)";
+  }
+
+  let displayPhone = profilePhone;
+  let displayPhoneNote: string | null = null;
+  if (!displayPhone && profileWhatsapp) {
+    displayPhone = profileWhatsapp;
+    displayPhoneNote = "From WhatsApp number (store phone not set)";
+  } else if (!displayPhone && ownerPhone) {
+    displayPhone = ownerPhone;
+    displayPhoneNote = "From owner auth phone";
+  }
+
+  let displayWhatsapp = profileWhatsapp;
+  let displayWhatsappNote: string | null = null;
+  if (!displayWhatsapp && profilePhone) {
+    displayWhatsapp = profilePhone;
+    displayWhatsappNote = "From store phone (WhatsApp not set)";
+  }
+
+  let displayEmail = profileEmail;
+  let displayEmailNote: string | null = null;
+  if (!displayEmail && ownerEmail) {
+    displayEmail = ownerEmail;
+    displayEmailNote = "From owner login email (store profile email not set)";
+  }
+
   return {
     ...store,
     ownerEmail,
     ownerName,
     ownerUserId,
+    ownerPhone,
     memberCount: membersRes.count ?? 0,
     staffCount: staffRes.count ?? 0,
     customerCount: customersRes.count ?? 0,
     saleCount: salesRes.count ?? 0,
     appointmentCount: appointmentsRes.count ?? 0,
     payments,
+    paymentAccounts,
+    displayAddress,
+    displayAddressNote,
+    displayPhone,
+    displayPhoneNote,
+    displayWhatsapp,
+    displayWhatsappNote,
+    displayEmail,
+    displayEmailNote,
   };
 }
 

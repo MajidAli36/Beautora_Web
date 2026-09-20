@@ -38,8 +38,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireAuth();
-  const org = await getActiveOrganization();
+  const [user, org] = await Promise.all([requireAuth(), getActiveOrganization()]);
   if (!org) {
     redirect("/onboarding");
   }

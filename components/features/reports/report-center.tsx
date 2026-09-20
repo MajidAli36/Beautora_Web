@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Printer, RefreshCw, Download, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
@@ -114,6 +114,7 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
   const tab: ReportTabId = isReportTabId(tabParam) ? tabParam : initialTab;
 
   const [cache, setCache] = useState<Partial<TabDataMap>>({});
+  const cacheRef = useRef<Record<string, TabDataMap[ReportTabId]>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -131,12 +132,19 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
 
   const loadTab = useCallback(
     async (active: ReportTabId, rangeFrom: string, rangeTo: string, force = false) => {
+      const key = `${active}:${rangeFrom}:${rangeTo}`;
+      if (!force && cacheRef.current[key]) {
+        setCache((prev) => ({
+          ...prev,
+          [active]: cacheRef.current[key] as TabDataMap[typeof active],
+        }));
+        setLoading(false);
+        setError(null);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
-        if (!force) {
-          // keep showing prior data while refetching same tab is handled below
-        }
         const loaders: { [K in ReportTabId]: () => Promise<TabDataMap[K]> } = {
           overall: () => getOverallReport(rangeFrom, rangeTo),
           sales: () => getSalesReport(rangeFrom, rangeTo),
@@ -152,6 +160,7 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
           dues: () => getDuesReport(rangeFrom, rangeTo),
         };
         const data = await loaders[active]();
+        cacheRef.current[key] = data;
         setCache((prev) => ({ ...prev, [active]: data }));
         setUpdatedAt(new Date().toISOString());
       } catch (e) {
@@ -170,11 +179,13 @@ export function ReportCenter({ initialFrom, initialTo, initialTab }: ReportCente
 
   function applyPreset(preset: ReportPeriodPreset) {
     const range = getReportPeriodRange(preset);
+    cacheRef.current = {};
     setCache({});
     pushState({ from: range.from, to: range.to });
   }
 
   function applyCustom(nextFrom: string, nextTo: string) {
+    cacheRef.current = {};
     setCache({});
     pushState({ from: nextFrom, to: nextTo });
   }

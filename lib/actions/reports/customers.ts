@@ -65,20 +65,31 @@ export async function getCustomersReport(from?: string, to?: string): Promise<Cu
   ]);
 
   const customers = allCustomers ?? [];
-  const customerIds = customers.map((c) => c.id);
 
-  // All-time completed sales for CLV / visit history (org scoped)
+  // Lifetime spend/visits from sales totals only (no line-item walk).
+  // Cap lookback to 2 years so large orgs stay responsive.
+  const historyStart = new Date(ctx.end);
+  historyStart.setFullYear(historyStart.getFullYear() - 2);
+
   const { data: allSales } = await supabase
     .from("sales")
     .select("id, customer_id, total, discount, completed_at")
     .eq("organization_id", ctx.organizationId)
-      .in("status", ["COMPLETED", "AMENDED"])
-      .is("deleted_at", null)
-      .not("customer_id", "is", null);
+    .in("status", ["COMPLETED", "AMENDED"])
+    .is("deleted_at", null)
+    .not("customer_id", "is", null)
+    .gte("completed_at", historyStart.toISOString());
 
   const sales = allSales ?? [];
-  const saleIds = sales.map((s) => s.id);
-  const items = await fetchSaleItems(ctx.organizationId, saleIds);
+
+  // Item split only for the selected period (not all history).
+  const periodSaleIds = [
+    ...new Set([
+      ...curSales.map((s) => s.id),
+      ...prevSales.map((s) => s.id),
+    ]),
+  ];
+  const items = await fetchSaleItems(ctx.organizationId, periodSaleIds);
 
   const itemsBySale = new Map<string, typeof items>();
   for (const item of items) {
@@ -198,8 +209,6 @@ export async function getCustomersReport(from?: string, to?: string): Promise<Cu
     const day = isoToLocalDateString(c.created_at);
     growthByDay[day] = (growthByDay[day] ?? 0) + 1;
   }
-
-  void customerIds;
 
   return {
     from: ctx.from,

@@ -76,13 +76,20 @@ async function loadSaleStaffMap(
   const map = new Map<string, string[]>();
   if (!saleIds.length) return map;
   const supabase = await getSupabase();
+  const chunks: string[][] = [];
   for (let i = 0; i < saleIds.length; i += 200) {
-    const chunk = saleIds.slice(i, i + 200);
-    const { data } = await supabase
-      .from("sale_staff")
-      .select("sale_id, staff_id")
-      .eq("organization_id", organizationId)
-      .in("sale_id", chunk);
+    chunks.push(saleIds.slice(i, i + 200));
+  }
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("sale_staff")
+        .select("sale_id, staff_id")
+        .eq("organization_id", organizationId)
+        .in("sale_id", chunk)
+    )
+  );
+  for (const { data } of results) {
     for (const row of data ?? []) {
       const list = map.get(row.sale_id) ?? [];
       list.push(row.staff_id);
@@ -201,20 +208,41 @@ export async function getStaffReport(from?: string, to?: string): Promise<StaffR
   );
   const prev = creditEqualShare(prevSales, saleStaffMap, apptStaff, prevRevenueByStaff);
 
+  const apptsByStaff = new Map<
+    string,
+    { total: number; completed: number; cancelled: number; noShow: number }
+  >();
+  for (const a of appointments) {
+    if (!a.staff_id) continue;
+    const bucket = apptsByStaff.get(a.staff_id) ?? {
+      total: 0,
+      completed: 0,
+      cancelled: 0,
+      noShow: 0,
+    };
+    bucket.total += 1;
+    if (a.status === "COMPLETED") bucket.completed += 1;
+    else if (a.status === "CANCELLED") bucket.cancelled += 1;
+    else if (a.status === "NO_SHOW") bucket.noShow += 1;
+    apptsByStaff.set(a.staff_id, bucket);
+  }
+
   const ranking: StaffPerformanceRow[] = staff.map((s) => {
-    const mine = appointments.filter((a) => a.staff_id === s.id);
-    const completed = mine.filter((a) => a.status === "COMPLETED").length;
-    const cancelled = mine.filter((a) => a.status === "CANCELLED").length;
-    const noShow = mine.filter((a) => a.status === "NO_SHOW").length;
+    const mine = apptsByStaff.get(s.id) ?? {
+      total: 0,
+      completed: 0,
+      cancelled: 0,
+      noShow: 0,
+    };
     const revenue = revenueByStaff.get(s.id) ?? 0;
     return {
       staffId: s.id,
       name: s.full_name,
-      appointments: mine.length,
-      completed,
-      cancelled,
-      noShow,
-      completionRate: mine.length ? (completed / mine.length) * 100 : 0,
+      appointments: mine.total,
+      completed: mine.completed,
+      cancelled: mine.cancelled,
+      noShow: mine.noShow,
+      completionRate: mine.total ? (mine.completed / mine.total) * 100 : 0,
       linkedSalesRevenue: revenue,
       customersServed: customersByStaff.get(s.id)?.size ?? 0,
     };

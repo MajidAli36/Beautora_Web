@@ -44,14 +44,49 @@ function dash(value: string | null | undefined) {
 }
 
 function phaseBadge(phase: string, adminDisabled: boolean, lifetimeAccess: boolean) {
-  if (adminDisabled) return <Badge variant="destructive">Disabled</Badge>;
-  if (lifetimeAccess || phase === "lifetime") {
-    return <Badge className="bg-violet-700">Lifetime</Badge>;
+  const base =
+    "h-auto min-h-6 overflow-visible px-2.5 py-1 text-xs font-semibold tracking-wide";
+  if (adminDisabled) {
+    return (
+      <Badge variant="destructive" className={cn(base, "bg-destructive text-white")}>
+        Disabled
+      </Badge>
+    );
   }
-  if (phase === "trial") return <Badge variant="secondary">Trial</Badge>;
-  if (phase === "active") return <Badge className="bg-emerald-600">Active</Badge>;
-  if (phase === "grace") return <Badge className="bg-amber-500">Grace</Badge>;
-  return <Badge variant="destructive">Locked</Badge>;
+  if (lifetimeAccess || phase === "lifetime") {
+    return (
+      <Badge
+        className={cn(
+          base,
+          "border-violet-800 bg-violet-700 text-white shadow-sm dark:bg-violet-600"
+        )}
+      >
+        Lifetime
+      </Badge>
+    );
+  }
+  if (phase === "trial") {
+    return (
+      <Badge variant="secondary" className={base}>
+        Trial
+      </Badge>
+    );
+  }
+  if (phase === "active") {
+    return (
+      <Badge className={cn(base, "bg-emerald-600 text-white")}>Active</Badge>
+    );
+  }
+  if (phase === "grace") {
+    return (
+      <Badge className={cn(base, "bg-amber-500 text-white")}>Grace</Badge>
+    );
+  }
+  return (
+    <Badge variant="destructive" className={cn(base, "bg-destructive text-white")}>
+      Locked
+    </Badge>
+  );
 }
 
 function storeStatusLine(store: PlatformStoreRow): string {
@@ -415,9 +450,9 @@ function StoreListItem({
       return;
     }
     setOpen(true);
-    if (details) return;
     startTransition(async () => {
       setError(null);
+      setDetails(null);
       try {
         const data = await getPlatformStoreDetails(store.id);
         if (!data) {
@@ -561,10 +596,38 @@ function StoreDetailsPanel({ details }: { details: PlatformStoreDetails }) {
           <Detail label="Tagline" value={dash(details.tagline)} />
           <Detail label="City" value={dash(details.city)} />
           <Detail label="Country" value={dash(details.country)} />
-          <Detail label="Address" value={dash(details.address)} />
-          <Detail label="Phone" value={dash(details.phone)} />
-          <Detail label="WhatsApp" value={dash(details.whatsappPhone)} />
-          <Detail label="Email (profile)" value={dash(details.email)} />
+          <Detail
+            label="Address"
+            value={dash(details.displayAddress)}
+            note={
+              details.displayAddressNote ??
+              (!details.displayAddress ? "Not set in store Settings yet" : null)
+            }
+          />
+          <Detail
+            label="Phone"
+            value={dash(details.displayPhone)}
+            note={
+              details.displayPhoneNote ??
+              (!details.displayPhone ? "Not set in store Settings yet" : null)
+            }
+          />
+          <Detail
+            label="WhatsApp"
+            value={dash(details.displayWhatsapp)}
+            note={
+              details.displayWhatsappNote ??
+              (!details.displayWhatsapp ? "Not set in store Settings yet" : null)
+            }
+          />
+          <Detail
+            label="Email"
+            value={dash(details.displayEmail)}
+            note={
+              details.displayEmailNote ??
+              (!details.displayEmail ? "Not set in store Settings yet" : null)
+            }
+          />
           <Detail
             label="Public booking"
             value={details.publicBookingEnabled ? "Enabled" : "Disabled"}
@@ -584,6 +647,7 @@ function StoreDetailsPanel({ details }: { details: PlatformStoreDetails }) {
         <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Detail label="Owner name" value={dash(details.ownerName)} />
           <Detail label="Owner email" value={dash(details.ownerEmail)} />
+          <Detail label="Owner phone" value={dash(details.ownerPhone)} />
           <Detail label="Owner user ID" value={dash(details.ownerUserId)} mono />
         </dl>
       </div>
@@ -634,6 +698,42 @@ function StoreDetailsPanel({ details }: { details: PlatformStoreDetails }) {
           <Stat label="Sales" value={String(details.saleCount)} />
           <Stat label="Appointments" value={String(details.appointmentCount)} />
         </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold">
+          Store payment accounts ({details.paymentAccounts.length})
+        </h3>
+        {details.paymentAccounts.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            No JazzCash / bank accounts saved in store settings yet.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {details.paymentAccounts.map((a) => (
+              <li
+                key={a.id}
+                className="rounded-md border bg-background px-3 py-2 text-sm"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{a.label}</span>
+                  <Badge variant="outline" className="capitalize">
+                    {a.accountType.replaceAll("_", " ")}
+                  </Badge>
+                  {!a.isActive ? <Badge variant="secondary">Inactive</Badge> : null}
+                </div>
+                <p className="mt-1 font-mono text-xs">
+                  {a.accountNumber}
+                  {a.accountTitle ? ` · ${a.accountTitle}` : ""}
+                  {a.bankName ? ` · ${a.bankName}` : ""}
+                </p>
+                {a.extraNote ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{a.extraNote}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div>
@@ -709,10 +809,12 @@ function Detail({
   label,
   value,
   mono,
+  note,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  note?: string | null;
 }) {
   return (
     <div>
@@ -720,6 +822,7 @@ function Detail({
         {label}
       </dt>
       <dd className={cn("mt-1 break-all font-medium", mono && "font-mono text-sm")}>{value}</dd>
+      {note ? <p className="mt-0.5 text-[11px] text-muted-foreground">{note}</p> : null}
     </div>
   );
 }

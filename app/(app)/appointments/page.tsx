@@ -78,6 +78,8 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
 
   const historySource = canViewInHouse ? "ALL" : "ONLINE";
 
+  const emptyAppts = Promise.resolve([] as Awaited<ReturnType<typeof fetchInHouseAppointments>>);
+
   const [
     inHouse,
     online,
@@ -96,14 +98,24 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
     canCreateAppointment,
     canMarkNoShow,
   ] = await Promise.all([
-    canViewInHouse ? fetchInHouseAppointments(inHouseDate).catch(() => []) : Promise.resolve([]),
-    canViewOnline
+    // Only hydrate the active tab on SSR — hub refetches when switching tabs.
+    canViewInHouse && initialTab === "in-house"
+      ? fetchInHouseAppointments(inHouseDate).catch(() => [])
+      : emptyAppts,
+    canViewOnline && initialTab === "online"
       ? fetchOnlineAppointments({ date: onlineDate }).catch(() => [])
-      : Promise.resolve([]),
-    fetchIncomingAppointments({ onlineOnly: !canViewInHouse }).catch(() => []),
-    fetchAppointmentHistory({ date: onlineDate, source: historySource }).catch(() => []),
+      : emptyAppts,
+    initialTab === "incoming"
+      ? fetchIncomingAppointments({ onlineOnly: !canViewInHouse }).catch(() => [])
+      : emptyAppts,
+    initialTab === "history"
+      ? fetchAppointmentHistory({ date: onlineDate, source: historySource }).catch(() => [])
+      : emptyAppts,
+    // Staff list is small and used across tabs (booking / filters).
     getOnlineBookingStaff().catch(() => []),
-    getStaffSchedulesForOrg().catch(() => []),
+    initialTab === "setup"
+      ? getStaffSchedulesForOrg().catch(() => [])
+      : Promise.resolve([]),
     getBookingAdvanceSettings().catch(() => null),
     getPendingDepositCount().catch(() => 0),
     getPublicBookingEnabled().catch(() => true),

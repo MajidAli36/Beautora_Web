@@ -75,7 +75,8 @@ export async function fetchCompletedSales(
       "id, total, subtotal, discount, tax, deposit_applied, completed_at, customer_id, appointment_id, staff_id, created_by, status"
     )
     .eq("organization_id", ctx.organizationId)
-    .in("status", ["COMPLETED", "AMENDED", "REFUNDED", "VOID"])
+    .in("status", ["COMPLETED", "AMENDED"])
+    .is("deleted_at", null)
     .gte("completed_at", start.toISOString())
     .lte("completed_at", end.toISOString());
 
@@ -129,14 +130,20 @@ export async function fetchSaleItems(
     unit_cost: number;
   }[] = [];
 
-  for (const chunk of chunks) {
-    const { data, error } = await supabase
-      .from("sale_items")
-      .select("sale_id, item_type, item_id, name, quantity, unit_price, line_total, unit_cost")
-      .eq("organization_id", organizationId)
-      .in("sale_id", chunk);
-    if (error) throw new Error(error.message);
-    for (const r of data ?? []) {
+  const chunkResults = await Promise.all(
+    chunks.map(async (chunk) => {
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select("sale_id, item_type, item_id, name, quantity, unit_price, line_total, unit_cost")
+        .eq("organization_id", organizationId)
+        .in("sale_id", chunk);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    })
+  );
+
+  for (const data of chunkResults) {
+    for (const r of data) {
       rows.push({
         sale_id: r.sale_id,
         item_type: r.item_type,

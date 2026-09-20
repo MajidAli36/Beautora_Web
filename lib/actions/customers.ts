@@ -154,37 +154,49 @@ export async function getCustomersDirectory(search?: string): Promise<{
   const supabase = await createClient();
   const customers = await getCustomers(search);
 
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("customer_id, total, completed_at, status")
-    .eq("organization_id", org.organizationId)
-    .in("status", ["COMPLETED", "AMENDED"])
-    .is("deleted_at", null)
-    .not("customer_id", "is", null);
-
+  const customerIds = (customers ?? []).map((c) => c.id);
   const byCustomer = new Map<
     string,
     { totalSpent: number; visitCount: number; lastVisitAt: string | null }
   >();
 
-  for (const sale of sales ?? []) {
-    const cid = sale.customer_id as string;
-    if (!cid) continue;
-    const prev = byCustomer.get(cid) ?? {
-      totalSpent: 0,
-      visitCount: 0,
-      lastVisitAt: null as string | null,
-    };
-    prev.totalSpent += Number(sale.total) || 0;
-    prev.visitCount += 1;
-    const completed = sale.completed_at as string | null;
-    if (
-      completed &&
-      (!prev.lastVisitAt || new Date(completed) > new Date(prev.lastVisitAt))
-    ) {
-      prev.lastVisitAt = completed;
+  if (customerIds.length > 0) {
+    const chunks: string[][] = [];
+    for (let i = 0; i < customerIds.length; i += 200) {
+      chunks.push(customerIds.slice(i, i + 200));
     }
-    byCustomer.set(cid, prev);
+    const salesChunks = await Promise.all(
+      chunks.map((chunk) =>
+        supabase
+          .from("sales")
+          .select("customer_id, total, completed_at")
+          .eq("organization_id", org.organizationId)
+          .in("status", ["COMPLETED", "AMENDED"])
+          .is("deleted_at", null)
+          .in("customer_id", chunk)
+      )
+    );
+    for (const { data: sales } of salesChunks) {
+      for (const sale of sales ?? []) {
+        const cid = sale.customer_id as string;
+        if (!cid) continue;
+        const prev = byCustomer.get(cid) ?? {
+          totalSpent: 0,
+          visitCount: 0,
+          lastVisitAt: null as string | null,
+        };
+        prev.totalSpent += Number(sale.total) || 0;
+        prev.visitCount += 1;
+        const completed = sale.completed_at as string | null;
+        if (
+          completed &&
+          (!prev.lastVisitAt || new Date(completed) > new Date(prev.lastVisitAt))
+        ) {
+          prev.lastVisitAt = completed;
+        }
+        byCustomer.set(cid, prev);
+      }
+    }
   }
 
   const monthStart = new Date();
@@ -338,10 +350,11 @@ export async function getCustomers(search?: string) {
 
   let query = supabase
     .from("customers")
-    .select("*")
+    .select("id, first_name, last_name, phone, email, created_at, notes, tags")
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
-    .order("first_name");
+    .order("first_name")
+    .limit(500);
 
   if (search?.trim()) {
     const term = `%${search.trim()}%`;

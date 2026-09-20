@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { enterCurrencyFromCountry } from "@/lib/currency/runtime.server";
 import type { MemberRole } from "@/types";
@@ -10,7 +11,7 @@ export type OrganizationMembership = {
   country: string | null;
 };
 
-export async function getUserMemberships(): Promise<OrganizationMembership[]> {
+export const getUserMemberships = cache(async (): Promise<OrganizationMembership[]> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -42,22 +43,22 @@ export async function getUserMemberships(): Promise<OrganizationMembership[]> {
       role: row.role as MemberRole,
       country: (row.organization as { country?: string | null }).country ?? null,
     }));
-}
+});
 
-export async function getActiveOrganization(): Promise<OrganizationMembership | null> {
+export const getActiveOrganization = cache(async (): Promise<OrganizationMembership | null> => {
   const memberships = await getUserMemberships();
   if (memberships.length === 0) return null;
   // Single-salon MVP: auto-select the first (only) organization.
   const org = memberships[0];
   enterCurrencyFromCountry(org.country);
   return org;
-}
+});
 
-export async function requireOrganization(): Promise<OrganizationMembership> {
+export const requireOrganization = cache(async (): Promise<OrganizationMembership> => {
   const org = await getActiveOrganization();
   if (!org) {
     throw new Error("No organization membership found");
   }
   enterCurrencyFromCountry(org.country);
   return org;
-}
+});
