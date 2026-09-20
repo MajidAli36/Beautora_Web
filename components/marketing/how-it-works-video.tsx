@@ -3,31 +3,30 @@
 import { useEffect, useEffectEvent, useRef, useState, type MouseEvent } from "react";
 import Image from "next/image";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
-import {
-  HOW_IT_WORKS_VIDEO,
-  HOW_IT_WORKS_VIDEO_MP4,
-  HOW_IT_WORKS_VIDEO_MP4_MOBILE,
-} from "@/lib/marketing/how-it-works-video";
+import type { HowItWorksVideoSource } from "@/lib/marketing/how-it-works-video";
 import { cn } from "@/lib/utils";
 
 type HowItWorksVideoProps = {
+  source: HowItWorksVideoSource;
   className?: string;
+  /** Restart load when the language/source changes */
+  sourceKey: string;
 };
 
-function pickSrc() {
-  if (typeof window === "undefined") return HOW_IT_WORKS_VIDEO_MP4;
+function pickSrc(source: HowItWorksVideoSource) {
+  if (typeof window === "undefined") return source.mp4;
   return window.matchMedia("(max-width: 640px)").matches
-    ? HOW_IT_WORKS_VIDEO_MP4_MOBILE
-    : HOW_IT_WORKS_VIDEO_MP4;
+    ? source.mp4Mobile
+    : source.mp4;
 }
 
 /**
  * Fast-loading walkthrough player:
  * - Poster paints immediately (no video bytes)
  * - Source attaches only when near viewport
- * - Muted autoplay once ready; user can unmute
+ * - Reloads cleanly when language tab changes
  */
-export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
+export function HowItWorksVideo({ source, sourceKey, className }: HowItWorksVideoProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
@@ -53,24 +52,38 @@ export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
     return () => io.disconnect();
   }, []);
 
+  // Reset playback state when switching language
+  useEffect(() => {
+    setReady(false);
+    setPlaying(false);
+    setFailed(false);
+    setMuted(true);
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      delete video.dataset.src;
+      video.removeAttribute("src");
+      while (video.firstChild) video.removeChild(video.firstChild);
+    }
+  }, [sourceKey]);
+
   useEffect(() => {
     if (!shouldLoad) return;
     const video = videoRef.current;
     if (!video) return;
 
-    const src = pickSrc();
+    const src = pickSrc(source);
     if (video.dataset.src === src) return;
     video.dataset.src = src;
 
-    // Clear then set for clean load on mobile/desktop swap
     video.removeAttribute("src");
     while (video.firstChild) video.removeChild(video.firstChild);
-    const source = document.createElement("source");
-    source.src = src;
-    source.type = "video/mp4";
-    video.appendChild(source);
+    const el = document.createElement("source");
+    el.src = src;
+    el.type = "video/mp4";
+    video.appendChild(el);
     video.load();
-  }, [shouldLoad]);
+  }, [shouldLoad, source, sourceKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -81,9 +94,10 @@ export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
       setFailed(false);
       video.muted = true;
       setMuted(true);
-      void video.play().then(() => setPlaying(true)).catch(() => {
-        setPlaying(false);
-      });
+      void video
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => setPlaying(false));
     };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
@@ -99,7 +113,7 @@ export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
       video.removeEventListener("pause", onPause);
       video.removeEventListener("error", onError);
     };
-  }, [shouldLoad]);
+  }, [shouldLoad, sourceKey]);
 
   function togglePlay() {
     const video = videoRef.current;
@@ -127,10 +141,12 @@ export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
         "group relative aspect-video w-full overflow-hidden bg-[var(--m-ink)]",
         className
       )}
+      lang={source.lang}
+      dir={source.dir ?? "ltr"}
     >
-      {/* Instant paint */}
       <Image
-        src={HOW_IT_WORKS_VIDEO.poster}
+        key={`poster-${sourceKey}`}
+        src={source.poster}
         alt=""
         fill
         sizes="(max-width: 1024px) 100vw, 1120px"
@@ -143,6 +159,7 @@ export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
 
       <video
         ref={videoRef}
+        key={`video-${sourceKey}`}
         className={cn(
           "absolute inset-0 size-full object-cover transition-opacity duration-500",
           ready ? "opacity-100" : "opacity-0"
@@ -151,11 +168,10 @@ export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
         muted
         loop
         preload="none"
-        poster={HOW_IT_WORKS_VIDEO.poster}
-        aria-label={HOW_IT_WORKS_VIDEO.title}
+        poster={source.poster}
+        aria-label={source.title}
       />
 
-      {/* Soft vignette so controls read on any frame */}
       <div
         className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(6,33,29,0.15)_0%,transparent_35%,transparent_65%,rgba(6,33,29,0.55)_100%)]"
         aria-hidden
@@ -184,8 +200,8 @@ export function HowItWorksVideo({ className }: HowItWorksVideoProps) {
       </button>
 
       <div className="absolute bottom-4 left-4 right-4 z-[2] flex items-end justify-between gap-3 sm:bottom-5 sm:left-5 sm:right-5">
-        <p className="max-w-[16rem] text-[11px] font-medium uppercase tracking-[0.18em] text-white/80 sm:max-w-xs">
-          Beautora walkthrough
+        <p className="max-w-[18rem] text-[11px] font-medium uppercase tracking-[0.18em] text-white/80 sm:max-w-xs">
+          {source.nativeLabel ?? source.label} · Beautora
         </p>
         <button
           type="button"

@@ -40,8 +40,9 @@ export default function HowItWorksPage() {
             From signup to a live salon floor
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-[var(--m-muted)]">
-            Watch the product walkthrough below — then open bookings, salon POS, team ops, and
-            Marketplace from one Beautora workspace. Built by {SYNCOPS.builder.name}.
+            Watch the walkthrough in English or Urdu — or follow the written tutorial below. Then
+            open bookings, salon POS, team ops, and Marketplace from one Beautora workspace. Built
+            by {SYNCOPS.builder.name}.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
