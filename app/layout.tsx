@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Inter, Geist_Mono } from "next/font/google";
 import { SYNCOPS } from "@/lib/print/syncops";
 import { SiteJsonLd } from "@/components/seo/site-json-ld";
 import { AnalyticsScripts } from "@/components/seo/analytics";
 import { AppToaster } from "@/components/ui/app-toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PartnerRefCapture } from "@/components/partners/partner-ref-capture";
 import { buildRootMetadata, SITE_SEO } from "@/lib/seo/site";
 import "./globals.css";
 
@@ -39,6 +41,9 @@ export default function RootLayout({
       </head>
       <body className="flex min-h-full flex-col">
         <TooltipProvider>
+          <Suspense fallback={null}>
+            <PartnerRefCapture />
+          </Suspense>
           {children}
           <AppToaster />
         </TooltipProvider>

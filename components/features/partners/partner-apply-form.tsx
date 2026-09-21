@@ -125,9 +125,15 @@ export function PartnerApplyForm() {
           </p>
         ) : (
           <p className="text-xs text-[var(--m-muted)]">
-            After SyncOps approves you, clients open stores with{" "}
-            <span className="font-medium text-[var(--m-ink)]">
+            After SyncOps approves you, share any of these (all remember your code):
+            <span className="mt-1 block font-medium text-[var(--m-ink)]">
               /signup?ref={username.trim() || "yourname"}
+            </span>
+            <span className="block font-medium text-[var(--m-ink)]">
+              /?ref={username.trim() || "yourname"}
+            </span>
+            <span className="block font-medium text-[var(--m-ink)]">
+              /partner?ref={username.trim() || "yourname"}
             </span>
           </p>
         )}

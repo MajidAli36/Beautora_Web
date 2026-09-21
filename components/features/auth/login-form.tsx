@@ -9,6 +9,7 @@ import { confirmUserEmail, requestPasswordReset } from "@/lib/actions/auth";
 import { ensureHardcodedPlatformAdmin } from "@/lib/actions/platform-auth";
 import { PLATFORM_HARDCODED_ADMIN } from "@/lib/platform/admin";
 import { createClient } from "@/lib/supabase/client";
+import { PartnerAwareSignupLink } from "@/components/partners/partner-aware-signup-link";
 import { cn } from "@/lib/utils";
 
 export function LoginForm() {
@@ -149,12 +150,9 @@ export function LoginForm() {
         </h2>
         <p className="mt-1.5 text-sm text-[var(--m-muted)] sm:mt-2">
           Don&apos;t have an account?{" "}
-          <Link
-            href="/signup"
-            className="font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline"
-          >
+          <PartnerAwareSignupLink className="font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline">
             Sign up
-          </Link>
+          </PartnerAwareSignupLink>
           {" · "}
           <Link
             href="/partner"

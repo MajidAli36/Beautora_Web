@@ -105,7 +105,23 @@ export async function getRememberedPartnerReferral(): Promise<string | null> {
   const raw = jar.get(PARTNER_REF_COOKIE)?.value;
   if (!raw) return null;
   const validated = validatePartnerUsername(raw);
-  return validated.ok ? validated.username : null;
+  if (!validated.ok) return null;
+
+  // Ensure partner is still approved; refresh cookie TTL while we're here.
+  const partner = await resolveApprovedPartnerByUsername(validated.username);
+  if (!partner) return null;
+
+  const isProd =
+    process.env.VERCEL_ENV === "production" ||
+    process.env.NODE_ENV === "production";
+  jar.set(PARTNER_REF_COOKIE, partner.username, {
+    path: "/",
+    maxAge: PARTNER_REF_MAX_AGE_DAYS * 24 * 60 * 60,
+    sameSite: "lax",
+    httpOnly: true,
+    secure: isProd,
+  });
+  return partner.username;
 }
 
 /** Resolve an approved partner by username (for org creation). */

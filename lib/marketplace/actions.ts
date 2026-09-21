@@ -84,6 +84,10 @@ export async function registerMarketplaceSeller(
   const bio = String(formData.get("bio") ?? "").trim() || null;
   if (shopName.length < 2) return { error: "Shop name is required." };
 
+  const { requireContactPhone } = await import("@/lib/phone/contact");
+  const phoneResult = requireContactPhone(String(formData.get("phone") ?? ""));
+  if (!phoneResult.ok) return { error: phoneResult.error };
+
   const baseSlug = slugify(shopName);
   const supabase = await createClient();
 
@@ -110,6 +114,7 @@ export async function registerMarketplaceSeller(
     shop_name: shopName,
     slug,
     bio,
+    phone: phoneResult.phone,
     status: "pending",
   });
 
@@ -654,14 +659,131 @@ async function requireMarketplacePlatformAdmin() {
   return user;
 }
 
-export async function listPlatformMarketplaceSellers() {
+export type PlatformMarketplaceSeller = {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  shop_name: string;
+  slug: string;
+  bio: string | null;
+  phone: string | null;
+  payout_notes: string | null;
+  status: "pending" | "approved" | "suspended";
+  created_at: string;
+  updated_at: string;
+  ownerEmail: string | null;
+  ownerName: string | null;
+  ownerAuthPhone: string | null;
+  organizationName: string | null;
+  organizationSlug: string | null;
+  organizationPhone: string | null;
+  organizationWhatsapp: string | null;
+  organizationCity: string | null;
+  organizationCountry: string | null;
+  productCount: number;
+};
+
+export async function listPlatformMarketplaceSellers(): Promise<
+  PlatformMarketplaceSeller[]
+> {
   await requireMarketplacePlatformAdmin();
   const admin = createAdminClient();
   const { data } = await admin
     .from("marketplace_sellers")
     .select("*")
     .order("created_at", { ascending: false });
-  return data ?? [];
+
+  const sellers = (data ?? []) as SellerRow[];
+  if (sellers.length === 0) return [];
+
+  const orgIds = [
+    ...new Set(sellers.map((s) => s.organization_id).filter(Boolean) as string[]),
+  ];
+  const sellerIds = sellers.map((s) => s.id);
+
+  const [orgsRes, productCountsRes] = await Promise.all([
+    orgIds.length
+      ? admin
+          .from("organizations")
+          .select("id, name, slug, phone, whatsapp_phone, city, country")
+          .in("id", orgIds)
+      : Promise.resolve({ data: [] as {
+          id: string;
+          name: string;
+          slug: string;
+          phone: string | null;
+          whatsapp_phone: string | null;
+          city: string | null;
+          country: string | null;
+        }[] }),
+    admin
+      .from("marketplace_products")
+      .select("seller_id")
+      .in("seller_id", sellerIds),
+  ]);
+
+  const orgById = new Map(
+    (orgsRes.data ?? []).map((o) => [o.id, o] as const)
+  );
+  const productCountBySeller = new Map<string, number>();
+  for (const row of productCountsRes.data ?? []) {
+    productCountBySeller.set(
+      row.seller_id,
+      (productCountBySeller.get(row.seller_id) ?? 0) + 1
+    );
+  }
+
+  const enriched = await Promise.all(
+    sellers.map(async (s) => {
+      let ownerEmail: string | null = null;
+      let ownerName: string | null = null;
+      let ownerAuthPhone: string | null = null;
+      try {
+        const { data: authUser } = await admin.auth.admin.getUserById(s.user_id);
+        const user = authUser.user;
+        ownerEmail = user?.email ?? null;
+        ownerAuthPhone = user?.phone?.trim() || null;
+        const meta = user?.user_metadata as
+          | { full_name?: string; name?: string }
+          | undefined;
+        ownerName =
+          (typeof meta?.full_name === "string" && meta.full_name.trim()) ||
+          (typeof meta?.name === "string" && meta.name.trim()) ||
+          null;
+      } catch {
+        /* optional */
+      }
+
+      const org = s.organization_id ? orgById.get(s.organization_id) : null;
+      const phoneCol = (s as SellerRow & { phone?: string | null }).phone ?? null;
+
+      return {
+        id: s.id,
+        user_id: s.user_id,
+        organization_id: s.organization_id,
+        shop_name: s.shop_name,
+        slug: s.slug,
+        bio: s.bio,
+        phone: phoneCol,
+        payout_notes: s.payout_notes,
+        status: s.status,
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+        ownerEmail,
+        ownerName,
+        ownerAuthPhone,
+        organizationName: org?.name ?? null,
+        organizationSlug: org?.slug ?? null,
+        organizationPhone: org?.phone ?? null,
+        organizationWhatsapp: org?.whatsapp_phone ?? null,
+        organizationCity: org?.city ?? null,
+        organizationCountry: org?.country ?? null,
+        productCount: productCountBySeller.get(s.id) ?? 0,
+      };
+    })
+  );
+
+  return enriched;
 }
 
 export async function setMarketplaceSellerStatus(

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { scrollMarketingToTop } from "@/components/marketing/marketing-scroll-manager";
 import { BeautoraWordmark } from "@/components/brand/beautora-logo";
 import { SiteTopBar } from "@/components/marketing/site-top-bar";
+import { PartnerAwareSignupLink } from "@/components/partners/partner-aware-signup-link";
 import { cn } from "@/lib/utils";
 
 /** Every item is a real indexable page — no hash-only destinations. */
@@ -195,12 +196,9 @@ export function SiteHeader() {
             >
               Login
             </Link>
-            <Link
-              href="/signup"
-              className="inline-flex h-10 items-center rounded-full bg-[var(--m-ink)] px-5 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]"
-            >
+            <PartnerAwareSignupLink className="inline-flex h-10 items-center rounded-full bg-[var(--m-ink)] px-5 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]">
               Start free
-            </Link>
+            </PartnerAwareSignupLink>
           </div>
 
           <button
@@ -254,13 +252,11 @@ export function SiteHeader() {
                 >
                   Login
                 </Link>
-                <Link
-                  href="/signup"
-                  onClick={() => setOpen(false)}
+                <PartnerAwareSignupLink
                   className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
                 >
                   Start free
-                </Link>
+                </PartnerAwareSignupLink>
               </div>
             </nav>
           </div>

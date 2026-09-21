@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { PartnerApplyForm } from "@/components/features/partners/partner-apply-form";
+import { PartnerIncomingRefBanner } from "@/components/partners/partner-incoming-ref-banner";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -15,6 +17,9 @@ export const metadata: Metadata = buildPageMetadata({
 export default function PartnerLandingPage() {
   return (
     <div className="bg-[var(--m-paper)] text-[var(--m-ink)]">
+      <Suspense fallback={null}>
+        <PartnerIncomingRefBanner />
+      </Suspense>
       <section className="relative overflow-hidden border-b border-[var(--m-line)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(15,157,140,0.08),_transparent_55%)]" />
         <div className="relative mx-auto grid max-w-6xl gap-12 px-6 pb-16 pt-28 lg:grid-cols-2 lg:items-start lg:gap-16 lg:pb-24 lg:pt-32">

@@ -79,14 +79,14 @@ export function GettingStartedGuide({ className }: GettingStartedGuideProps) {
         variant="outline"
         size="sm"
         className={cn(
-          "h-9 shrink-0 gap-1.5 rounded-lg border-primary/25 bg-primary/5 px-2.5 text-primary hover:bg-primary/10 hover:text-primary",
+          "h-9 shrink-0 gap-1.5 rounded-lg border-primary/25 bg-primary/5 px-2 text-primary hover:bg-primary/10 hover:text-primary sm:px-2.5",
           className
         )}
         aria-label="Open Getting Started guide"
         onClick={() => openGuide(0)}
       >
-        <BookOpen className="size-3.5" />
-        <span className="text-xs font-semibold tracking-wide">Guide</span>
+        <BookOpen className="size-3.5 shrink-0" />
+        <span className="hidden text-xs font-semibold tracking-wide sm:inline">Guide</span>
       </Button>
 
       <Sheet

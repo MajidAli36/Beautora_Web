@@ -41,6 +41,23 @@ export function SellerRegisterForm() {
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="phone">
+              Phone number <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              required
+              minLength={7}
+              autoComplete="tel"
+              placeholder="e.g. 0301 1234567"
+            />
+            <p className="text-xs text-muted-foreground">
+              Required so platform admin can contact you before approving your shop.
+            </p>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="bio">About your shop (optional)</Label>
             <Textarea
               id="bio"

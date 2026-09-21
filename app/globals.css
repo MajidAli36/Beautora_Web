@@ -372,7 +372,8 @@
 
   /* App shell — mobile comfort */
   .app-main {
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    /* Extra room so the FAB never covers bottom actions (Inventory / Finances) */
+    padding-bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   @keyframes app-nav-progress {

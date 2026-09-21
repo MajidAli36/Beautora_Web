@@ -27,11 +27,11 @@ export function DashboardHeader({ organizationName, userEmail }: DashboardHeader
         <p className="text-xs text-muted-foreground">{formatDate(today, "weekday")}</p>
       </div>
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+      <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:overflow-visible sm:pb-0">
         <Button
           variant="outline"
           size="sm"
-          className="h-11 shrink-0 touch-target sm:h-8"
+          className="h-11 w-full touch-target sm:h-8 sm:w-auto"
           render={<Link href="/appointments/new" />}
         >
           <Calendar className="size-4" />
@@ -39,7 +39,7 @@ export function DashboardHeader({ organizationName, userEmail }: DashboardHeader
         </Button>
         <Button
           size="sm"
-          className="h-11 shrink-0 touch-target sm:h-8"
+          className="h-11 w-full touch-target sm:h-8 sm:w-auto"
           render={<Link href="/pos" />}
         >
           <Plus className="size-4" />

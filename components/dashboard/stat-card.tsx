@@ -46,7 +46,9 @@ export function StatCard({
                   </span>
                 ) : null}
                 {subtext ? (
-                  <span className="text-muted-foreground">{subtext}</span>
+                  <span className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                    {subtext}
+                  </span>
                 ) : null}
               </div>
             )}

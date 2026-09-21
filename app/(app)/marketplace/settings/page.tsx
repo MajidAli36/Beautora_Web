@@ -26,6 +26,12 @@ export default async function MarketplaceSettingsPage() {
             <span className="text-muted-foreground">Status</span>
             <Badge variant="outline">{seller.status}</Badge>
           </div>
+          {seller.phone ? (
+            <p>
+              <span className="text-muted-foreground">Phone </span>
+              {seller.phone}
+            </p>
+          ) : null}
           {seller.bio ? <p>{seller.bio}</p> : null}
           <p className="text-xs text-muted-foreground">
             Contact Beautora platform admin to change shop name, suspend, or update payout notes.

@@ -46,14 +46,14 @@ export function SalonCheatsheet({
         variant="outline"
         size="sm"
         className={cn(
-          "h-9 shrink-0 gap-1.5 rounded-lg border-border bg-background px-2.5 text-foreground hover:bg-muted",
+          "h-9 shrink-0 gap-1.5 rounded-lg border-border bg-background px-2 text-foreground hover:bg-muted sm:px-2.5",
           className
         )}
         aria-label="Open salon cheatsheet"
         onClick={() => setOpen(true)}
       >
-        <ScrollText className="size-3.5" />
-        <span className="text-xs font-semibold tracking-wide">Cheatsheet</span>
+        <ScrollText className="size-3.5 shrink-0" />
+        <span className="hidden text-xs font-semibold tracking-wide sm:inline">Cheatsheet</span>
       </Button>
 
       <Sheet open={open} onOpenChange={setOpen}>

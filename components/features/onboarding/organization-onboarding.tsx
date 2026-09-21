@@ -31,6 +31,7 @@ export function OrganizationOnboarding({
   const router = useRouter();
   const [productIntent, setProductIntent] = useState<ProductIntent | null>(null);
   const [salonName, setSalonName] = useState(initialSalonName);
+  const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState<string>(DEFAULT_STORE_COUNTRY);
   const [nameOk, setNameOk] = useState<boolean | null>(null);
@@ -84,12 +85,17 @@ export function OrganizationOnboarding({
       notify.error("Select your country");
       return;
     }
+    if (phone.trim().replace(/\D/g, "").length < 7) {
+      notify.error("Enter a valid phone number");
+      return;
+    }
 
     setLoading(true);
     const result = await createSalonOrganization({
       salonName: name,
       city,
       country,
+      phone,
       bookingSlotMinutes: 30,
       bookingDaysAhead: 14,
       referralCode: partnerRef,
@@ -199,6 +205,28 @@ export function OrganizationOnboarding({
           )}
         </div>
 
+        <div className="space-y-2">
+          <label htmlFor="phone" className="text-sm font-medium text-[var(--m-ink-soft)]">
+            Phone number <span className="text-[var(--m-accent)]">*</span>
+          </label>
+          <input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void finish();
+            }}
+            placeholder="e.g. 0301 1234567"
+            className={fieldClassName}
+            autoComplete="tel"
+            required
+          />
+          <p className="text-xs text-[var(--m-muted)]">
+            Required for bookings, WhatsApp, and platform review.
+          </p>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="city" className="text-sm font-medium text-[var(--m-ink-soft)]">
@@ -250,7 +278,7 @@ export function OrganizationOnboarding({
         </button>
 
         <p className="text-center text-[11px] text-[var(--m-muted)]">
-          Booking page &amp; WhatsApp can be set later under Settings.
+          You can refine booking hours and WhatsApp templates later under Settings.
         </p>
       </div>
     </div>

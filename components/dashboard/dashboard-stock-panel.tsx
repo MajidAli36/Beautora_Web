@@ -33,18 +33,19 @@ export function DashboardStockPanel({ stock }: DashboardStockPanelProps) {
 
   return (
     <div className="dashboard-card w-full min-w-0 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Stock &amp; inventory today</h3>
           <p className="text-xs text-muted-foreground">
             Product sales at POS and what remains on the shelf
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button type="button" size="sm" variant="outline" className="h-9" render={<Link href="/finances" />}>
+        {/* pr clears the FAB on mobile so Inventory stays tappable */}
+        <div className="flex gap-2 pr-14 sm:pr-0">
+          <Button type="button" size="sm" variant="outline" className="h-9 flex-1 sm:flex-none" render={<Link href="/finances" />}>
             Finances
           </Button>
-          <Button type="button" size="sm" variant="outline" className="h-9" render={<Link href="/products" />}>
+          <Button type="button" size="sm" variant="outline" className="h-9 flex-1 sm:flex-none" render={<Link href="/products" />}>
             Inventory
           </Button>
         </div>

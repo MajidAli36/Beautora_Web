@@ -41,41 +41,50 @@ export function AppHeader({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/90 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md supports-[backdrop-filter]:bg-card/70 sm:gap-3 sm:px-6">
-      <SidebarTrigger className="touch-target -ml-0.5 size-11 sm:size-9" />
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1.5 border-b border-border bg-card/90 px-2 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md supports-[backdrop-filter]:bg-card/70 sm:h-16 sm:gap-3 sm:px-6">
+      <SidebarTrigger className="touch-target -ml-0.5 size-10 shrink-0 sm:size-9" />
       <Separator orientation="vertical" className="hidden h-4 sm:block" />
 
-      <div className="min-w-0 shrink">
-        <h1 className="truncate text-sm font-semibold text-foreground sm:text-base">{pageTitle}</h1>
+      {/* Title — capped width so it never collides with guide pills */}
+      <div className="min-w-0 max-w-[30%] shrink sm:max-w-none sm:flex-1 md:flex-none">
+        <h1 className="truncate text-sm font-semibold text-foreground sm:text-base">
+          {pageTitle}
+        </h1>
         {organizationName && pathname !== "/dashboard" ? (
-          <p className="hidden truncate text-xs text-muted-foreground sm:block">{organizationName}</p>
+          <p className="hidden truncate text-xs text-muted-foreground sm:block">
+            {organizationName}
+          </p>
         ) : null}
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:justify-center sm:gap-3">
-        <GettingStartedGuide className="shrink-0" />
-        <SalonCheatsheet className="shrink-0" hasLifetimeAccess={hasLifetimeAccess} />
-
-        <form
-          onSubmit={handleSearch}
-          className="hidden max-w-sm flex-1 md:flex md:max-w-xs lg:max-w-md"
-        >
-          <div className="relative w-full">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              name="q"
-              placeholder="Search customers, appointments…"
-              className="h-9 rounded-lg border-border bg-muted/50 pl-9 text-sm transition-colors focus:bg-background"
-            />
-          </div>
-        </form>
+      {/* Guide / Cheatsheet — icon-only on narrow phones to stop label overlap */}
+      <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
+        <GettingStartedGuide className="header-guide-trigger" />
+        <SalonCheatsheet
+          className="header-cheatsheet-trigger"
+          hasLifetimeAccess={hasLifetimeAccess}
+        />
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      <form
+        onSubmit={handleSearch}
+        className="mx-auto hidden max-w-sm flex-1 md:flex md:max-w-xs lg:max-w-md"
+      >
+        <div className="relative w-full">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            name="q"
+            placeholder="Search customers, appointments…"
+            className="h-9 rounded-lg border-border bg-muted/50 pl-9 text-sm transition-colors focus:bg-background"
+          />
+        </div>
+      </form>
+
+      <div className="ml-auto flex shrink-0 items-center gap-0 sm:gap-1">
         <Button
           variant="ghost"
           size="icon"
-          className="touch-target size-11 md:hidden"
+          className="touch-target size-10 md:hidden"
           aria-label="Search"
           onClick={() => router.push("/customers")}
         >

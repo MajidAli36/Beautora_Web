@@ -10,7 +10,11 @@ import {
   checkSalonNameAvailable,
   registerAccount,
 } from "@/lib/actions/auth";
-import { rememberPartnerReferral } from "@/lib/actions/partners";
+import { rememberPartnerReferral, getRememberedPartnerReferral } from "@/lib/actions/partners";
+import {
+  PARTNER_REF_STORAGE_KEY,
+  validatePartnerUsername,
+} from "@/lib/partners/referral";
 import type { SignupAccountType } from "@/lib/auth/account-types";
 import { cn } from "@/lib/utils";
 
@@ -43,18 +47,76 @@ export function SignupForm() {
     } else if (intent === "owner" || intent === "salon") {
       setAccountType("owner");
     }
-    const ref = searchParams.get("ref")?.trim();
-    if (!ref) return;
-    void (async () => {
-      const result = await rememberPartnerReferral(ref);
-      if (result.error) {
-        setPartnerRef(null);
-        setRefHint(result.error);
+  }, [searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydratePartnerRef() {
+      const urlRef = searchParams.get("ref")?.trim() ?? null;
+      let stored: string | null = null;
+      try {
+        const raw = window.localStorage.getItem(PARTNER_REF_STORAGE_KEY);
+        if (raw) {
+          const validated = validatePartnerUsername(raw);
+          stored = validated.ok ? validated.username : null;
+        }
+      } catch {
+        /* ignore */
+      }
+
+      const candidate = urlRef || stored;
+      if (candidate) {
+        const result = await rememberPartnerReferral(candidate);
+        if (cancelled) return;
+        if (result.error) {
+          // Only show error when they landed with an explicit bad ?ref=
+          if (urlRef) {
+            setPartnerRef(null);
+            setRefHint(result.error);
+          } else {
+            // Stale localStorage — clear and fall through to cookie
+            try {
+              window.localStorage.removeItem(PARTNER_REF_STORAGE_KEY);
+            } catch {
+              /* ignore */
+            }
+            const remembered = await getRememberedPartnerReferral();
+            if (!cancelled && remembered) {
+              setPartnerRef(remembered);
+              setRefHint(null);
+            }
+          }
+          return;
+        }
+        const username = result.username ?? candidate.toLowerCase();
+        try {
+          window.localStorage.setItem(PARTNER_REF_STORAGE_KEY, username);
+        } catch {
+          /* ignore */
+        }
+        setPartnerRef(username);
+        setRefHint(null);
         return;
       }
-      setPartnerRef(result.username ?? ref.toLowerCase());
-      setRefHint(null);
-    })();
+
+      const remembered = await getRememberedPartnerReferral();
+      if (cancelled) return;
+      if (remembered) {
+        try {
+          window.localStorage.setItem(PARTNER_REF_STORAGE_KEY, remembered);
+        } catch {
+          /* ignore */
+        }
+        setPartnerRef(remembered);
+        setRefHint(null);
+      }
+    }
+
+    void hydratePartnerRef();
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams]);
 
   useEffect(() => {

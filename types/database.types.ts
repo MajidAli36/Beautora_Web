@@ -1588,6 +1588,7 @@ export type Database = {
           shop_name: string;
           slug: string;
           bio: string | null;
+          phone: string | null;
           payout_notes: string | null;
           status: "pending" | "approved" | "suspended";
           created_at: string;
@@ -1600,6 +1601,7 @@ export type Database = {
           shop_name: string;
           slug: string;
           bio?: string | null;
+          phone?: string | null;
           payout_notes?: string | null;
           status?: "pending" | "approved" | "suspended";
           created_at?: string;

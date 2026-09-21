@@ -7,7 +7,11 @@ import { Copy, LogOut, Users, Wallet, Clock, CheckCircle2 } from "lucide-react";
 import { notify } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
-import { partnerReferralSignupPath } from "@/lib/partners/referral";
+import {
+  partnerReferralPartnerPath,
+  partnerReferralSignupPath,
+  partnerReferralSitePath,
+} from "@/lib/partners/referral";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type {
@@ -80,15 +84,19 @@ export function PartnerDashboardClient({
 }: PartnerDashboardClientProps) {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const referralUrl = useMemo(
-    () => `${origin}${partnerReferralSignupPath(partner.username)}`,
-    [origin, partner.username]
-  );
+  const links = useMemo(() => {
+    const u = partner.username;
+    return {
+      signup: `${origin}${partnerReferralSignupPath(u)}`,
+      site: `${origin}${partnerReferralSitePath(u)}`,
+      partner: `${origin}${partnerReferralPartnerPath(u)}`,
+    };
+  }, [origin, partner.username]);
 
-  async function copyLink() {
+  async function copyText(label: string, url: string) {
     try {
-      await navigator.clipboard.writeText(referralUrl);
-      notify.success("Referral link copied");
+      await navigator.clipboard.writeText(url);
+      notify.success(`${label} copied`);
     } catch {
       notify.error("Could not copy — select the link manually");
     }
@@ -206,23 +214,34 @@ export function PartnerDashboardClient({
 
         {/* Referral link */}
         <section className="space-y-3 rounded-xl border border-[#EAEAEA] bg-white p-5">
-          <h2 className="text-lg font-semibold text-[#111827]">Your referral link</h2>
+          <h2 className="text-lg font-semibold text-[#111827]">
+            Your personal referral links
+          </h2>
           <p className="text-sm text-[#6B7280]">
-            Share with salon owners. They open a store under your username — you see them below.
+            Only <span className="font-semibold text-[#111827]">@{partner.username}</span>{" "}
+            earns from these links. Each partner has a separate code — sharing someone
+            else&apos;s link credits them, not you. All three URLs below use your same code;
+            visitors are remembered for 90 days even if they browse first and sign up later.
           </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 truncate rounded-lg border border-[#EAEAEA] bg-[#FAFAFA] px-3 py-2.5 text-xs text-[#111827] sm:text-sm">
-              {partner.status === "approved" ? referralUrl : "Available after SyncOps approval"}
-            </code>
-            <Button
-              type="button"
-              size="sm"
+          <div className="space-y-3">
+            <ReferralLinkRow
+              label="Signup (best to share)"
+              url={partner.status === "approved" ? links.signup : null}
               disabled={partner.status !== "approved"}
-              onClick={copyLink}
-            >
-              <Copy className="size-4" />
-              Copy link
-            </Button>
+              onCopy={() => void copyText("Signup link", links.signup)}
+            />
+            <ReferralLinkRow
+              label="Website home (same partner)"
+              url={partner.status === "approved" ? links.site : null}
+              disabled={partner.status !== "approved"}
+              onCopy={() => void copyText("Website link", links.site)}
+            />
+            <ReferralLinkRow
+              label="Partner page (same partner)"
+              url={partner.status === "approved" ? links.partner : null}
+              disabled={partner.status !== "approved"}
+              onCopy={() => void copyText("Partner page link", links.partner)}
+            />
           </div>
         </section>
 
@@ -385,6 +404,33 @@ export function PartnerDashboardClient({
           </Link>
         </p>
       </main>
+    </div>
+  );
+}
+
+function ReferralLinkRow({
+  label,
+  url,
+  disabled,
+  onCopy,
+}: {
+  label: string;
+  url: string | null;
+  disabled: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">{label}</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <code className="min-w-0 flex-1 truncate rounded-lg border border-[#EAEAEA] bg-[#FAFAFA] px-3 py-2.5 text-xs text-[#111827] sm:text-sm">
+          {url ?? "Available after SyncOps approval"}
+        </code>
+        <Button type="button" size="sm" disabled={disabled || !url} onClick={onCopy}>
+          <Copy className="size-4" />
+          Copy
+        </Button>
+      </div>
     </div>
   );
 }

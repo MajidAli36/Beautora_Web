@@ -27,7 +27,10 @@ export type CreateOrganizationInput = {
   city: string;
   /** Required — used for directory filters and future country/city grouping. */
   country: string;
+  /** Required contact phone (stored as phone + whatsapp_phone). */
+  phone: string;
   slug?: string;
+  /** @deprecated use phone — kept for older callers */
   whatsappPhone?: string;
   bookingSlotMinutes?: number;
   bookingDaysAhead?: number;
@@ -57,6 +60,10 @@ export async function createSalonOrganization(
     country: input.country,
   });
   if (!location.ok) return { error: location.error };
+
+  const { requireContactPhone } = await import("@/lib/phone/contact");
+  const phoneResult = requireContactPhone(input.phone || input.whatsappPhone);
+  if (!phoneResult.ok) return { error: phoneResult.error };
 
   const explicitSlug = Boolean(input.slug?.trim());
   const rawBase = input.slug?.trim() || salonName;
@@ -194,7 +201,7 @@ export async function createSalonOrganization(
     }
   }
 
-  const phone = input.whatsappPhone?.trim() || null;
+  const phone = phoneResult.phone;
   const trialEndsAt = new Date();
   trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + SUBSCRIPTION.trialDays);
 
@@ -232,6 +239,7 @@ export async function createSalonOrganization(
       slug,
       city: location.city,
       country: location.country,
+      phone,
       whatsapp_phone: phone,
       booking_slot_minutes: safeSlot,
       booking_days_ahead: safeDays,
