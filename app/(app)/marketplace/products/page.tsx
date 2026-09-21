@@ -4,7 +4,7 @@ import {
   listMarketplaceCategories,
   listSellerProducts,
 } from "@/lib/marketplace/actions";
-import { SellerProductForm } from "@/components/marketplace/seller-product-form";
+import { SellerProductStudio } from "@/components/marketplace/seller-product-studio";
 import { MarketplaceProductsList } from "@/components/marketplace/seller-searchable-lists";
 import { redirect } from "next/navigation";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MarketplaceProductsPage() {
   const seller = await getMyMarketplaceSeller();
-  if (!seller) redirect("/marketplace");
+  if (!seller) redirect("/marketplace/onboarding");
 
   const [products, categories] = await Promise.all([
     listSellerProducts(),
@@ -20,13 +20,16 @@ export default async function MarketplaceProductsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-8">
       <PageHeader
         title="Marketplace products"
-        description="Catalog for Beautora Marketplace only. Does not change Salon Management POS or in-house stock."
+        description="Next-level catalog for Beautora Marketplace — multi-image gallery, product video, TikTok reel, and rich description. Does not change Salon POS stock."
       />
-      <SellerProductForm categories={categories} />
-      <MarketplaceProductsList products={products} />
+      <SellerProductStudio categories={categories} />
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Your catalog</h2>
+        <MarketplaceProductsList products={products} />
+      </div>
     </div>
   );
 }

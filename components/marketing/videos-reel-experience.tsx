@@ -334,7 +334,11 @@ const RATING_OPTIONS: { value: MarketplaceReelFilters["minRating"]; label: strin
   { value: 4.5, label: "4.5+ stars" },
 ];
 
-export function VideosReelExperience() {
+export function VideosReelExperience({
+  initialReels = MARKETPLACE_REELS,
+}: {
+  initialReels?: MarketplaceReel[];
+}) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(true);
@@ -344,12 +348,16 @@ export function VideosReelExperience() {
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
 
-  const countries = useMemo(() => listReelCountries(), []);
+  const catalog = initialReels.length > 0 ? initialReels : MARKETPLACE_REELS;
+  const countries = useMemo(() => listReelCountries(catalog), [catalog]);
   const cities = useMemo(
-    () => listReelCities(filters.country),
-    [filters.country]
+    () => listReelCities(filters.country, catalog),
+    [filters.country, catalog]
   );
-  const reels = useMemo(() => filterMarketplaceReels(filters), [filters]);
+  const reels = useMemo(
+    () => filterMarketplaceReels(filters, catalog),
+    [filters, catalog]
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");

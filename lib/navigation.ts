@@ -3,6 +3,7 @@ import {
   BarChart3,
   Calendar,
   CalendarCheck,
+  Clapperboard,
   Globe,
   LayoutDashboard,
   MessageSquare,
@@ -100,17 +101,23 @@ export const marketplaceNavGroups: NavGroup[] = [
     label: "Marketplace",
     items: [
       { title: "Dashboard", href: "/marketplace", icon: LayoutDashboard, key: "mp_dashboard" },
+      { title: "Onboarding", href: "/marketplace/onboarding", icon: Store, key: "mp_onboarding" },
       { title: "Products", href: "/marketplace/products", icon: Package, key: "mp_products" },
       { title: "Inventory", href: "/marketplace/inventory", icon: Boxes, key: "mp_inventory" },
       { title: "Orders", href: "/marketplace/orders", icon: ClipboardList, key: "mp_orders" },
       { title: "Payouts", href: "/marketplace/payouts", icon: Wallet, key: "mp_payouts" },
+      { title: "Analytics", href: "/marketplace/analytics", icon: BarChart3, key: "mp_analytics" },
       { title: "Reviews", href: "/marketplace/reviews", icon: Star, key: "mp_reviews" },
-      { title: "Shop settings", href: "/marketplace/settings", icon: Store, key: "mp_settings" },
+      { title: "Account settings", href: "/marketplace/settings", icon: Settings, key: "mp_settings" },
     ],
   },
   {
     label: "Storefront",
-    items: [{ title: "Public shop", href: "/shop", icon: ShoppingBag, key: "mp_shop" }],
+    items: [
+      { title: "Public shop", href: "/shop", icon: ShoppingBag, key: "mp_shop" },
+      { title: "Discover", href: "/discover", icon: Globe, key: "mp_discover" },
+      { title: "Videos / Reels", href: "/videos", icon: Clapperboard, key: "mp_videos" },
+    ],
   },
 ];
 
@@ -139,13 +146,19 @@ export const pageTitles: Record<string, string> = {
   "/feedback": "Feedback",
   "/settings": "Settings",
   "/marketplace": "Marketplace",
+  "/marketplace/onboarding": "Marketplace onboarding",
   "/marketplace/products": "Marketplace products",
   "/marketplace/inventory": "Marketplace inventory",
   "/marketplace/orders": "Marketplace orders",
   "/marketplace/payouts": "Marketplace payouts",
+  "/marketplace/analytics": "Marketplace analytics",
   "/marketplace/reviews": "Marketplace reviews",
-  "/marketplace/settings": "Shop settings",
+  "/marketplace/settings": "Account settings",
+  "/platform/marketplace": "Marketplace admin",
   "/shop": "Marketplace Shop",
+  "/discover": "Discover",
+  "/cart": "Cart",
+  "/checkout": "Checkout",
 };
 
 export function getPageTitle(pathname: string) {

@@ -14,6 +14,7 @@ type MarketplaceProduct = {
   price: number | string;
   stock: number;
   status: string;
+  low_stock_threshold?: number | null;
 };
 
 type OrderItem = {
@@ -31,6 +32,8 @@ type MarketplaceOrderGroup = {
     buyer_phone: string;
     buyer_address: string;
     status: string;
+    payment_method?: string;
+    payment_status?: string;
   };
   items: OrderItem[];
   sellerTotal: number;
@@ -123,6 +126,9 @@ export function MarketplaceOrdersList({ orders }: { orders: MarketplaceOrderGrou
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <Badge variant="outline">{order.status}</Badge>
+                  <p className="text-xs text-muted-foreground">
+                    {order.payment_method ?? "COD"} · {order.payment_status ?? "unpaid"}
+                  </p>
                   <p className="text-sm font-semibold">{formatCurrency(sellerTotal)}</p>
                 </div>
               </CardHeader>
@@ -134,7 +140,12 @@ export function MarketplaceOrdersList({ orders }: { orders: MarketplaceOrderGrou
                     </li>
                   ))}
                 </ul>
-                <SellerOrderActions orderId={order.id} status={order.status} />
+                <SellerOrderActions
+                  orderId={order.id}
+                  status={order.status}
+                  paymentMethod={order.payment_method}
+                  paymentStatus={order.payment_status}
+                />
               </CardContent>
             </Card>
           ))}
@@ -150,26 +161,40 @@ export function MarketplaceInventoryList({ products }: { products: MarketplacePr
       items={products}
       empty={<li className="p-4 text-sm text-muted-foreground">No products.</li>}
       search={{
-        placeholder: "Search product, status…",
+        placeholder: "Search product, status, stock…",
         getText: (p) => [p.title, p.status, String(p.stock), String(p.price)].join(" "),
       }}
     >
       {(slice) => (
-        <ul className="divide-y rounded-lg border">
-          {slice.map((p) => (
-            <li
-              key={p.id}
-              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-            >
-              <div>
-                <p className="font-medium">{p.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCurrency(Number(p.price))} · status {p.status}
-                </p>
-              </div>
-              <InventoryAdjustForm productId={p.id} stock={p.stock} />
-            </li>
-          ))}
+        <ul className="divide-y rounded-xl border bg-card">
+          {slice.map((p) => {
+            const threshold = Number(p.low_stock_threshold ?? 3);
+            const stock = Number(p.stock);
+            const tone =
+              stock <= 0 ? "out" : stock <= threshold ? "low" : "ok";
+            return (
+              <li
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-4"
+              >
+                <div className="min-w-0 space-y-1">
+                  <p className="font-medium">{p.title}</p>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{formatCurrency(Number(p.price))}</span>
+                    <Badge variant="outline">{p.status}</Badge>
+                    {tone === "out" ? (
+                      <Badge variant="destructive">Out of stock</Badge>
+                    ) : tone === "low" ? (
+                      <Badge variant="warning">Low · ≤{threshold}</Badge>
+                    ) : (
+                      <Badge variant="success">Healthy</Badge>
+                    )}
+                  </div>
+                </div>
+                <InventoryAdjustForm productId={p.id} stock={stock} />
+              </li>
+            );
+          })}
         </ul>
       )}
     </PaginatedList>

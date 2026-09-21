@@ -2,17 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ShoppingBag, Star, X } from "lucide-react";
-import {
-  placeMarketplaceCodOrder,
-  submitMarketplaceReview,
-  type PublicProductCard,
-} from "@/lib/marketplace/actions";
+import { Search, ShoppingBag, X } from "lucide-react";
+import { placeMarketplaceCodOrder, type PublicProductCard } from "@/lib/marketplace/actions";
 import {
   MARKETPLACE_CART_KEY,
   cartSubtotal,
+  groupCartBySeller,
   type MarketplaceCartItem,
 } from "@/lib/marketplace/cart";
+import { formatMarketplaceMoney } from "@/lib/marketplace/pricing";
+import { MarketplaceProductCard } from "@/components/marketplace/product-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,30 +27,50 @@ import {
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/toast";
 import type { Database } from "@/types/database.types";
+import {
+  marketplaceCategoryChildren,
+  marketplaceCategoryMatchIds,
+  marketplaceCategoryParents,
+} from "@/lib/marketplace/category-tree";
 
 type Category = Database["public"]["Tables"]["marketplace_categories"]["Row"];
-
-function formatMoney(n: number) {
-  return `Rs ${n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
 
 export function MarketplaceShop({
   initialProducts,
   categories,
   isLoggedIn = false,
+  initialQuery = "",
+  initialCategory = null,
 }: {
   initialProducts: PublicProductCard[];
   categories: Category[];
   isLoggedIn?: boolean;
+  initialQuery?: string;
+  initialCategory?: string | null;
 }) {
   const router = useRouter();
-  const [q, setQ] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
+  const [q, setQ] = useState(initialQuery);
+  const [category, setCategory] = useState<string | null>(initialCategory);
   const [cart, setCart] = useState<MarketplaceCartItem[]>([]);
-  const [detail, setDetail] = useState<PublicProductCard | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  const parents = useMemo(
+    () => marketplaceCategoryParents(categories),
+    [categories]
+  );
+  const activeParent = useMemo(() => {
+    if (!category) return null;
+    const hit = categories.find((c) => c.slug === category);
+    if (!hit) return null;
+    if (!hit.parent_id) return hit;
+    return categories.find((c) => c.id === hit.parent_id) ?? null;
+  }, [categories, category]);
+  const subcategories = useMemo(
+    () => (activeParent ? marketplaceCategoryChildren(categories, activeParent.id) : []),
+    [categories, activeParent]
+  );
 
   useEffect(() => {
     try {
@@ -73,17 +92,16 @@ export function MarketplaceShop({
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
+    const matchIds = marketplaceCategoryMatchIds(categories, category);
     return initialProducts.filter((p) => {
-      if (category && p.category_id) {
-        const cat = categories.find((c) => c.id === p.category_id);
-        if (cat?.slug !== category) return false;
-      } else if (category) {
-        return false;
+      if (matchIds) {
+        if (!p.category_id || !matchIds.has(p.category_id)) return false;
       }
       if (!qq) return true;
       return (
         p.title.toLowerCase().includes(qq) ||
         (p.description ?? "").toLowerCase().includes(qq) ||
+        (p.short_description ?? "").toLowerCase().includes(qq) ||
         p.seller_name.toLowerCase().includes(qq)
       );
     });
@@ -91,54 +109,30 @@ export function MarketplaceShop({
 
   const count = cart.reduce((s, i) => s + i.quantity, 0);
   const subtotal = cartSubtotal(cart);
+  const grouped = groupCartBySeller(cart);
 
   function requireShopperLogin(action: string) {
     notify.error(`Sign in to ${action}`);
     router.push(`/login?redirect=${encodeURIComponent("/shop")}`);
   }
 
-  function addToCart(p: PublicProductCard, qty = 1) {
-    if (!isLoggedIn) {
-      requireShopperLogin("add items to your cart");
-      return;
-    }
-    const existing = cart.find((i) => i.productId === p.id);
-    const nextQty = (existing?.quantity ?? 0) + qty;
-    if (nextQty > p.stock) {
-      notify.error("Not enough stock");
-      return;
-    }
-    const item: MarketplaceCartItem = {
-      productId: p.id,
-      title: p.title,
-      price: Number(p.price),
-      quantity: nextQty,
-      imageUrl: p.image_url,
-      sellerId: p.seller_id,
-      sellerName: p.seller_name,
-      stock: p.stock,
-    };
-    const next = existing
-      ? cart.map((i) => (i.productId === p.id ? item : i))
-      : [...cart, item];
-    persist(next);
-    notify.success("Added to cart");
+  function cartKey(i: { productId: string; variantId?: string | null }) {
+    return `${i.productId}:${i.variantId ?? ""}`;
   }
 
-  function setQty(productId: string, quantity: number) {
+  function setQty(item: MarketplaceCartItem, quantity: number) {
     if (!isLoggedIn) {
       requireShopperLogin("update your cart");
       return;
     }
+    const key = cartKey(item);
     if (quantity < 1) {
-      persist(cart.filter((i) => i.productId !== productId));
+      persist(cart.filter((i) => cartKey(i) !== key));
       return;
     }
     persist(
       cart.map((i) =>
-        i.productId === productId
-          ? { ...i, quantity: Math.min(quantity, i.stock) }
-          : i
+        cartKey(i) === key ? { ...i, quantity: Math.min(quantity, i.stock) } : i
       )
     );
   }
@@ -155,7 +149,11 @@ export function MarketplaceShop({
         buyerPhone: String(fd.get("buyer_phone") ?? ""),
         buyerAddress: String(fd.get("buyer_address") ?? ""),
         buyerNotes: String(fd.get("buyer_notes") ?? ""),
-        items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        items: cart.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          variantId: i.variantId,
+        })),
       });
       if (res.error) {
         notify.error(res.error);
@@ -184,40 +182,73 @@ export function MarketplaceShop({
           <Button
             type="button"
             className="h-11 gap-2"
-            onClick={() => setCartOpen(true)}
+            onClick={() => router.push("/cart")}
           >
             <ShoppingBag className="size-4" />
             Cart{count > 0 ? ` (${count})` : ""}
           </Button>
         </div>
-        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 pb-3 sm:px-6">
-          <button
-            type="button"
-            onClick={() => setCategory(null)}
-            className={cn(
-              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold",
-              !category
-                ? "border-[var(--m-ink)] bg-[var(--m-ink)] text-[var(--m-paper)]"
-                : "border-[var(--m-line)] text-[var(--m-ink-soft)]"
-            )}
-          >
-            All
-          </button>
-          {categories.map((c) => (
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 pb-3 sm:px-6">
+          <div className="flex gap-2 overflow-x-auto">
             <button
-              key={c.id}
               type="button"
-              onClick={() => setCategory(c.slug)}
+              onClick={() => setCategory(null)}
               className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold",
-                category === c.slug
+                "shrink-0 border px-3 py-1.5 text-xs font-semibold",
+                !category
                   ? "border-[var(--m-ink)] bg-[var(--m-ink)] text-[var(--m-paper)]"
                   : "border-[var(--m-line)] text-[var(--m-ink-soft)]"
               )}
             >
-              {c.name}
+              All
             </button>
-          ))}
+            {parents.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategory(c.slug)}
+                className={cn(
+                  "shrink-0 border px-3 py-1.5 text-xs font-semibold",
+                  category === c.slug || activeParent?.id === c.id
+                    ? "border-[var(--m-ink)] bg-[var(--m-ink)] text-[var(--m-paper)]"
+                    : "border-[var(--m-line)] text-[var(--m-ink-soft)]"
+                )}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+          {subcategories.length > 0 ? (
+            <div className="flex gap-2 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setCategory(activeParent?.slug ?? null)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium",
+                  category === activeParent?.slug
+                    ? "border-[var(--m-accent)] bg-[var(--m-accent)]/10 text-[var(--m-ink)]"
+                    : "border-[var(--m-line)] text-[var(--m-muted)]"
+                )}
+              >
+                All {activeParent?.name}
+              </button>
+              {subcategories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategory(c.slug)}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium",
+                    category === c.slug
+                      ? "border-[var(--m-accent)] bg-[var(--m-accent)]/10 text-[var(--m-ink)]"
+                      : "border-[var(--m-line)] text-[var(--m-muted)]"
+                  )}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -227,82 +258,9 @@ export function MarketplaceShop({
             No products match. Sellers publish after platform approval.
           </p>
         ) : (
-          filtered.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setDetail(p)}
-              className="group flex flex-col overflow-hidden border border-[var(--m-line)] bg-[var(--m-paper)] text-left transition-shadow hover:shadow-md"
-            >
-              <div className="aspect-square bg-[var(--m-mist)]">
-                {p.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={p.image_url}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <div className="flex size-full items-center justify-center text-xs text-[var(--m-muted)]">
-                    No image
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-1 flex-col gap-1 p-3">
-                <p className="line-clamp-2 text-sm font-semibold text-[var(--m-ink)]">
-                  {p.title}
-                </p>
-                <p className="text-[11px] text-[var(--m-muted)]">{p.seller_name}</p>
-                <p className="mt-auto text-sm font-semibold text-[var(--m-ink)]">
-                  {formatMoney(Number(p.price))}
-                </p>
-              </div>
-            </button>
-          ))
+          filtered.map((p) => <MarketplaceProductCard key={p.id} product={p} />)
         )}
       </div>
-
-      <Sheet open={Boolean(detail)} onOpenChange={(o) => !o && setDetail(null)}>
-        <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl">
-          {detail ? (
-            <>
-              <div className="aspect-[4/3] bg-[var(--m-mist)]">
-                {detail.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={detail.image_url} alt="" className="size-full object-cover" />
-                ) : null}
-              </div>
-              <SheetHeader className="border-b px-5 py-4">
-                <SheetTitle className="text-xl">{detail.title}</SheetTitle>
-                <SheetDescription>
-                  {detail.seller_name}
-                  {detail.category_name ? ` · ${detail.category_name}` : ""}
-                  {detail.avg_rating != null
-                    ? ` · ${detail.avg_rating.toFixed(1)}★ (${detail.review_count})`
-                    : ""}
-                </SheetDescription>
-              </SheetHeader>
-              <div className="space-y-4 px-5 py-4">
-                <p className="text-2xl font-semibold">{formatMoney(Number(detail.price))}</p>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {detail.description || "No description."}
-                </p>
-                <p className="text-xs text-muted-foreground">In stock: {detail.stock}</p>
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    addToCart(detail);
-                    setCartOpen(true);
-                  }}
-                >
-                  Add to cart
-                </Button>
-                <ReviewForm productId={detail.id} />
-              </div>
-            </>
-          ) : null}
-        </SheetContent>
-      </Sheet>
 
       <Sheet open={cartOpen} onOpenChange={setCartOpen}>
         <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
@@ -312,43 +270,55 @@ export function MarketplaceShop({
               Cash on delivery · Beautora Marketplace — separate from salon POS
             </SheetDescription>
           </SheetHeader>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
             {cart.length === 0 ? (
               <p className="text-sm text-muted-foreground">Cart is empty.</p>
             ) : (
-              cart.map((i) => (
-                <div key={i.productId} className="flex gap-3 border-b border-border pb-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{i.title}</p>
-                    <p className="text-xs text-muted-foreground">{formatMoney(i.price)}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setQty(i.productId, i.quantity - 1)}
-                      >
-                        −
-                      </Button>
-                      <span className="text-sm">{i.quantity}</span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setQty(i.productId, i.quantity + 1)}
-                      >
-                        +
-                      </Button>
-                      <button
-                        type="button"
-                        className="ml-auto text-muted-foreground hover:text-foreground"
-                        onClick={() => setQty(i.productId, 0)}
-                        aria-label="Remove"
-                      >
-                        <X className="size-4" />
-                      </button>
+              grouped.map((group) => (
+                <div key={group.sellerId} className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--m-muted)]">
+                    {group.sellerName || "Seller"}
+                  </p>
+                  {group.items.map((i) => (
+                    <div
+                      key={cartKey(i)}
+                      className="flex gap-3 border-b border-border pb-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{i.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatMarketplaceMoney(i.price)}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setQty(i, i.quantity - 1)}
+                          >
+                            −
+                          </Button>
+                          <span className="text-sm">{i.quantity}</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setQty(i, i.quantity + 1)}
+                          >
+                            +
+                          </Button>
+                          <button
+                            type="button"
+                            className="ml-auto text-muted-foreground hover:text-foreground"
+                            onClick={() => setQty(i, 0)}
+                            aria-label="Remove"
+                          >
+                            <X className="size-4" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               ))
             )}
@@ -356,7 +326,7 @@ export function MarketplaceShop({
           <SheetFooter className="border-t bg-muted/30 p-4 sm:flex-col sm:space-y-2">
             <div className="flex w-full items-center justify-between text-sm font-semibold">
               <span>Subtotal</span>
-              <span>{formatMoney(subtotal)}</span>
+              <span>{formatMarketplaceMoney(subtotal)}</span>
             </div>
             <Button
               className="w-full"
@@ -377,7 +347,7 @@ export function MarketplaceShop({
           <SheetHeader className="border-b px-5 py-4">
             <SheetTitle>Place COD order</SheetTitle>
             <SheetDescription>
-              Pay when your order is delivered. Total {formatMoney(subtotal)}.
+              Pay when your order is delivered. Total {formatMarketplaceMoney(subtotal)}.
             </SheetDescription>
           </SheetHeader>
           <form
@@ -410,47 +380,5 @@ export function MarketplaceShop({
         </SheetContent>
       </Sheet>
     </div>
-  );
-}
-
-function ReviewForm({ productId }: { productId: string }) {
-  const [pending, startTransition] = useTransition();
-  return (
-    <form
-      className="space-y-3 rounded-xl border border-border p-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const fd = new FormData(e.currentTarget);
-        fd.set("product_id", productId);
-        startTransition(async () => {
-          const res = await submitMarketplaceReview(fd);
-          if (res.error) notify.error(res.error);
-          else {
-            notify.success("Review submitted");
-            e.currentTarget.reset();
-          }
-        });
-      }}
-    >
-      <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        <Star className="size-3.5" /> Leave a review
-      </p>
-      <Input name="reviewer_name" placeholder="Your name" required />
-      <select
-        name="rating"
-        defaultValue="5"
-        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-      >
-        {[5, 4, 3, 2, 1].map((n) => (
-          <option key={n} value={n}>
-            {n} stars
-          </option>
-        ))}
-      </select>
-      <Textarea name="comment" rows={2} placeholder="Optional comment" />
-      <Button type="submit" size="sm" variant="outline" disabled={pending}>
-        Submit review
-      </Button>
-    </form>
   );
 }

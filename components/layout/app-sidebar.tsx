@@ -68,6 +68,7 @@ export function AppSidebar({
   const showSettingsLink =
     !isMarketplace &&
     navGroups.some((g) => g.items.some((item) => item.href === "/settings"));
+  const showMarketplaceAccountLink = isMarketplace;
   const myWorkActive = Boolean(
     !isMarketplace &&
       myStaffHref &&
@@ -107,9 +108,9 @@ export function AppSidebar({
                 <Link href="/settings">Workspace settings</Link>
               </DropdownMenuItem>
             )}
-            {isMarketplace && (
+            {showMarketplaceAccountLink && (
               <DropdownMenuItem>
-                <Link href="/marketplace/settings">Shop settings</Link>
+                <Link href="/marketplace/settings">Account settings</Link>
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

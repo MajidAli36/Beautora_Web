@@ -48,6 +48,14 @@ export default async function PlatformAdminPage() {
         adminEmail={user.email ?? ""}
       />
       <div className="mx-auto max-w-5xl px-4 pb-12 sm:px-6">
+        <p className="mb-4 text-sm">
+          <a
+            href="/platform/marketplace"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Open full Marketplace admin →
+          </a>
+        </p>
         <PlatformMarketplacePanel
           sellers={mpSellers}
           products={mpProducts}

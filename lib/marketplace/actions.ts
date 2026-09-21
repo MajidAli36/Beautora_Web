@@ -8,11 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, tryCreateAdminClient } from "@/lib/supabase/admin";
 import {
   APP_MODE_COOKIE,
-  MARKETPLACE_COMMISSION_RATE,
   slugify,
   type AppMode,
   type MarketplaceOrderStatus,
 } from "@/lib/marketplace/constants";
+import { resolveCommissionRate } from "@/lib/marketplace/commission";
 import type { ActionResult } from "@/types/commerce";
 import type { Database } from "@/types/database.types";
 
@@ -156,14 +156,23 @@ export async function upsertSellerProduct(
   const id = String(formData.get("id") ?? "").trim() || null;
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
+  const shortDescription = String(formData.get("short_description") ?? "").trim() || null;
   const categoryId = String(formData.get("category_id") ?? "").trim() || null;
+  const brandId = String(formData.get("brand_id") ?? "").trim() || null;
   const price = Number(formData.get("price") ?? 0);
+  const salePriceRaw = String(formData.get("sale_price") ?? "").trim();
+  const salePrice = salePriceRaw ? Number(salePriceRaw) : null;
   const stock = Math.max(0, Math.floor(Number(formData.get("stock") ?? 0)));
   const imageUrl = String(formData.get("image_url") ?? "").trim() || null;
+  const sku = String(formData.get("sku") ?? "").trim() || null;
+  const barcode = String(formData.get("barcode") ?? "").trim() || null;
+  const seoTitle = String(formData.get("seo_title") ?? "").trim() || null;
+  const seoDescription = String(formData.get("seo_description") ?? "").trim() || null;
   const submitForReview = String(formData.get("submit_for_review") ?? "") === "1";
 
   if (title.length < 2) return { error: "Title is required." };
   if (!(price >= 0)) return { error: "Invalid price." };
+  if (salePrice != null && !(salePrice >= 0)) return { error: "Invalid sale price." };
 
   const slug = slugify(title);
   const supabase = await createClient();
@@ -174,10 +183,17 @@ export async function upsertSellerProduct(
       title,
       slug,
       description,
+      short_description: shortDescription,
       category_id: categoryId,
+      brand_id: brandId,
       price,
+      sale_price: salePrice,
       stock,
       image_url: imageUrl,
+      sku,
+      barcode,
+      seo_title: seoTitle,
+      seo_description: seoDescription,
       updated_at: new Date().toISOString(),
     };
     if (submitForReview) patch.status = "pending";
@@ -193,10 +209,17 @@ export async function upsertSellerProduct(
       title,
       slug,
       description,
+      short_description: shortDescription,
       category_id: categoryId,
+      brand_id: brandId,
       price,
+      sale_price: salePrice,
       stock,
       image_url: imageUrl,
+      sku,
+      barcode,
+      seo_title: seoTitle,
+      seo_description: seoDescription,
       status,
     });
     if (error) return { error: error.message };
@@ -249,20 +272,40 @@ export async function listPublicMarketplaceProducts(opts?: {
     .order("updated_at", { ascending: false })
     .limit(100);
 
-  if (opts?.category) {
-    query = query.eq("marketplace_categories.slug", opts.category);
-  }
-
   const { data, error } = await query;
   if (error || !data) return [];
 
   const q = (opts?.q ?? "").trim().toLowerCase();
-  const rows = (data as unknown as Array<
+  let rows = data as unknown as Array<
     ProductRow & {
       marketplace_sellers: { shop_name: string; slug: string; status: string };
-      marketplace_categories: { name: string; slug: string } | null;
+      marketplace_categories: { name: string; slug: string; parent_id?: string | null } | null;
     }
-  >).filter((p) => {
+  >;
+
+  if (opts?.category) {
+    const { data: cats } = await admin
+      .from("marketplace_categories")
+      .select("id, slug, parent_id")
+      .eq("is_active", true);
+    const allCats = (cats ?? []) as Array<{
+      id: string;
+      slug: string;
+      parent_id: string | null;
+    }>;
+    const match = allCats.find((c) => c.slug === opts.category);
+    if (match) {
+      const ids = new Set<string>([match.id]);
+      for (const c of allCats) {
+        if (c.parent_id === match.id) ids.add(c.id);
+      }
+      rows = rows.filter((p) => p.category_id && ids.has(p.category_id));
+    } else {
+      rows = [];
+    }
+  }
+
+  rows = rows.filter((p) => {
     if (!q) return true;
     return (
       p.title.toLowerCase().includes(q) ||
@@ -347,14 +390,22 @@ export async function placeMarketplaceCodOrder(input: {
   buyerPhone: string;
   buyerAddress: string;
   buyerNotes?: string;
-  items: { productId: string; quantity: number }[];
+  addressId?: string;
+  buyerEmail?: string;
+  paymentMethod?: "COD" | "CARD";
+  items: { productId: string; quantity: number; variantId?: string | null }[];
 }): Promise<ActionResult & { orderNumber?: string }> {
+  let buyerUserId: string | null = null;
+  let buyerEmail: string | null = input.buyerEmail?.trim() || null;
   try {
-    await requireAuth();
+    const user = await requireAuth();
+    buyerUserId = user.id;
+    if (!buyerEmail) buyerEmail = user.email ?? null;
   } catch {
     return { error: "Sign in to place a Marketplace order." };
   }
 
+  const paymentMethod = input.paymentMethod === "CARD" ? "CARD" : "COD";
   const name = input.buyerName.trim();
   const phone = input.buyerPhone.trim();
   const address = input.buyerAddress.trim();
@@ -362,14 +413,24 @@ export async function placeMarketplaceCodOrder(input: {
   if (phone.length < 7) return { error: "Phone is required." };
   if (address.length < 5) return { error: "Address is required." };
   if (!input.items.length) return { error: "Cart is empty." };
+  if (paymentMethod === "CARD" && !buyerEmail) {
+    return { error: "Email is required for card payments (invoice delivery)." };
+  }
 
   const admin = tryCreateAdminClient();
   if (!admin) return { error: "Checkout unavailable right now." };
 
-  const productIds = input.items.map((i) => i.productId);
+  const { isMarketplaceEnabled } = await import("@/lib/marketplace/settings");
+  if (!(await isMarketplaceEnabled())) {
+    return { error: "Marketplace checkout is temporarily unavailable." };
+  }
+
+  const productIds = [...new Set(input.items.map((i) => i.productId))];
   const { data: products } = await admin
     .from("marketplace_products")
-    .select("id, title, price, stock, seller_id, status, marketplace_sellers!inner(status)")
+    .select(
+      "id, title, price, sale_price, stock, seller_id, status, marketplace_sellers!inner(status)"
+    )
     .in("id", productIds);
 
   if (!products?.length) return { error: "Products not found." };
@@ -378,12 +439,28 @@ export async function placeMarketplaceCodOrder(input: {
     id: string;
     title: string;
     price: number;
+    sale_price: number | null;
     stock: number;
     seller_id: string;
     status: string;
     marketplace_sellers: { status: string };
   };
   const byId = new Map((products as unknown as P[]).map((p) => [p.id, p]));
+
+  const variantIds = [
+    ...new Set(input.items.map((i) => i.variantId).filter(Boolean)),
+  ] as string[];
+  const variantById = new Map<
+    string,
+    { id: string; product_id: string; name: string; price: number; sale_price: number | null; stock: number; is_active: boolean }
+  >();
+  if (variantIds.length) {
+    const { data: variants } = await admin
+      .from("marketplace_product_variants")
+      .select("id, product_id, name, price, sale_price, stock, is_active")
+      .in("id", variantIds);
+    for (const v of variants ?? []) variantById.set(v.id, v);
+  }
 
   const lines: {
     product_id: string;
@@ -392,6 +469,9 @@ export async function placeMarketplaceCodOrder(input: {
     unit_price: number;
     quantity: number;
     line_total: number;
+    variant_id: string | null;
+    variant_name: string | null;
+    fulfillment_status: "placed";
   }[] = [];
 
   let subtotal = 0;
@@ -400,25 +480,51 @@ export async function placeMarketplaceCodOrder(input: {
     if (!p || p.status !== "published" || p.marketplace_sellers.status !== "approved") {
       return { error: "One or more products are unavailable." };
     }
-    if (item.quantity < 1 || item.quantity > p.stock) {
-      return { error: `Insufficient stock for ${p.title}.` };
+
+    let unitPrice = Number(p.sale_price ?? p.price);
+    let stock = p.stock;
+    let variantId: string | null = null;
+    let variantName: string | null = null;
+    let title = p.title;
+
+    if (item.variantId) {
+      const v = variantById.get(item.variantId);
+      if (!v || v.product_id !== p.id || !v.is_active) {
+        return { error: `Variant unavailable for ${p.title}.` };
+      }
+      unitPrice = Number(v.sale_price ?? v.price);
+      stock = v.stock;
+      variantId = v.id;
+      variantName = v.name;
+      title = `${p.title} (${v.name})`;
     }
-    const lineTotal = Number(p.price) * item.quantity;
+
+    if (item.quantity < 1 || item.quantity > stock) {
+      return { error: `Insufficient stock for ${title}.` };
+    }
+    const lineTotal = unitPrice * item.quantity;
     subtotal += lineTotal;
     lines.push({
       product_id: p.id,
       seller_id: p.seller_id,
-      product_title: p.title,
-      unit_price: Number(p.price),
+      product_title: title,
+      unit_price: unitPrice,
       quantity: item.quantity,
       line_total: lineTotal,
+      variant_id: variantId,
+      variant_name: variantName,
+      fulfillment_status: "placed",
     });
   }
 
   const { data: orderNumData } = await admin.rpc("next_marketplace_order_number");
   const orderNumber =
-    (typeof orderNumData === "string" && orderNumData) ||
-    `MP-${Date.now()}`;
+    (typeof orderNumData === "string" && orderNumData) || `MP-${Date.now()}`;
+  const idempotencyKey = `${paymentMethod.toLowerCase()}:${buyerUserId}:${orderNumber}`;
+
+  const { getPaymentProvider } = await import("@/lib/marketplace/payments");
+  const payment = getPaymentProvider(paymentMethod === "CARD" ? "card" : "cod");
+  const paymentStatus = paymentMethod === "CARD" ? "pending" : "unpaid";
 
   const { data: order, error: orderErr } = await admin
     .from("marketplace_orders")
@@ -428,8 +534,13 @@ export async function placeMarketplaceCodOrder(input: {
       buyer_phone: phone,
       buyer_address: address,
       buyer_notes: input.buyerNotes?.trim() || null,
+      buyer_user_id: buyerUserId,
       status: "placed",
-      payment_method: "COD",
+      payment_method: paymentMethod,
+      payment_status: paymentStatus,
+      payment_provider: payment.name,
+      idempotency_key: idempotencyKey,
+      currency: "PKR",
       subtotal,
       total: subtotal,
     })
@@ -438,22 +549,198 @@ export async function placeMarketplaceCodOrder(input: {
 
   if (orderErr || !order) return { error: orderErr?.message ?? "Could not create order." };
 
+  // Per-seller sub-orders
+  const bySeller = new Map<string, typeof lines>();
+  for (const l of lines) {
+    const cur = bySeller.get(l.seller_id) ?? [];
+    cur.push(l);
+    bySeller.set(l.seller_id, cur);
+  }
+
+  const sellerOrderIdBySeller = new Map<string, string>();
+  for (const [sellerId, sellerLines] of bySeller) {
+    const sellerSubtotal = sellerLines.reduce((s, l) => s + l.line_total, 0);
+    const { data: sellerOrder, error: soErr } = await admin
+      .from("marketplace_seller_orders")
+      .insert({
+        order_id: order.id,
+        seller_id: sellerId,
+        status: "placed",
+        subtotal: sellerSubtotal,
+        shipping_fee: 0,
+        total: sellerSubtotal,
+      })
+      .select("id")
+      .single();
+    if (soErr || !sellerOrder) return { error: soErr?.message ?? "Could not create seller order." };
+    sellerOrderIdBySeller.set(sellerId, sellerOrder.id);
+  }
+
   const { error: itemsErr } = await admin.from("marketplace_order_items").insert(
-    lines.map((l) => ({ ...l, order_id: order.id }))
+    lines.map((l) => ({
+      ...l,
+      order_id: order.id,
+      seller_order_id: sellerOrderIdBySeller.get(l.seller_id) ?? null,
+    }))
   );
   if (itemsErr) return { error: itemsErr.message };
 
-  for (const l of lines) {
-    const p = byId.get(l.product_id)!;
-    await admin
-      .from("marketplace_products")
-      .update({ stock: p.stock - l.quantity, updated_at: new Date().toISOString() })
-      .eq("id", l.product_id);
+  // Persist COD payment intent (architecture hook; no capture)
+  const intent = await payment.createPayment({
+    orderId: order.id,
+    amount: subtotal,
+    currency: "PKR",
+    idempotencyKey,
+  });
+  try {
+    await admin.from("marketplace_payment_intents").insert({
+      order_id: order.id,
+      provider: intent.provider,
+      provider_ref: intent.providerRef ?? null,
+      amount: intent.amount,
+      currency: intent.currency,
+      status: intent.status,
+      idempotency_key: idempotencyKey,
+    });
+  } catch {
+    // Phase 2 table may be pending apply — order still succeeds
   }
 
+  for (const l of lines) {
+    if (l.variant_id) {
+      const v = variantById.get(l.variant_id)!;
+      await admin
+        .from("marketplace_product_variants")
+        .update({ stock: v.stock - l.quantity, updated_at: new Date().toISOString() })
+        .eq("id", l.variant_id);
+    } else {
+      const p = byId.get(l.product_id)!;
+      await admin
+        .from("marketplace_products")
+        .update({ stock: p.stock - l.quantity, updated_at: new Date().toISOString() })
+        .eq("id", l.product_id);
+    }
+  }
+
+  try {
+    const { trackMarketplaceEvent } = await import("@/lib/marketplace/analytics");
+    for (const [sellerId] of bySeller) {
+      await trackMarketplaceEvent({
+        eventType: "purchase",
+        sellerId,
+        meta: { orderId: order.id, orderNumber: order.order_number, paymentMethod },
+      });
+    }
+  } catch {
+    // analytics best-effort
+  }
+
+  if (buyerEmail) {
+    try {
+      const { notifyMarketplaceOrderInvoice } = await import("@/lib/email/notify");
+      await notifyMarketplaceOrderInvoice({
+        to: buyerEmail,
+        buyerName: name,
+        orderNumber: order.order_number,
+        total: subtotal,
+        paymentMethod,
+        paymentStatus,
+        lines: lines.map((l) => ({
+          title: l.product_title,
+          quantity: l.quantity,
+          lineTotal: l.line_total,
+        })),
+      });
+    } catch {
+      // never fail checkout on email
+    }
+  }
+
+  void input.addressId;
   revalidatePath("/shop");
+  revalidatePath("/cart");
+  revalidatePath("/checkout");
   revalidatePath("/marketplace/orders");
+  revalidatePath("/account");
   return { success: true, orderNumber: order.order_number };
+}
+
+/** Mark card/online payment as paid and email payment receipt + invoice care. */
+export async function markMarketplaceOrderPaid(
+  orderId: string
+): Promise<ActionResult> {
+  const seller = await getMyMarketplaceSeller();
+  if (!seller) return { error: "Not a seller." };
+  const admin = createAdminClient();
+
+  const { data: mine } = await admin
+    .from("marketplace_order_items")
+    .select("id")
+    .eq("order_id", orderId)
+    .eq("seller_id", seller.id)
+    .limit(1);
+  if (!mine?.length) return { error: "Order not found." };
+
+  const { data: order } = await admin
+    .from("marketplace_orders")
+    .select("*")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return { error: "Order not found." };
+  if (order.payment_status === "paid") return { success: true, message: "Already paid." };
+
+  const { error } = await admin
+    .from("marketplace_orders")
+    .update({
+      payment_status: "paid",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId);
+  if (error) return { error: error.message };
+
+  await admin
+    .from("marketplace_payment_intents")
+    .update({ status: "succeeded", updated_at: new Date().toISOString() })
+    .eq("order_id", orderId);
+
+  if (order.buyer_user_id) {
+    try {
+      const { data: userData } = await admin.auth.admin.getUserById(order.buyer_user_id);
+      const email = userData.user?.email;
+      if (email) {
+        const { notifyMarketplacePaymentReceipt, notifyMarketplaceOrderInvoice } =
+          await import("@/lib/email/notify");
+        const { data: items } = await admin
+          .from("marketplace_order_items")
+          .select("product_title, quantity, line_total")
+          .eq("order_id", orderId);
+        await notifyMarketplacePaymentReceipt({
+          to: email,
+          buyerName: order.buyer_name,
+          orderNumber: order.order_number,
+          total: Number(order.total),
+        });
+        await notifyMarketplaceOrderInvoice({
+          to: email,
+          buyerName: order.buyer_name,
+          orderNumber: order.order_number,
+          total: Number(order.total),
+          paymentMethod: order.payment_method,
+          paymentStatus: "paid",
+          lines: (items ?? []).map((l) => ({
+            title: l.product_title,
+            quantity: l.quantity,
+            lineTotal: Number(l.line_total),
+          })),
+        });
+      }
+    } catch {
+      /* email best-effort */
+    }
+  }
+
+  revalidatePath("/marketplace/orders");
+  return { success: true, message: "Payment marked paid — invoice emailed." };
 }
 
 export async function listSellerOrders() {
@@ -509,6 +796,24 @@ export async function updateSellerOrderStatus(
   if (!seller) return { error: "Not a seller." };
 
   const admin = createAdminClient();
+
+  // Prefer per-seller sub-order when Phase 2 tables are present
+  const { data: sub } = await admin
+    .from("marketplace_seller_orders")
+    .select("id")
+    .eq("order_id", orderId)
+    .eq("seller_id", seller.id)
+    .maybeSingle();
+
+  if (sub) {
+    const { updateSellerSubOrderStatus } = await import("@/lib/marketplace/fulfillment");
+    const mapped =
+      status === "shipped" || status === "delivered" || status === "confirmed" || status === "cancelled" || status === "placed"
+        ? status
+        : "confirmed";
+    return updateSellerSubOrderStatus(sub.id, mapped);
+  }
+
   const { data: mine } = await admin
     .from("marketplace_order_items")
     .select("id")
@@ -543,25 +848,60 @@ async function ensureCommissionsForOrder(orderId: string) {
   const admin = createAdminClient();
   const { data: items } = await admin
     .from("marketplace_order_items")
-    .select("seller_id, line_total")
+    .select("seller_id, line_total, product_id")
     .eq("order_id", orderId);
   if (!items?.length) return;
 
-  const bySeller = new Map<string, number>();
-  for (const i of items) {
-    bySeller.set(i.seller_id, (bySeller.get(i.seller_id) ?? 0) + Number(i.line_total));
+  const productIds = [...new Set(items.map((i) => i.product_id).filter(Boolean))] as string[];
+  const categoryByProduct = new Map<string, string | null>();
+  if (productIds.length) {
+    const { data: products } = await admin
+      .from("marketplace_products")
+      .select("id, category_id")
+      .in("id", productIds);
+    for (const p of products ?? []) {
+      categoryByProduct.set(p.id, p.category_id);
+    }
   }
 
-  for (const [sellerId, gross] of bySeller) {
-    const commission = Math.round(gross * MARKETPLACE_COMMISSION_RATE * 100) / 100;
+  type Acc = { gross: number; rate: number; ruleScope: string };
+  const bySeller = new Map<string, Acc>();
+
+  for (const i of items) {
+    const { rate, ruleScope } = await resolveCommissionRate({
+      productId: i.product_id,
+      sellerId: i.seller_id,
+      categoryId: i.product_id ? categoryByProduct.get(i.product_id) ?? null : null,
+    });
+    const prev = bySeller.get(i.seller_id);
+    if (!prev) {
+      bySeller.set(i.seller_id, { gross: Number(i.line_total), rate, ruleScope });
+    } else {
+      // Weighted average rate across lines for this seller on the order
+      const nextGross = prev.gross + Number(i.line_total);
+      const weighted =
+        nextGross > 0
+          ? (prev.rate * prev.gross + rate * Number(i.line_total)) / nextGross
+          : rate;
+      bySeller.set(i.seller_id, {
+        gross: nextGross,
+        rate: weighted,
+        ruleScope: prev.ruleScope === ruleScope ? ruleScope : "settings",
+      });
+    }
+  }
+
+  for (const [sellerId, { gross, rate, ruleScope }] of bySeller) {
+    const commission = Math.round(gross * rate * 100) / 100;
     await admin.from("marketplace_commissions").upsert(
       {
         order_id: orderId,
         seller_id: sellerId,
         gross_amount: gross,
-        rate: MARKETPLACE_COMMISSION_RATE,
+        rate,
         commission_amount: commission,
         payout_status: "owed",
+        rule_scope: ruleScope,
       },
       { onConflict: "order_id,seller_id" }
     );

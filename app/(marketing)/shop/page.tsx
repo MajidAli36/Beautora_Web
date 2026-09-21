@@ -24,13 +24,18 @@ export const metadata: Metadata = buildPageMetadata({
   ],
 });
 
-export default async function ShopPage() {
+export default async function ShopPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string }>;
+}) {
+  const { q, category } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   const [products, categories] = await Promise.all([
-    listPublicMarketplaceProducts(),
+    listPublicMarketplaceProducts({ q: q?.trim() || undefined, category }),
     listMarketplaceCategories(),
   ]);
 
@@ -51,8 +56,16 @@ export default async function ShopPage() {
             Marketplace Shop
           </h1>
           <p className="mt-3 max-w-xl text-base text-[var(--m-muted)]">
-            Discover products from Beautora sellers. Sign in as a shopper to add to cart and place
-            COD orders.
+            Discover products from Beautora sellers. Open a product for details, variants, and COD
+            checkout.
+          </p>
+          <p className="mt-4 text-sm">
+            <Link
+              href="/discover"
+              className="font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline"
+            >
+              Discover salons &amp; shops
+            </Link>
           </p>
           {!user ? (
             <p className="mt-4 text-sm text-[var(--m-ink-soft)]">
@@ -82,6 +95,8 @@ export default async function ShopPage() {
         initialProducts={products}
         categories={categories}
         isLoggedIn={Boolean(user)}
+        initialQuery={q ?? ""}
+        initialCategory={category ?? null}
       />
     </div>
   );

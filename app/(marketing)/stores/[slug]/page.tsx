@@ -3,6 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublicStoreBySlug } from "@/lib/actions/stores";
+import { getPublicSalonMarketplaceStore } from "@/lib/marketplace/buyer";
+import {
+  listPublicMarketplaceProducts,
+  type PublicProductCard,
+} from "@/lib/marketplace/actions";
+import { MarketplaceProductCard } from "@/components/marketplace/product-card";
 import { formatCurrency, formatDuration } from "@/lib/format";
 import { resolveStorePublicContact } from "@/lib/marketing/store-contact";
 import { buildPageMetadata } from "@/lib/seo/site";
@@ -51,6 +57,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const { slug } = await params;
   const store = await getPublicStoreBySlug(slug);
   if (!store) notFound();
+
+  const marketplace = await getPublicSalonMarketplaceStore(slug);
+  let marketplaceCards: PublicProductCard[] = [];
+  if (marketplace?.seller) {
+    const all = await listPublicMarketplaceProducts();
+    marketplaceCards = all.filter((p) => p.seller_id === marketplace.seller!.id);
+  }
 
   // Store phone / WhatsApp only — never platform SyncOps support number.
   const contact = resolveStorePublicContact({
@@ -134,9 +147,39 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             >
               View menu
             </Link>
+            {marketplaceCards.length > 0 ? (
+              <Link
+                href="#marketplace"
+                className="inline-flex h-12 items-center border border-white/35 px-7 text-sm font-medium tracking-wide text-white transition-colors hover:border-white hover:bg-white/10"
+              >
+                Shop products
+              </Link>
+            ) : null}
           </div>
         </div>
       </section>
+
+      <nav className="sticky top-[var(--m-chrome)] z-10 border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl gap-6 overflow-x-auto px-6 py-3 text-sm font-medium">
+          <a href="#menu" className="shrink-0 text-[var(--m-ink)] hover:text-[var(--m-accent)]">
+            Services
+          </a>
+          {marketplaceCards.length > 0 ? (
+            <a
+              href="#marketplace"
+              className="shrink-0 text-[var(--m-ink-soft)] hover:text-[var(--m-accent)]"
+            >
+              Marketplace
+            </a>
+          ) : null}
+          <a href="#team" className="shrink-0 text-[var(--m-ink-soft)] hover:text-[var(--m-accent)]">
+            Team
+          </a>
+          <a href="#visit" className="shrink-0 text-[var(--m-ink-soft)] hover:text-[var(--m-accent)]">
+            Visit
+          </a>
+        </div>
+      </nav>
 
       <section className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
         <div className="mx-auto grid max-w-6xl gap-8 px-6 py-10 sm:grid-cols-3">
@@ -158,7 +201,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         </div>
       </section>
 
-      <section id="menu" className="scroll-mt-24 py-20 sm:py-24">
+      <section id="menu" className="scroll-mt-28 py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
@@ -207,7 +250,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               {store.products.length > 0 ? (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-muted)]">
-                    Products
+                    In-salon retail
                   </h3>
                   <ul className="mt-5 divide-y divide-[var(--m-line)] border-y border-[var(--m-line)]">
                     {store.products.map((product) => (
@@ -238,7 +281,43 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         </div>
       </section>
 
-      <section className="bg-[var(--m-mist)] py-20 sm:py-24">
+      {marketplaceCards.length > 0 ? (
+        <section
+          id="marketplace"
+          className="scroll-mt-28 border-y border-[var(--m-line)] bg-[var(--m-mist)] py-20 sm:py-24"
+        >
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="max-w-xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
+                  Marketplace
+                </p>
+                <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)]">
+                  Shop from this salon
+                </h2>
+                <p className="mt-4 text-lg text-[var(--m-muted)]">
+                  Products listed on Beautora Marketplace — order online with cash on delivery.
+                </p>
+              </div>
+              {marketplace?.seller ? (
+                <Link
+                  href={`/shop/seller/${marketplace.seller.slug}`}
+                  className="text-sm font-medium text-[var(--m-accent)] underline-offset-4 hover:underline"
+                >
+                  View seller store →
+                </Link>
+              ) : null}
+            </div>
+            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {marketplaceCards.map((p) => (
+                <MarketplaceProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section id="team" className="scroll-mt-28 bg-[var(--m-mist)] py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
@@ -283,7 +362,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         </div>
       </section>
 
-      <section className="py-20 sm:py-24">
+      <section id="visit" className="scroll-mt-28 py-20 sm:py-24">
         <div className="mx-auto grid max-w-6xl gap-12 px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">

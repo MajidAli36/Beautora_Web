@@ -9,6 +9,8 @@ export const EmailType = {
   SubscriptionDeactivated: "subscription_deactivated",
   PlatformPaymentSubmitted: "platform_payment_submitted",
   TeamInvite: "team_invite",
+  MarketplaceOrderInvoice: "marketplace_order_invoice",
+  MarketplacePaymentReceipt: "marketplace_payment_receipt",
 } as const;
 
 export type EmailType = (typeof EmailType)[keyof typeof EmailType];

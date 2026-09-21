@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 import { listPublicStores, listPublicStoreCities } from "@/lib/actions/stores";
+import { listPublicMarketplaceProducts } from "@/lib/marketplace/actions";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getAllBlogSlugs } from "@/lib/seo/content/blog";
 import { getPublishedMarketSlugs } from "@/lib/seo/content/markets";
 import { getAllSeoPillarPaths } from "@/lib/seo/content/registry";
@@ -16,6 +18,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteUrl("/features"), lastModified: now, changeFrequency: "monthly", priority: 0.85 },
     { url: absoluteUrl("/how-it-works"), lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: absoluteUrl("/stores"), lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    { url: absoluteUrl("/discover"), lastModified: now, changeFrequency: "daily", priority: 0.88 },
     { url: absoluteUrl("/shop"), lastModified: now, changeFrequency: "daily", priority: 0.85 },
     { url: absoluteUrl("/videos"), lastModified: now, changeFrequency: "weekly", priority: 0.7 },
     { url: absoluteUrl("/book"), lastModified: now, changeFrequency: "weekly", priority: 0.75 },
@@ -88,6 +91,34 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Static routes still ship
   }
 
+  let productRoutes: MetadataRoute.Sitemap = [];
+  let sellerRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const products = await listPublicMarketplaceProducts();
+    productRoutes = products.slice(0, 500).map((p) => ({
+      url: absoluteUrl(`/product/${p.id}`),
+      lastModified: new Date(p.updated_at),
+      changeFrequency: "weekly" as const,
+      priority: 0.65,
+    }));
+    const admin = tryCreateAdminClient();
+    if (admin) {
+      const { data: sellers } = await admin
+        .from("marketplace_sellers")
+        .select("slug, updated_at")
+        .eq("status", "approved")
+        .limit(200);
+      sellerRoutes = (sellers ?? []).map((s) => ({
+        url: absoluteUrl(`/shop/seller/${s.slug}`),
+        lastModified: new Date(s.updated_at),
+        changeFrequency: "weekly" as const,
+        priority: 0.65,
+      }));
+    }
+  } catch {
+    // marketplace tables may be pending migration
+  }
+
   return [
     ...staticRoutes,
     ...pillarRoutes,
@@ -95,5 +126,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...blogRoutes,
     ...cityRoutes,
     ...storeRoutes,
+    ...productRoutes,
+    ...sellerRoutes,
   ];
 }

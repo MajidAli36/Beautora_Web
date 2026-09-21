@@ -278,3 +278,62 @@ export function platformPaymentSubmittedEmail(input: {
     }),
   };
 }
+
+export function marketplaceOrderInvoiceEmail(input: {
+  buyerName: string;
+  orderNumber: string;
+  totalLabel: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  linesHtml: string;
+  shopUrl: string;
+}) {
+  const name = escapeHtml(input.buyerName || "there");
+  return {
+    subject: `Beautora Marketplace invoice · ${input.orderNumber}`,
+    ...renderEmailLayout({
+      preheader: `Invoice for order ${input.orderNumber} · ${input.totalLabel}`,
+      title: "Your marketplace invoice",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Hi ${name},</p>
+        <p style="margin:0 0 12px;">Thanks for shopping on <strong>Beautora Marketplace</strong>. Here is your invoice.</p>
+        <ul style="margin:0 0 12px;padding-left:18px;">
+          <li>Order: <strong>${escapeHtml(input.orderNumber)}</strong></li>
+          <li>Payment: ${escapeHtml(input.paymentMethod)} · ${escapeHtml(input.paymentStatus)}</li>
+          <li>Total: <strong>${escapeHtml(input.totalLabel)}</strong></li>
+        </ul>
+        <div style="margin:0 0 12px;padding:12px;border:1px solid #E6EBE9;border-radius:8px;">
+          ${input.linesHtml}
+        </div>
+        <p style="margin:0;font-size:13px;color:#6B7672;">Keep this email for your records. For COD orders, pay the courier when delivered.</p>
+      `,
+      ctaLabel: "View shop",
+      ctaUrl: input.shopUrl,
+      footerNote: "This invoice is for Beautora Marketplace only — separate from salon POS receipts.",
+    }),
+  };
+}
+
+export function marketplacePaymentReceiptEmail(input: {
+  buyerName: string;
+  orderNumber: string;
+  totalLabel: string;
+  shopUrl: string;
+}) {
+  const name = escapeHtml(input.buyerName || "there");
+  return {
+    subject: `Payment received · ${input.orderNumber}`,
+    ...renderEmailLayout({
+      preheader: `We received ${input.totalLabel} for order ${input.orderNumber}.`,
+      title: "Payment confirmed",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Hi ${name},</p>
+        <p style="margin:0 0 12px;">Your card / online payment for order <strong>${escapeHtml(input.orderNumber)}</strong> was received successfully.</p>
+        <p style="margin:0 0 12px;">Amount paid: <strong>${escapeHtml(input.totalLabel)}</strong></p>
+        <p style="margin:0;font-size:13px;color:#6B7672;">A detailed invoice was also sent to this email. Contact the seller via Beautora if you need help with delivery.</p>
+      `,
+      ctaLabel: "Continue shopping",
+      ctaUrl: input.shopUrl,
+    }),
+  };
+}

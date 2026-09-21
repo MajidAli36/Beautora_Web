@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MarketplaceCategoryPicker } from "@/components/marketplace/category-picker";
 
 type Category = Database["public"]["Tables"]["marketplace_categories"]["Row"];
 
@@ -36,22 +37,7 @@ export function SellerProductForm({ categories }: { categories: Category[] }) {
             <Label htmlFor="stock">Stock</Label>
             <Input id="stock" name="stock" type="number" min={0} step={1} required defaultValue={1} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="category_id">Category</Label>
-            <select
-              id="category_id"
-              name="category_id"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-              defaultValue=""
-            >
-              <option value="">Uncategorized</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MarketplaceCategoryPicker categories={categories} />
           <div className="space-y-2">
             <Label htmlFor="image_url">Image URL (optional)</Label>
             <Input id="image_url" name="image_url" placeholder="https://…" />

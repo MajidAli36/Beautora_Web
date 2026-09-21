@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { VideosReelExperience } from "@/components/marketing/videos-reel-experience";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { BEAUTORA_PRODUCTS } from "@/lib/marketing/products";
+import { listMarketplaceVideoReels } from "@/lib/marketplace/video-reels";
 
-export const revalidate = 3600;
+export const revalidate = 60;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Marketplace Videos — Product Reels",
@@ -18,13 +19,15 @@ export const metadata: Metadata = buildPageMetadata({
   ],
 });
 
-export default function VideosPage() {
+export default async function VideosPage() {
+  const reels = await listMarketplaceVideoReels();
+
   return (
     <>
       <h1 className="sr-only">
         Beautora Marketplace videos — product reels by country, city, and rating
       </h1>
-      <VideosReelExperience />
+      <VideosReelExperience initialReels={reels} />
     </>
   );
 }

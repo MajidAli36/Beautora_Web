@@ -1,12 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   getMyMarketplaceSeller,
   getSellerDashboardStats,
 } from "@/lib/marketplace/actions";
-import { MARKETPLACE_COMMISSION_RATE } from "@/lib/marketplace/constants";
-import { BEAUTORA_PRODUCTS, BEAUTORA_PRODUCT_PAIR } from "@/lib/marketing/products";
-import { SellerRegisterForm } from "@/components/marketplace/seller-register-form";
+import { formatCommissionPercent } from "@/lib/marketplace/constants";
+import { getDefaultCommissionRate } from "@/lib/marketplace/commission";
+import { BEAUTORA_PRODUCTS } from "@/lib/marketing/products";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,31 +17,19 @@ export const dynamic = "force-dynamic";
 
 export default async function MarketplaceDashboardPage() {
   const seller = await getMyMarketplaceSeller();
-  if (!seller) {
-    return (
-      <div className="mx-auto max-w-xl space-y-6">
-        <PageHeader
-          title="Join Beautora Marketplace"
-          description={`${BEAUTORA_PRODUCTS.marketplace.description} Completely separate from ${BEAUTORA_PRODUCTS.saas.name} — salon POS stock and reports stay untouched.`}
-        />
-        <Card className="border-primary/20 bg-primary/[0.03]">
-          <CardHeader>
-            <CardTitle className="text-base">{BEAUTORA_PRODUCT_PAIR.title}</CardTitle>
-            <CardDescription>{BEAUTORA_PRODUCT_PAIR.description}</CardDescription>
-          </CardHeader>
-        </Card>
-        <SellerRegisterForm />
-      </div>
-    );
-  }
+  if (!seller) redirect("/marketplace/onboarding");
 
-  const stats = await getSellerDashboardStats();
+  const [stats, commissionRate] = await Promise.all([
+    getSellerDashboardStats(),
+    getDefaultCommissionRate(),
+  ]);
+  const commissionLabel = formatCommissionPercent(commissionRate);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={seller.shop_name}
-        description={`${BEAUTORA_PRODUCTS.marketplace.name} seller hub — products, COD orders, and ${MARKETPLACE_COMMISSION_RATE * 100}% platform commission. Not linked to salon sales or finances.`}
+        description={`${BEAUTORA_PRODUCTS.marketplace.name} seller hub — products, COD orders, and ${commissionLabel}% platform commission. Not linked to salon sales or finances.`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Badge
@@ -89,9 +78,7 @@ export default async function MarketplaceDashboardPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>
-              Commission owed ({MARKETPLACE_COMMISSION_RATE * 100}%)
-            </CardDescription>
+            <CardDescription>Commission owed ({commissionLabel}%)</CardDescription>
             <CardTitle className="text-2xl">
               {formatCurrency(stats?.owedCommission ?? 0)}
             </CardTitle>
@@ -101,24 +88,20 @@ export default async function MarketplaceDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Seller toolkit</CardTitle>
-          <CardDescription>
-            Fulfill online orders here. Switch back to {BEAUTORA_PRODUCTS.saas.name} anytime from the
-            workspace menu for bookings and POS.
-          </CardDescription>
+          <CardTitle className="text-base">Quick links</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" render={<Link href="/marketplace/orders" />}>
+          <Button variant="outline" size="sm" render={<Link href="/marketplace/orders" />}>
             Orders
           </Button>
-          <Button variant="outline" render={<Link href="/marketplace/inventory" />}>
-            Inventory
-          </Button>
-          <Button variant="outline" render={<Link href="/marketplace/payouts" />}>
+          <Button variant="outline" size="sm" render={<Link href="/marketplace/payouts" />}>
             Payouts
           </Button>
-          <Button variant="outline" render={<Link href="/marketplace/reviews" />}>
-            Reviews
+          <Button variant="outline" size="sm" render={<Link href="/marketplace/analytics" />}>
+            Analytics
+          </Button>
+          <Button variant="outline" size="sm" render={<Link href="/marketplace/settings" />}>
+            Settings
           </Button>
         </CardContent>
       </Card>

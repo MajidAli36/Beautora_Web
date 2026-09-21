@@ -13,6 +13,7 @@ import {
   teamInviteEmail,
 } from "@/lib/email/templates";
 import { EmailType } from "@/lib/email/types";
+import type { SendEmailResult } from "@/lib/email/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   formatPlanAmount,
@@ -343,6 +344,76 @@ export async function sendPlatformPaymentSubmittedEmail(input: {
   const failed = results.find((r) => !r.ok);
   if (failed && !failed.ok) return failed;
   return { ok: true as const };
+}
+
+export async function notifyMarketplaceOrderInvoice(input: {
+  to: string;
+  buyerName: string;
+  orderNumber: string;
+  total: number;
+  paymentMethod: string;
+  paymentStatus: string;
+  lines: { title: string; quantity: number; lineTotal: number }[];
+}): Promise<SendEmailResult> {
+  const { marketplaceOrderInvoiceEmail } = await import("@/lib/email/templates");
+  const { getEmailLinkBaseUrl } = await import("@/lib/email/config");
+  const linesHtml = input.lines
+    .map(
+      (l) =>
+        `<div style="margin:0 0 6px;font-size:14px;">${escapeForInvoice(l.title)} × ${l.quantity} — Rs ${l.lineTotal.toLocaleString("en-PK")}</div>`
+    )
+    .join("");
+  const content = marketplaceOrderInvoiceEmail({
+    buyerName: input.buyerName,
+    orderNumber: input.orderNumber,
+    totalLabel: `Rs ${input.total.toLocaleString("en-PK")}`,
+    paymentMethod: input.paymentMethod,
+    paymentStatus: input.paymentStatus,
+    linesHtml,
+    shopUrl: `${getEmailLinkBaseUrl()}/shop`,
+  });
+  return sendTransactionalEmail({
+    to: input.to,
+    toName: input.buyerName,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
+    type: EmailType.MarketplaceOrderInvoice,
+    idempotencyKey: `mp-invoice:${input.orderNumber}:${input.to}`,
+  });
+}
+
+export async function notifyMarketplacePaymentReceipt(input: {
+  to: string;
+  buyerName: string;
+  orderNumber: string;
+  total: number;
+}): Promise<SendEmailResult> {
+  const { marketplacePaymentReceiptEmail } = await import("@/lib/email/templates");
+  const { getEmailLinkBaseUrl } = await import("@/lib/email/config");
+  const content = marketplacePaymentReceiptEmail({
+    buyerName: input.buyerName,
+    orderNumber: input.orderNumber,
+    totalLabel: `Rs ${input.total.toLocaleString("en-PK")}`,
+    shopUrl: `${getEmailLinkBaseUrl()}/shop`,
+  });
+  return sendTransactionalEmail({
+    to: input.to,
+    toName: input.buyerName,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
+    type: EmailType.MarketplacePaymentReceipt,
+    idempotencyKey: `mp-receipt:${input.orderNumber}:${input.to}`,
+  });
+}
+
+function escapeForInvoice(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 async function getOrganizationOwnerContact(organizationId: string): Promise<{
