@@ -111,7 +111,15 @@ async function maybeRollupParentOrderStatus(orderId: string) {
   if (parent) {
     await admin
       .from("marketplace_orders")
-      .update({ status: parent, updated_at: new Date().toISOString() })
+      .update({
+        status: parent as
+          | "placed"
+          | "confirmed"
+          | "shipped"
+          | "delivered"
+          | "cancelled",
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", orderId);
   }
 }

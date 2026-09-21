@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/types/commerce";
+import type { Json } from "@/types/database.types";
 
 export async function trackMarketplaceEvent(input: {
   eventType: string;
@@ -30,7 +31,7 @@ export async function trackMarketplaceEvent(input: {
     seller_id: input.sellerId ?? null,
     product_id: input.productId ?? null,
     organization_id: input.organizationId ?? null,
-    meta: input.meta ?? null,
+    meta: (input.meta ?? null) as Json | null,
   });
 }
 

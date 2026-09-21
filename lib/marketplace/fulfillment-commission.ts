@@ -2,6 +2,11 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveCommissionRate } from "@/lib/marketplace/commission";
+import type { Database } from "@/types/database.types";
+
+type RuleScope = NonNullable<
+  Database["public"]["Tables"]["marketplace_commissions"]["Row"]["rule_scope"]
+>;
 
 export async function ensureCommissionsForSellerOrder(input: {
   orderId: string;
@@ -31,7 +36,7 @@ export async function ensureCommissionsForSellerOrder(input: {
 
   let weightedRate = 0;
   let gross = 0;
-  let ruleScope: string = "settings";
+  let ruleScope: RuleScope = "settings";
   for (const i of items ?? []) {
     const { rate, ruleScope: scope } = await resolveCommissionRate({
       productId: i.product_id,
@@ -42,7 +47,7 @@ export async function ensureCommissionsForSellerOrder(input: {
     weightedRate =
       gross + line > 0 ? (weightedRate * gross + rate * line) / (gross + line) : rate;
     gross += line;
-    ruleScope = scope;
+    ruleScope = (scope as RuleScope | undefined) ?? "settings";
   }
 
   if (gross <= 0) gross = input.grossAmount;

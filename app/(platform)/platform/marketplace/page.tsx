@@ -39,10 +39,12 @@ export default async function PlatformMarketplacePage() {
     status: r.status,
     method: r.method,
     created_at: r.created_at,
-    marketplace_sellers: (r.marketplace_sellers as {
-      shop_name: string;
-      slug: string;
-    } | null) ?? null,
+    marketplace_sellers: ((r as { marketplace_sellers?: unknown }).marketplace_sellers as
+      | {
+          shop_name: string;
+          slug: string;
+        }
+      | null) ?? null,
   }));
 
   return (

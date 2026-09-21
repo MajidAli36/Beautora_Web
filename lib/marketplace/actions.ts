@@ -864,7 +864,8 @@ async function ensureCommissionsForOrder(orderId: string) {
     }
   }
 
-  type Acc = { gross: number; rate: number; ruleScope: string };
+  type RuleScope = Database["public"]["Tables"]["marketplace_commissions"]["Row"]["rule_scope"];
+  type Acc = { gross: number; rate: number; ruleScope: NonNullable<RuleScope> };
   const bySeller = new Map<string, Acc>();
 
   for (const i of items) {
@@ -873,9 +874,11 @@ async function ensureCommissionsForOrder(orderId: string) {
       sellerId: i.seller_id,
       categoryId: i.product_id ? categoryByProduct.get(i.product_id) ?? null : null,
     });
+    const scope: NonNullable<RuleScope> =
+      (ruleScope as NonNullable<RuleScope> | undefined) ?? "settings";
     const prev = bySeller.get(i.seller_id);
     if (!prev) {
-      bySeller.set(i.seller_id, { gross: Number(i.line_total), rate, ruleScope });
+      bySeller.set(i.seller_id, { gross: Number(i.line_total), rate, ruleScope: scope });
     } else {
       // Weighted average rate across lines for this seller on the order
       const nextGross = prev.gross + Number(i.line_total);
@@ -886,7 +889,7 @@ async function ensureCommissionsForOrder(orderId: string) {
       bySeller.set(i.seller_id, {
         gross: nextGross,
         rate: weighted,
-        ruleScope: prev.ruleScope === ruleScope ? ruleScope : "settings",
+        ruleScope: prev.ruleScope === scope ? scope : "settings",
       });
     }
   }
