@@ -220,6 +220,22 @@ export function SiteHeader() {
             className="max-h-[min(80vh,32rem)] overflow-y-auto border-t border-[var(--m-line)] bg-[var(--m-paper)] px-4 py-5 sm:px-6 xl:hidden"
           >
             <nav className="mx-auto flex max-w-7xl flex-col gap-6" aria-label="Mobile">
+              <div className="grid gap-2 border-b border-[var(--m-line)] pb-4 sm:hidden">
+                <Link
+                  href="/login"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--m-line)] text-sm font-medium text-[var(--m-ink)]"
+                >
+                  Login
+                </Link>
+                <PartnerAwareSignupLink
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
+                >
+                  Start free
+                </PartnerAwareSignupLink>
+              </div>
+
               {MOBILE_SECTIONS.map((section) => (
                 <div key={section.group}>
                   <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--m-muted)]">
@@ -244,21 +260,6 @@ export function SiteHeader() {
                   </div>
                 </div>
               ))}
-
-              <div className="grid gap-2 border-t border-[var(--m-line)] pt-4 sm:hidden">
-                <Link
-                  href="/login"
-                  onClick={() => setOpen(false)}
-                  className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--m-line)] text-sm font-medium text-[var(--m-ink)]"
-                >
-                  Login
-                </Link>
-                <PartnerAwareSignupLink
-                  className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
-                >
-                  Start free
-                </PartnerAwareSignupLink>
-              </div>
             </nav>
           </div>
         ) : null}

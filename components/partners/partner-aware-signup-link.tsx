@@ -16,12 +16,14 @@ import { cn } from "@/lib/utils";
 type PartnerAwareSignupLinkProps = {
   className?: string;
   children?: React.ReactNode;
+  onClick?: () => void;
 };
 
 /** Signup link that keeps any remembered partner ?ref=. */
 export function PartnerAwareSignupLink({
   className,
   children = "Sign up",
+  onClick,
 }: PartnerAwareSignupLinkProps) {
   const [href, setHref] = useState("/signup");
 
@@ -54,7 +56,7 @@ export function PartnerAwareSignupLink({
   }, []);
 
   return (
-    <Link href={href} className={cn(className)}>
+    <Link href={href} className={cn(className)} onClick={onClick}>
       {children}
     </Link>
   );

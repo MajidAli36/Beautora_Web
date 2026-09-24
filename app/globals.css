@@ -282,10 +282,17 @@
   /* Auth split-screen (login / signup) */
   .auth-root {
     font-family: var(--font-marketing-sans), ui-sans-serif, system-ui, sans-serif;
+    /* Fill viewport so the form column can become the scrollport */
+    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
   .auth-screen {
-    min-height: 100dvh;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
   }
 
   .auth-screen .auth-card {

@@ -50,9 +50,9 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-7 sm:p-8">
+    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-4 sm:p-7 lg:p-8">
       <div>
-        <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-4xl">
+        <h2 className="font-display text-[1.65rem] font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl lg:text-4xl">
           New password
         </h2>
         <p className="mt-2 text-sm text-[var(--m-muted)]">
@@ -129,4 +129,4 @@ export function ResetPasswordForm() {
 }
 
 const fieldClassName =
-  "h-12 w-full border border-[var(--m-line)] bg-white px-3.5 text-sm text-[var(--m-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--m-muted)]/70 focus:border-[var(--m-accent)] focus:ring-4 focus:ring-[var(--m-accent)]/15";
+  "h-11 w-full border border-[var(--m-line)] bg-white px-3.5 text-base text-[var(--m-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--m-muted)]/70 focus:border-[var(--m-accent)] focus:ring-4 focus:ring-[var(--m-accent)]/15 sm:h-12 sm:text-sm";

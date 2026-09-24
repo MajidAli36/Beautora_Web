@@ -114,11 +114,11 @@ export function OrganizationOnboarding({
   }
 
   return (
-    <div className="auth-card w-full max-w-[480px] border border-[var(--m-line)] bg-white/90 p-7 sm:p-8">
+    <div className="auth-card w-full max-w-[480px] border border-[var(--m-line)] bg-white/90 p-4 sm:p-7 lg:p-8">
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
         Quick start
       </p>
-      <h2 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-[1.75rem]">
+      <h2 className="mt-1.5 font-display text-[1.45rem] font-semibold tracking-tight text-[var(--m-ink)] sm:text-[1.75rem]">
         Configure your Beautora workspace
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-[var(--m-muted)]">
@@ -286,4 +286,4 @@ export function OrganizationOnboarding({
 }
 
 const fieldClassName =
-  "h-12 w-full border border-[var(--m-line)] bg-white px-3.5 text-sm text-[var(--m-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--m-muted)]/70 focus:border-[var(--m-accent)] focus:ring-4 focus:ring-[var(--m-accent)]/15";
+  "h-11 w-full border border-[var(--m-line)] bg-white px-3.5 text-base text-[var(--m-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--m-muted)]/70 focus:border-[var(--m-accent)] focus:ring-4 focus:ring-[var(--m-accent)]/15 sm:h-12 sm:text-sm";

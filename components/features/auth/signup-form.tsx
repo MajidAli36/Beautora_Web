@@ -213,9 +213,9 @@ export function SignupForm() {
   }
 
   return (
-    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-5 sm:p-7 lg:p-8">
+    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-4 sm:p-7 lg:p-8">
       <div>
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl lg:text-4xl">
+        <h2 className="font-display text-[1.65rem] font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl lg:text-4xl">
           Sign up
         </h2>
         <p className="mt-1.5 text-sm text-[var(--m-muted)] sm:mt-2">
@@ -243,17 +243,17 @@ export function SignupForm() {
         ) : null}
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-7 sm:space-y-5">
+      <form onSubmit={handleSubmit} className="mt-4 space-y-3.5 sm:mt-7 sm:space-y-5">
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-[var(--m-ink-soft)]">
             Why are you joining Beautora?
           </legend>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2">
             <button
               type="button"
               onClick={() => setAccountType("customer")}
               className={cn(
-                "flex items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
+                "flex min-h-[3.25rem] items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
                 isCustomer
                   ? "border-[var(--m-ink)] bg-[var(--m-mist)]"
                   : "border-[var(--m-line)] hover:border-[var(--m-accent)]/50"
@@ -264,7 +264,7 @@ export function SignupForm() {
                 <span className="block text-sm font-semibold text-[var(--m-ink)]">
                   I want to shop
                 </span>
-                <span className="mt-0.5 block text-xs text-[var(--m-muted)]">
+                <span className="mt-0.5 block text-xs leading-snug text-[var(--m-muted)]">
                   Marketplace buyer — sign in to add to cart &amp; COD checkout
                 </span>
               </span>
@@ -273,7 +273,7 @@ export function SignupForm() {
               type="button"
               onClick={() => setAccountType("owner")}
               className={cn(
-                "flex w-full items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
+                "flex min-h-[3.25rem] w-full items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
                 isOwner
                   ? "border-[var(--m-ink)] bg-[var(--m-mist)]"
                   : "border-[var(--m-line)] hover:border-[var(--m-accent)]/50"
@@ -284,7 +284,7 @@ export function SignupForm() {
                 <span className="block text-sm font-semibold text-[var(--m-ink)]">
                   I run a salon / shop
                 </span>
-                <span className="mt-0.5 block text-xs text-[var(--m-muted)]">
+                <span className="mt-0.5 block text-xs leading-snug text-[var(--m-muted)]">
                   Owner — after email verify, pick Marketplace, Salon POS, or Both
                 </span>
               </span>
@@ -457,4 +457,4 @@ export function SignupForm() {
 }
 
 const fieldClassName =
-  "h-12 w-full border border-[var(--m-line)] bg-white px-3.5 text-sm text-[var(--m-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--m-muted)]/70 focus:border-[var(--m-accent)] focus:ring-4 focus:ring-[var(--m-accent)]/15";
+  "h-11 w-full border border-[var(--m-line)] bg-white px-3.5 text-base text-[var(--m-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--m-muted)]/70 focus:border-[var(--m-accent)] focus:ring-4 focus:ring-[var(--m-accent)]/15 sm:h-12 sm:text-sm";

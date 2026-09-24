@@ -55,9 +55,9 @@ export function AcceptInviteForm({ token, preview }: Props) {
   }
 
   return (
-    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-7 sm:p-8">
+    <div className="auth-card border border-[var(--m-line)] bg-white/90 p-4 sm:p-7 lg:p-8">
       <div>
-        <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-4xl">
+        <h2 className="font-display text-[1.65rem] font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl lg:text-4xl">
           Join {preview.salonName}
         </h2>
         <p className="mt-2 text-sm text-[var(--m-muted)]">
@@ -84,7 +84,7 @@ export function AcceptInviteForm({ token, preview }: Props) {
             onChange={(e) => setFullName(e.target.value)}
             autoComplete="name"
             className={cn(
-              "flex h-11 w-full rounded-xl border border-[var(--m-line)] bg-white px-3.5 text-sm",
+              "flex h-11 w-full rounded-xl border border-[var(--m-line)] bg-white px-3.5 text-base sm:text-sm",
               "text-[var(--m-ink)] outline-none focus-visible:border-[var(--m-accent)]"
             )}
           />
@@ -106,13 +106,13 @@ export function AcceptInviteForm({ token, preview }: Props) {
                   minLength={8}
                   autoComplete="new-password"
                   className={cn(
-                    "flex h-11 w-full rounded-xl border border-[var(--m-line)] bg-white px-3.5 pr-11 text-sm",
+                    "flex h-11 w-full rounded-xl border border-[var(--m-line)] bg-white px-3.5 pr-11 text-base sm:text-sm",
                     "text-[var(--m-ink)] outline-none focus-visible:border-[var(--m-accent)]"
                   )}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--m-muted)]"
+                  className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center px-3 text-[var(--m-muted)]"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
@@ -136,7 +136,7 @@ export function AcceptInviteForm({ token, preview }: Props) {
                 minLength={8}
                 autoComplete="new-password"
                 className={cn(
-                  "flex h-11 w-full rounded-xl border border-[var(--m-line)] bg-white px-3.5 text-sm",
+                  "flex h-11 w-full rounded-xl border border-[var(--m-line)] bg-white px-3.5 text-base sm:text-sm",
                   "text-[var(--m-ink)] outline-none focus-visible:border-[var(--m-accent)]"
                 )}
               />
