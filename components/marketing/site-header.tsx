@@ -74,7 +74,10 @@ export function SiteHeader() {
       if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMoreOpen(false);
+      if (e.key === "Escape") {
+        setMoreOpen(false);
+        setOpen(false);
+      }
     }
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
@@ -83,6 +86,15 @@ export function SiteHeader() {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   function goHome(e: MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
@@ -108,18 +120,23 @@ export function SiteHeader() {
     <div className="fixed inset-x-0 top-0 z-50">
       <SiteTopBar />
       <header className="border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 shadow-[0_8px_24px_-18px_rgba(6,33,29,0.45)] backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:h-16 lg:gap-6">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:h-16 lg:gap-4">
           <Link
             href="/"
             onClick={goHome}
-            className="shrink-0 transition-opacity hover:opacity-90"
+            className="min-w-0 shrink transition-opacity hover:opacity-90"
             aria-label="Beautora home"
           >
-            <BeautoraWordmark size="sm" priority textClassName="text-[var(--m-ink)]" />
+            <BeautoraWordmark
+              size="sm"
+              priority
+              className="gap-1.5 sm:gap-2.5"
+              textClassName="text-[var(--m-ink)] text-base sm:text-lg"
+            />
           </Link>
 
           <nav
-            className="ml-2 hidden min-w-0 flex-1 items-center justify-center xl:flex"
+            className="hidden min-w-0 flex-1 items-center justify-center xl:flex"
             aria-label="Primary"
           >
             <div className="inline-flex items-center gap-1 rounded-full bg-[var(--m-mist)]/80 px-1.5 py-1">
@@ -190,7 +207,8 @@ export function SiteHeader() {
             </div>
           </nav>
 
-          <div className="ml-auto hidden items-center gap-3 sm:flex xl:ml-0">
+          {/* Desktop auth */}
+          <div className="hidden shrink-0 items-center gap-3 xl:flex">
             <Link
               href="/login"
               className="px-2 text-sm font-medium text-[var(--m-muted)] transition-opacity hover:opacity-75"
@@ -202,40 +220,36 @@ export function SiteHeader() {
             </PartnerAwareSignupLink>
           </div>
 
-          <button
-            type="button"
-            className="ml-auto inline-flex size-11 items-center justify-center rounded-full bg-[var(--m-mist)] text-[var(--m-ink)] xl:hidden"
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            aria-controls="mobile-nav"
-            aria-label={open ? "Close menu" : "Open menu"}
-          >
-            {open ? <X className="size-5" /> : <Menu className="size-5" />}
-          </button>
+          {/* Mobile / tablet: Login + Start free + menu — always visible */}
+          <div className="flex shrink-0 items-center gap-2 xl:hidden">
+            <Link
+              href="/login"
+              className="inline-flex h-9 items-center justify-center rounded-full px-2.5 text-sm font-semibold text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)] sm:px-3"
+            >
+              Login
+            </Link>
+            <PartnerAwareSignupLink className="inline-flex h-9 max-w-[5.75rem] items-center justify-center truncate rounded-full bg-[var(--m-ink)] px-2.5 text-xs font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)] sm:max-w-none sm:px-3.5 sm:text-sm">
+              Start free
+            </PartnerAwareSignupLink>
+            <button
+              type="button"
+              className="relative z-[1] inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--m-mist)] text-[var(--m-ink)] ring-1 ring-[var(--m-line)]"
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              aria-controls="mobile-nav"
+              aria-label={open ? "Close menu" : "Open menu"}
+            >
+              {open ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
+          </div>
         </div>
 
         {open ? (
           <div
             id="mobile-nav"
-            className="max-h-[min(80vh,32rem)] overflow-y-auto border-t border-[var(--m-line)] bg-[var(--m-paper)] px-4 py-5 sm:px-6 xl:hidden"
+            className="max-h-[min(78dvh,36rem)] overflow-y-auto overscroll-contain border-t border-[var(--m-line)] bg-[var(--m-paper)] px-4 py-4 sm:px-6 xl:hidden"
           >
-            <nav className="mx-auto flex max-w-7xl flex-col gap-6" aria-label="Mobile">
-              <div className="grid gap-2 border-b border-[var(--m-line)] pb-4 sm:hidden">
-                <Link
-                  href="/login"
-                  onClick={() => setOpen(false)}
-                  className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--m-line)] text-sm font-medium text-[var(--m-ink)]"
-                >
-                  Login
-                </Link>
-                <PartnerAwareSignupLink
-                  onClick={() => setOpen(false)}
-                  className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)]"
-                >
-                  Start free
-                </PartnerAwareSignupLink>
-              </div>
-
+            <nav className="mx-auto flex max-w-7xl flex-col gap-5" aria-label="Mobile">
               {MOBILE_SECTIONS.map((section) => (
                 <div key={section.group}>
                   <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--m-muted)]">
@@ -247,7 +261,7 @@ export function SiteHeader() {
                         key={item.href}
                         href={item.href}
                         onClick={() => setOpen(false)}
-                        className="flex min-h-12 items-center justify-between rounded-lg px-3 text-base font-medium text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
+                        className="flex min-h-11 items-center justify-between rounded-lg px-3 text-base font-medium text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
                       >
                         <span>{item.label}</span>
                         {"badge" in item && item.badge ? (
