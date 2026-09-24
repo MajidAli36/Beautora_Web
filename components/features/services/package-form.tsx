@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionResult } from "@/lib/actions/customers";
 import type { Service } from "@/types";
+import { priceFieldLabel } from "@/lib/currency/labels";
 
 type PackageFormProps = {
   services: Service[];
@@ -30,7 +31,7 @@ export function PackageForm({ services }: PackageFormProps) {
           <Textarea id="pkg_description" name="description" rows={2} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="pkg_price">Package price (PKR) *</Label>
+          <Label htmlFor="pkg_price">{priceFieldLabel("Package price", true)}</Label>
           <Input id="pkg_price" name="price" type="number" min={0} required defaultValue={0} />
         </div>
         <div className="flex items-center gap-2 pt-6">

@@ -5,6 +5,7 @@ import {
   effectiveProductPrice,
   formatMarketplaceMoney,
 } from "@/lib/marketplace/pricing";
+import { currencyFromCountry } from "@/lib/currency/from-country";
 
 /** Live seller reels (TikTok video) merged ahead of demo catalogue. */
 export async function listMarketplaceVideoReels(): Promise<MarketplaceReel[]> {
@@ -47,6 +48,8 @@ export async function listMarketplaceVideoReels(): Promise<MarketplaceReel[]> {
         price: Number(p.price),
         sale_price: p.sale_price != null ? Number(p.sale_price) : null,
       });
+      const currency = currencyFromCountry(seller.country).code;
+      const money = formatMarketplaceMoney(price, currency);
       return {
         id: p.id,
         title: p.title,
@@ -56,8 +59,8 @@ export async function listMarketplaceVideoReels(): Promise<MarketplaceReel[]> {
           `Shop ${p.title} on Beautora Marketplace.`,
         shopName: seller.shop_name,
         handle: seller.slug,
-        priceLabel: formatMarketplaceMoney(price).replace(/^Rs\s*/, ""),
-        currency: "Rs",
+        priceLabel: money.replace(/^[^\d-]*/, "").trim() || money,
+        currency,
         rating: 4.8,
         reviewCount: 0,
         country: seller.country || "Pakistan",

@@ -4,6 +4,7 @@ type OrgPrintRow = {
   name?: string | null;
   address?: string | null;
   city?: string | null;
+  country?: string | null;
   phone?: string | null;
   whatsapp_phone?: string | null;
 };
@@ -21,6 +22,7 @@ export function orgToBusinessPrintInfo(
   return {
     name,
     address,
+    country: org?.country?.trim() || null,
     phone: phone || whatsapp,
     phonePtcl: phone,
     phoneMobile: whatsapp || phone,

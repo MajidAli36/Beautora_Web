@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionResult } from "@/lib/actions/customers";
 import type { ServiceCategory } from "@/types";
+import { priceFieldLabel } from "@/lib/currency/labels";
 
 type ServiceFormProps = {
   categories: ServiceCategory[];
@@ -44,7 +45,7 @@ export function ServiceForm({ categories }: ServiceFormProps) {
         </select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="price">Price (PKR) *</Label>
+        <Label htmlFor="price">{priceFieldLabel("Price", true)}</Label>
         <Input id="price" name="price" type="number" min={0} step={1} required defaultValue={0} />
       </div>
       <div className="space-y-2">

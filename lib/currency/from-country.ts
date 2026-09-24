@@ -1,22 +1,208 @@
 /**
- * Map store country (Settings / onboarding label) → ISO 4217 currency + locale.
- * Pakistan → PKR (displays as Rs with en-PK).
+ * Map store country (Settings / onboarding label) → ISO 4217 currency + locale + symbol.
+ * Pakistan → PKR (Rs). India → INR (₹). UAE → AED. USA → USD ($). …
  */
 
 export type CurrencyConfig = {
   /** ISO 4217 code, e.g. PKR, USD, AED */
   code: string;
-  /** BCP 47 locale for number grouping / symbol style */
+  /** BCP 47 locale for number grouping */
   locale: string;
+  /** Display symbol shown before amounts (Rs, ₹, $, AED, …) */
+  symbol: string;
 };
 
-export const DEFAULT_CURRENCY: CurrencyConfig = {
+/** ISO code → salon-friendly symbol (always visible in POS / invoices / marketplace). */
+export const CURRENCY_SYMBOLS: Record<string, string> = {
+  AED: "AED",
+  AFN: "؋",
+  ALL: "L",
+  AMD: "֏",
+  AOA: "Kz",
+  ARS: "AR$",
+  AUD: "A$",
+  AZN: "₼",
+  BAM: "KM",
+  BBD: "Bds$",
+  BDT: "৳",
+  BGN: "лв",
+  BHD: "BD",
+  BIF: "FBu",
+  BMD: "$",
+  BND: "B$",
+  BOB: "Bs",
+  BRL: "R$",
+  BSD: "B$",
+  BTN: "Nu",
+  BWP: "P",
+  BYN: "Br",
+  BZD: "BZ$",
+  CAD: "C$",
+  CDF: "FC",
+  CHF: "CHF",
+  CLP: "CL$",
+  CNY: "¥",
+  COP: "CO$",
+  CRC: "₡",
+  CUP: "₱",
+  CVE: "$",
+  CZK: "Kč",
+  DJF: "Fdj",
+  DKK: "kr",
+  DOP: "RD$",
+  DZD: "DA",
+  EGP: "E£",
+  ERN: "Nfk",
+  ETB: "Br",
+  EUR: "€",
+  FJD: "FJ$",
+  GBP: "£",
+  GEL: "₾",
+  GHS: "GH₵",
+  GMD: "D",
+  GNF: "FG",
+  GTQ: "Q",
+  GYD: "G$",
+  HKD: "HK$",
+  HNL: "L",
+  HTG: "G",
+  HUF: "Ft",
+  IDR: "Rp",
+  ILS: "₪",
+  INR: "₹",
+  IQD: "ع.د",
+  IRR: "﷼",
+  ISK: "kr",
+  JMD: "J$",
+  JOD: "JD",
+  JPY: "¥",
+  KES: "KSh",
+  KGS: "сом",
+  KHR: "៛",
+  KMF: "CF",
+  KPW: "₩",
+  KRW: "₩",
+  KWD: "KD",
+  KZT: "₸",
+  LAK: "₭",
+  LBP: "L£",
+  LKR: "Rs",
+  LRD: "L$",
+  LSL: "L",
+  LYD: "LD",
+  MAD: "MAD",
+  MDL: "L",
+  MGA: "Ar",
+  MKD: "ден",
+  MMK: "K",
+  MNT: "₮",
+  MOP: "MOP$",
+  MRU: "UM",
+  MUR: "₨",
+  MVR: "Rf",
+  MWK: "MK",
+  MXN: "MX$",
+  MYR: "RM",
+  MZN: "MT",
+  NAD: "N$",
+  NGN: "₦",
+  NIO: "C$",
+  NOK: "kr",
+  NPR: "रू",
+  NZD: "NZ$",
+  OMR: "OR",
+  PAB: "B/.",
+  PEN: "S/",
+  PGK: "K",
+  PHP: "₱",
+  PKR: "Rs",
+  PLN: "zł",
+  PYG: "₲",
+  QAR: "QR",
+  RON: "lei",
+  RSD: "дин",
+  RUB: "₽",
+  RWF: "FRw",
+  SAR: "SAR",
+  SBD: "SI$",
+  SCR: "₨",
+  SDG: "ج.س",
+  SEK: "kr",
+  SGD: "S$",
+  SLE: "Le",
+  SOS: "Sh",
+  SRD: "$",
+  SSP: "£",
+  STN: "Db",
+  SYP: "£S",
+  SZL: "E",
+  THB: "฿",
+  TJS: "SM",
+  TMT: "m",
+  TND: "DT",
+  TOP: "T$",
+  TRY: "₺",
+  TTD: "TT$",
+  TWD: "NT$",
+  TZS: "TSh",
+  UAH: "₴",
+  UGX: "USh",
+  USD: "$",
+  UYU: "$U",
+  UZS: "сўм",
+  VES: "Bs",
+  VND: "₫",
+  VUV: "VT",
+  WST: "WS$",
+  XAF: "FCFA",
+  XCD: "EC$",
+  XOF: "CFA",
+  YER: "﷼",
+  ZAR: "R",
+  ZMW: "ZK",
+  ZWL: "Z$",
+};
+
+/** Currencies where the symbol sits flush against the number ($15.00, ₹1,500.00). */
+const TIGHT_SYMBOL = new Set([
+  "USD",
+  "GBP",
+  "EUR",
+  "INR",
+  "JPY",
+  "CNY",
+  "KRW",
+  "AUD",
+  "CAD",
+  "NZD",
+  "HKD",
+  "SGD",
+  "CHF",
+  "BRL",
+  "MXN",
+]);
+
+export function currencySymbol(code: string | null | undefined): string {
+  const c = (code ?? "").trim().toUpperCase();
+  if (!c) return CURRENCY_SYMBOLS.PKR;
+  return CURRENCY_SYMBOLS[c] ?? c;
+}
+
+function withSymbol(cfg: { code: string; locale: string }): CurrencyConfig {
+  return {
+    code: cfg.code,
+    locale: cfg.locale,
+    symbol: currencySymbol(cfg.code),
+  };
+}
+
+export const DEFAULT_CURRENCY: CurrencyConfig = withSymbol({
   code: "PKR",
   locale: "en-PK",
-};
+});
 
 /** Country display name → currency (covers STORE_COUNTRY_OPTIONS / WORLD_COUNTRIES). */
-const COUNTRY_CURRENCY: Record<string, CurrencyConfig> = {
+const COUNTRY_CURRENCY: Record<string, { code: string; locale: string }> = {
   Afghanistan: { code: "AFN", locale: "en-AF" },
   Albania: { code: "ALL", locale: "en-AL" },
   Algeria: { code: "DZD", locale: "en-DZ" },
@@ -65,6 +251,7 @@ const COUNTRY_CURRENCY: Record<string, CurrencyConfig> = {
   Czechia: { code: "CZK", locale: "en-CZ" },
   "Czech Republic": { code: "CZK", locale: "en-CZ" },
   Denmark: { code: "DKK", locale: "en-DK" },
+  "Democratic Republic of the Congo": { code: "CDF", locale: "en-CD" },
   Djibouti: { code: "DJF", locale: "en-DJ" },
   Dominica: { code: "XCD", locale: "en-DM" },
   "Dominican Republic": { code: "DOP", locale: "en-DO" },
@@ -217,7 +404,7 @@ const COUNTRY_CURRENCY: Record<string, CurrencyConfig> = {
 };
 
 const COUNTRY_LOOKUP = new Map(
-  Object.entries(COUNTRY_CURRENCY).map(([name, cfg]) => [name.toLowerCase(), cfg])
+  Object.entries(COUNTRY_CURRENCY).map(([name, cfg]) => [name.toLowerCase(), withSymbol(cfg)])
 );
 
 export function currencyFromCountry(country: string | null | undefined): CurrencyConfig {
@@ -231,5 +418,22 @@ export function currencyFromCode(code: string | null | undefined): CurrencyConfi
   if (!c) return DEFAULT_CURRENCY;
   if (c === "PKR") return DEFAULT_CURRENCY;
   const match = Object.values(COUNTRY_CURRENCY).find((x) => x.code === c);
-  return match ?? { code: c, locale: "en" };
+  if (match) return withSymbol(match);
+  return withSymbol({ code: c, locale: "en" });
+}
+
+/** Whether to put a space between symbol and amount (Rs 10 vs $10). */
+export function currencyUsesSpacedSymbol(code: string): boolean {
+  return !TIGHT_SYMBOL.has(code.toUpperCase());
+}
+
+/** Format number body only (no symbol) using the currency locale. */
+export function formatCurrencyAmount(
+  amount: number,
+  config: CurrencyConfig = DEFAULT_CURRENCY
+): string {
+  return new Intl.NumberFormat(config.locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }

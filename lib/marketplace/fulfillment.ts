@@ -68,6 +68,11 @@ export async function updateSellerSubOrderStatus(
       sellerOrderId: sub.id,
       grossAmount: Number(sub.subtotal),
     });
+    const { data: parentOrder } = await admin
+      .from("marketplace_orders")
+      .select("currency")
+      .eq("id", sub.order_id)
+      .maybeSingle();
     await recordDeliveryLedger({
       sellerId: seller.id,
       orderId: sub.order_id,
@@ -75,6 +80,7 @@ export async function updateSellerSubOrderStatus(
       grossAmount: Number(sub.subtotal),
       commissionAmount: commission.commissionAmount,
       commissionId: commission.commissionId,
+      currency: parentOrder?.currency ?? "PKR",
     });
   }
 

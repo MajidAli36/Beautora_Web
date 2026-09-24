@@ -1,5 +1,5 @@
 import { SYNCOPS } from "@/lib/print/syncops";
-import { formatDate, formatTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { roundMoney } from "@/lib/sales/calculate";
 
 /** Thermal paper presets — content width leaves a printer-safe margin on both sides. */
@@ -451,21 +451,17 @@ function escapeHtml(value: string): string {
 
 /**
  * Thermal money — always exactly 2 decimals, never clipped by layout.
- * Uses a stable "Rs 1,234.56" form (common for PKR salons / thermal).
+ * Pass store `country` so PK / IN / AE / US receipts use the right currency.
  */
-function formatMoney(amount: number): string {
-  const n = roundMoney(Number(amount) || 0);
-  const body = n.toLocaleString("en-PK", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    useGrouping: true,
-  });
-  return `Rs ${body}`;
+function formatMoney(amount: number, country?: string | null): string {
+  return formatCurrency(amount, country ? { country } : undefined);
 }
 
 export type BusinessPrintInfo = {
   name: string;
   address?: string | null;
+  /** Store country — drives receipt currency when AsyncLocalStorage is not bound. */
+  country?: string | null;
   phone?: string | null;
   phonePtcl?: string | null;
   phoneMobile?: string | null;
@@ -534,6 +530,8 @@ export type SaleReceiptInput = {
 
 export function renderSaleReceiptHtml(data: SaleReceiptInput): string {
   const paper = data.paperWidth ?? DEFAULT_THERMAL_PAPER;
+  const country = data.business.country;
+  const money = (n: number) => formatMoney(n, country);
   const amountDue = Math.max(0, Math.round((Number(data.amountDue ?? 0) || 0) * 100) / 100);
   const changeGiven = Math.max(
     0,
@@ -547,14 +545,14 @@ export function renderSaleReceiptHtml(data: SaleReceiptInput): string {
       const line = roundMoney(Number(item.lineTotal) || 0);
       const qtyLabel =
         qty > 1
-          ? `Qty ${qty} × ${formatMoney(unit)}`
+          ? `Qty ${qty} × ${money(unit)}`
           : `Qty ${qty}`;
       return `
       <div class="item">
         <span class="item-name">${escapeHtml(item.name)}</span>
         <div class="item-money">
           <span class="item-qty mono">${qtyLabel}</span>
-          <span class="item-price mono">${formatMoney(line)}</span>
+          <span class="item-price mono">${money(line)}</span>
         </div>
       </div>`;
     })
@@ -577,17 +575,17 @@ export function renderSaleReceiptHtml(data: SaleReceiptInput): string {
     </div>
     ${itemsHtml}
     <div class="totals">
-      <div class="total-row muted"><span class="k">Subtotal</span><span class="v mono">${formatMoney(data.subtotal)}</span></div>
-      ${data.discount > 0 ? `<div class="total-row muted"><span class="k">Discount</span><span class="v mono">−${formatMoney(data.discount)}</span></div>` : ""}
-      ${data.tax > 0 ? `<div class="total-row muted"><span class="k">Tax</span><span class="v mono">+${formatMoney(data.tax)}</span></div>` : ""}
-      <div class="total-row grand"><span class="k">TOTAL</span><span class="v mono">${formatMoney(data.total)}</span></div>
+      <div class="total-row muted"><span class="k">Subtotal</span><span class="v mono">${money(data.subtotal)}</span></div>
+      ${data.discount > 0 ? `<div class="total-row muted"><span class="k">Discount</span><span class="v mono">−${money(data.discount)}</span></div>` : ""}
+      ${data.tax > 0 ? `<div class="total-row muted"><span class="k">Tax</span><span class="v mono">+${money(data.tax)}</span></div>` : ""}
+      <div class="total-row grand"><span class="k">TOTAL</span><span class="v mono">${money(data.total)}</span></div>
     </div>
     <div class="pay-box">
       <div class="pay-row"><span>Payment</span><span class="v">${escapeHtml(data.paymentMethod)}</span></div>
-      ${data.depositApplied > 0 ? `<div class="pay-row"><span>Advance applied</span><span class="v mono">${formatMoney(data.depositApplied)}</span></div>` : ""}
-      <div class="pay-row"><span>Amount paid</span><span class="v mono">${formatMoney(data.amountPaid)}</span></div>
-      ${amountDue > 0 ? `<div class="pay-row"><span>Due payment</span><span class="v mono">${formatMoney(amountDue)}</span></div>` : ""}
-      ${changeGiven > 0 ? `<div class="pay-row"><span>Change</span><span class="v mono">${formatMoney(changeGiven)}</span></div>` : ""}
+      ${data.depositApplied > 0 ? `<div class="pay-row"><span>Advance applied</span><span class="v mono">${money(data.depositApplied)}</span></div>` : ""}
+      <div class="pay-row"><span>Amount paid</span><span class="v mono">${money(data.amountPaid)}</span></div>
+      ${amountDue > 0 ? `<div class="pay-row"><span>Due payment</span><span class="v mono">${money(amountDue)}</span></div>` : ""}
+      ${changeGiven > 0 ? `<div class="pay-row"><span>Change</span><span class="v mono">${money(changeGiven)}</span></div>` : ""}
     </div>
     <div class="thanks">Thank you for visiting</div>
     <div class="sub-thanks">We look forward to seeing you again</div>
@@ -652,6 +650,7 @@ export type AppointmentReceiptInput = {
 
 export function renderAppointmentReceiptHtml(data: AppointmentReceiptInput): string {
   const paper = data.paperWidth ?? DEFAULT_THERMAL_PAPER;
+  const money = (n: number) => formatMoney(n, data.business.country);
   const scheduled = new Date(data.scheduledAt);
   const dateStr = formatDate(scheduled, "weekday");
   const timeStr = formatTime(scheduled);
@@ -667,7 +666,7 @@ export function renderAppointmentReceiptHtml(data: AppointmentReceiptInput): str
         <span class="item-name">${escapeHtml(s.name)}</span>
         <div class="item-money">
           <span class="item-qty"></span>
-          <span class="item-price mono">${formatMoney(s.price)}</span>
+          <span class="item-price mono">${money(s.price)}</span>
         </div>
       </div>`
     )
@@ -693,10 +692,10 @@ export function renderAppointmentReceiptHtml(data: AppointmentReceiptInput): str
     </div>
     ${servicesHtml}
     <div class="totals">
-      <div class="total-row grand"><span class="k">TOTAL</span><span class="v mono">${formatMoney(serviceTotal)}</span></div>
+      <div class="total-row grand"><span class="k">TOTAL</span><span class="v mono">${money(serviceTotal)}</span></div>
       ${
         data.advanceAmount && data.advanceAmount > 0
-          ? `<div class="total-row muted"><span class="k">Advance</span><span class="v mono">${formatMoney(data.advanceAmount)}${data.pendingApproval ? " (pending)" : ""}</span></div>`
+          ? `<div class="total-row muted"><span class="k">Advance</span><span class="v mono">${money(data.advanceAmount)}${data.pendingApproval ? " (pending)" : ""}</span></div>`
           : ""
       }
     </div>

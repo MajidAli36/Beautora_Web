@@ -51,11 +51,15 @@ function phaseLabel(store: PartnerReferredStore) {
     case "paid_out":
       return {
         badge: <Badge variant="success">Paid to you</Badge>,
-        detail: `Rs ${Number(store.commission_amount_pkr).toLocaleString("en-PK")} transferred`,
+        detail: `${formatMoney(Number(store.commission_amount_pkr))} transferred`,
       };
     case "earned":
       return {
-        badge: <Badge variant="default">You earned Rs {Number(store.commission_amount_pkr).toLocaleString("en-PK")}</Badge>,
+        badge: (
+          <Badge variant="default">
+            You earned {formatMoney(Number(store.commission_amount_pkr))}
+          </Badge>
+        ),
         detail: "First subscription approved — awaiting SyncOps payout (manual for now)",
       };
     case "awaiting_first_payment":
@@ -309,7 +313,7 @@ export function PartnerDashboardClient({
                               {formatMoney(store.commission_amount_pkr)}
                             </span>
                           ) : (
-                            <span className="text-[#9CA3AF]">Rs 0</span>
+                            <span className="text-[#9CA3AF]">$0</span>
                           )}
                         </td>
                       </tr>
@@ -344,7 +348,7 @@ export function PartnerDashboardClient({
                       <p className="font-semibold text-[#0F9D8C]">
                         {store.commission_amount_pkr != null
                           ? formatMoney(store.commission_amount_pkr)
-                          : "Rs 0"}
+                          : "$0"}
                       </p>
                     </div>
                     {phase.badge}

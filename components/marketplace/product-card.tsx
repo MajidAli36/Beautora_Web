@@ -61,11 +61,11 @@ export function MarketplaceProductCard({
         ) : null}
         <div className="mt-auto flex items-baseline gap-2">
           <p className="text-sm font-semibold text-[var(--m-ink)]">
-            {formatMarketplaceMoney(price)}
+            {formatMarketplaceMoney(price, product.currency)}
           </p>
           {onSale ? (
             <p className="text-xs text-[var(--m-muted)] line-through">
-              {formatMarketplaceMoney(list)}
+              {formatMarketplaceMoney(list, product.currency)}
             </p>
           ) : null}
         </div>

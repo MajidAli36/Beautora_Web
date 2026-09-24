@@ -48,7 +48,7 @@ export function MarketplaceCartPageClient() {
                     {i.title}
                   </Link>
                   <p className="mt-1 text-sm text-[var(--m-muted)]">
-                    {formatMarketplaceMoney(i.price)}
+                    {formatMarketplaceMoney(i.price, i.currency)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -82,14 +82,15 @@ export function MarketplaceCartPageClient() {
             ))}
           </ul>
           <p className="mt-3 text-sm font-medium text-[var(--m-ink)]">
-            Seller subtotal {formatMarketplaceMoney(group.subtotal)}
+            Seller subtotal{" "}
+            {formatMarketplaceMoney(group.subtotal, group.items[0]?.currency)}
           </p>
         </section>
       ))}
 
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--m-line)] pt-6">
         <p className="text-lg font-semibold text-[var(--m-ink)]">
-          Total {formatMarketplaceMoney(subtotal)}
+          Total {formatMarketplaceMoney(subtotal, items[0]?.currency)}
         </p>
         <div className="flex gap-2">
           <Button variant="outline" render={<Link href="/shop" />}>

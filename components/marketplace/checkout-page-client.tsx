@@ -165,7 +165,7 @@ export function MarketplaceCheckoutClient({
           order with independent seller fulfillment.
         </p>
         <Button type="submit" className="w-full sm:w-auto" disabled={pending}>
-          {pending ? "Placing…" : `Confirm COD · ${formatMarketplaceMoney(subtotal)}`}
+          {pending ? "Placing…" : `Confirm COD · ${formatMarketplaceMoney(subtotal, items[0]?.currency)}`}
         </Button>
       </form>
 
@@ -187,13 +187,13 @@ export function MarketplaceCheckoutClient({
                 ))}
               </ul>
               <p className="mt-2 text-sm font-semibold text-[var(--m-ink)]">
-                {formatMarketplaceMoney(g.subtotal)}
+                {formatMarketplaceMoney(g.subtotal, g.items[0]?.currency)}
               </p>
             </li>
           ))}
         </ul>
         <p className="mt-6 border-t border-[var(--m-line)] pt-4 text-base font-semibold text-[var(--m-ink)]">
-          Total {formatMarketplaceMoney(subtotal)}
+          Total {formatMarketplaceMoney(subtotal, items[0]?.currency)}
         </p>
         <Link
           href="/cart"

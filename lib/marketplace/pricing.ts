@@ -1,5 +1,7 @@
 /** Client-safe marketplace display price helpers. */
 
+import { formatCurrency } from "@/lib/format";
+
 export function effectiveProductPrice(p: {
   price: number;
   sale_price?: number | null;
@@ -9,6 +11,10 @@ export function effectiveProductPrice(p: {
   return Number(p.price);
 }
 
-export function formatMarketplaceMoney(n: number) {
-  return `Rs ${n.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+/** Format marketplace amounts using the product/order currency (defaults PKR). */
+export function formatMarketplaceMoney(
+  n: number,
+  currency: string | null | undefined = "PKR"
+) {
+  return formatCurrency(n, { currency: currency || "PKR" });
 }

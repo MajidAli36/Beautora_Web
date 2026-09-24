@@ -34,6 +34,7 @@ type MarketplaceOrderGroup = {
     status: string;
     payment_method?: string;
     payment_status?: string;
+    currency?: string | null;
   };
   items: OrderItem[];
   sellerTotal: number;
@@ -114,7 +115,9 @@ export function MarketplaceOrdersList({ orders }: { orders: MarketplaceOrderGrou
     >
       {(slice) => (
         <div className="space-y-4">
-          {slice.map(({ order, items, sellerTotal }) => (
+          {slice.map(({ order, items, sellerTotal }) => {
+            const moneyOpts = { currency: order.currency ?? undefined };
+            return (
             <Card key={order.id}>
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
                 <div>
@@ -128,15 +131,19 @@ export function MarketplaceOrdersList({ orders }: { orders: MarketplaceOrderGrou
                   <Badge variant="outline">{order.status}</Badge>
                   <p className="text-xs text-muted-foreground">
                     {order.payment_method ?? "COD"} · {order.payment_status ?? "unpaid"}
+                    {order.currency ? ` · ${order.currency}` : ""}
                   </p>
-                  <p className="text-sm font-semibold">{formatCurrency(sellerTotal)}</p>
+                  <p className="text-sm font-semibold">
+                    {formatCurrency(sellerTotal, moneyOpts)}
+                  </p>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <ul className="text-sm text-muted-foreground">
                   {items.map((i) => (
                     <li key={i.id}>
-                      {i.product_title} × {i.quantity} — {formatCurrency(Number(i.line_total))}
+                      {i.product_title} × {i.quantity} —{" "}
+                      {formatCurrency(Number(i.line_total), moneyOpts)}
                     </li>
                   ))}
                 </ul>
@@ -148,7 +155,8 @@ export function MarketplaceOrdersList({ orders }: { orders: MarketplaceOrderGrou
                 />
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </PaginatedList>

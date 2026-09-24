@@ -661,7 +661,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "urdu",
     ],
     answer:
-      "During onboarding / Settings you set the store country. Beautora formats money with that country’s currency (unknown countries fall back to PKR). Subscription billing is USDT: $10 for Asia, $15 elsewhere — selected automatically from the store country.",
+      "During onboarding / Settings you set the store country. Beautora formats salon money with that country’s currency (Pakistan → PKR, India → INR, UAE → AED, USA → USD, and so on). Subscription billing remains USDT: $10 for Asia, $15 elsewhere — selected automatically from the store country.",
     links: [{ label: "Start free", href: "/signup" }],
   },
 ];

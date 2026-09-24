@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database.types";
+import { currencyFromCountry } from "@/lib/currency/from-country";
 
 type Product = Database["public"]["Tables"]["marketplace_products"]["Row"];
 type Variant = Database["public"]["Tables"]["marketplace_product_variants"]["Row"];
@@ -36,16 +37,25 @@ export function MarketplaceProductPdp({
   variants,
   reviews,
   isLoggedIn,
+  currency: currencyProp,
 }: {
   product: Product;
-  seller: { shop_name: string; slug: string; logo_url?: string | null; city?: string | null };
+  seller: {
+    shop_name: string;
+    slug: string;
+    logo_url?: string | null;
+    city?: string | null;
+    country?: string | null;
+  };
   categoryName: string | null;
   brandName: string | null;
   images: ImageRow[];
   variants: Variant[];
   reviews: Review[];
   isLoggedIn: boolean;
+  currency?: string;
 }) {
+  const currency = currencyProp || currencyFromCountry(seller.country).code;
   const router = useRouter();
   const [variantId, setVariantId] = useState<string | null>(
     variants[0]?.id ?? null
@@ -127,6 +137,7 @@ export function MarketplaceProductPdp({
       sellerId: product.seller_id,
       sellerName: seller.shop_name,
       stock,
+      currency,
     };
     const next = existing
       ? cart.map((i) => (keyMatch(i) ? item : i))
@@ -243,11 +254,11 @@ export function MarketplaceProductPdp({
 
         <div className="mt-6 flex items-baseline gap-3">
           <p className="font-display text-3xl font-semibold text-[var(--m-ink)]">
-            {formatMarketplaceMoney(unitPrice)}
+            {formatMarketplaceMoney(unitPrice, currency)}
           </p>
           {unitPrice < listPrice ? (
             <p className="text-base text-[var(--m-muted)] line-through">
-              {formatMarketplaceMoney(listPrice)}
+              {formatMarketplaceMoney(listPrice, currency)}
             </p>
           ) : null}
         </div>

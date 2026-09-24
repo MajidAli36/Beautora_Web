@@ -72,12 +72,15 @@ export default async function ProductDetailPage({ params }: Props) {
       slug: string;
       logo_url: string | null;
       city: string | null;
+      country: string | null;
     };
     marketplace_categories: { name: string; slug: string } | null;
     marketplace_brands: { name: string; slug: string } | null;
   };
 
   const price = effectiveProductPrice(raw);
+  const { currencyFromCountry } = await import("@/lib/currency/from-country");
+  const currency = currencyFromCountry(raw.marketplace_sellers.country).code;
 
   return (
     <div className="pt-[var(--m-chrome)]">
@@ -93,7 +96,7 @@ export default async function ProductDetailPage({ params }: Props) {
             : undefined,
           offers: {
             "@type": "Offer",
-            priceCurrency: "PKR",
+            priceCurrency: currency,
             price: price,
             availability:
               raw.stock > 0
@@ -123,6 +126,7 @@ export default async function ProductDetailPage({ params }: Props) {
         variants={detail.variants as never}
         reviews={detail.reviews as never}
         isLoggedIn={Boolean(user)}
+        currency={currency}
       />
       <p className="sr-only">Price {price}</p>
       <div className="mx-auto max-w-6xl px-6 pb-16">

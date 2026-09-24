@@ -37,6 +37,7 @@ export default async function MarketplaceOrdersPage() {
                   buyer_address: string;
                   payment_method?: string;
                   payment_status?: string;
+                  currency?: string | null;
                 }
               | null
               | undefined;
@@ -47,6 +48,7 @@ export default async function MarketplaceOrdersPage() {
               quantity: number;
               line_total: number;
             }>;
+            const moneyOpts = { currency: order?.currency ?? undefined };
             return (
               <Card key={row.id}>
                 <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
@@ -63,9 +65,10 @@ export default async function MarketplaceOrdersPage() {
                     <Badge variant="outline">{row.status}</Badge>
                     <p className="text-xs text-muted-foreground">
                       {order?.payment_method ?? "COD"} · {order?.payment_status ?? "unpaid"}
+                      {order?.currency ? ` · ${order.currency}` : ""}
                     </p>
                     <p className="text-sm font-semibold">
-                      {formatCurrency(Number(row.total))}
+                      {formatCurrency(Number(row.total), moneyOpts)}
                     </p>
                   </div>
                 </CardHeader>
@@ -74,7 +77,7 @@ export default async function MarketplaceOrdersPage() {
                     {items.map((i) => (
                       <li key={i.id}>
                         {i.product_title} × {i.quantity} —{" "}
-                        {formatCurrency(Number(i.line_total))}
+                        {formatCurrency(Number(i.line_total), moneyOpts)}
                       </li>
                     ))}
                   </ul>

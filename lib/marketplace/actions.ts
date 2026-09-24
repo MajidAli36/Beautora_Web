@@ -252,6 +252,8 @@ export type PublicProductCard = ProductRow & {
   category_name: string | null;
   avg_rating: number | null;
   review_count: number;
+  /** ISO currency from seller country (PKR, INR, AED, USD…). */
+  currency: string;
 };
 
 export async function listPublicMarketplaceProducts(opts?: {
@@ -264,7 +266,7 @@ export async function listPublicMarketplaceProducts(opts?: {
   let query = admin
     .from("marketplace_products")
     .select(
-      "*, marketplace_sellers!inner(shop_name, slug, status), marketplace_categories(name, slug)"
+      "*, marketplace_sellers!inner(shop_name, slug, status, country, organization_id), marketplace_categories(name, slug)"
     )
     .eq("status", "published")
     .eq("marketplace_sellers.status", "approved")
@@ -278,7 +280,13 @@ export async function listPublicMarketplaceProducts(opts?: {
   const q = (opts?.q ?? "").trim().toLowerCase();
   let rows = data as unknown as Array<
     ProductRow & {
-      marketplace_sellers: { shop_name: string; slug: string; status: string };
+      marketplace_sellers: {
+        shop_name: string;
+        slug: string;
+        status: string;
+        country: string | null;
+        organization_id: string | null;
+      };
       marketplace_categories: { name: string; slug: string; parent_id?: string | null } | null;
     }
   >;
@@ -330,8 +338,35 @@ export async function listPublicMarketplaceProducts(opts?: {
     }
   }
 
+  const { currencyFromCountry } = await import("@/lib/currency/from-country");
+
+  // Prefer linked salon country when seller profile country is empty
+  const orgIds = [
+    ...new Set(
+      rows
+        .map((r) => r.marketplace_sellers.organization_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const orgCountry = new Map<string, string | null>();
+  if (orgIds.length) {
+    const { data: orgs } = await admin
+      .from("organizations")
+      .select("id, country")
+      .in("id", orgIds);
+    for (const o of orgs ?? []) {
+      orgCountry.set(o.id, o.country);
+    }
+  }
+
   return rows.map((p) => {
     const stats = ratingMap.get(p.id);
+    const country =
+      p.marketplace_sellers.country ||
+      (p.marketplace_sellers.organization_id
+        ? orgCountry.get(p.marketplace_sellers.organization_id)
+        : null) ||
+      null;
     return {
       ...p,
       seller_name: p.marketplace_sellers.shop_name,
@@ -339,6 +374,7 @@ export async function listPublicMarketplaceProducts(opts?: {
       category_name: p.marketplace_categories?.name ?? null,
       avg_rating: stats ? stats.sum / stats.n : null,
       review_count: stats?.n ?? 0,
+      currency: currencyFromCountry(country).code,
     };
   });
 }
@@ -351,7 +387,7 @@ export async function getPublicMarketplaceProduct(
   const { data } = await admin
     .from("marketplace_products")
     .select(
-      "*, marketplace_sellers!inner(shop_name, slug, status), marketplace_categories(name, slug)"
+      "*, marketplace_sellers!inner(shop_name, slug, status, country, organization_id), marketplace_categories(name, slug)"
     )
     .eq("id", productId)
     .eq("status", "published")
@@ -359,7 +395,12 @@ export async function getPublicMarketplaceProduct(
     .maybeSingle();
   if (!data) return null;
   const p = data as unknown as ProductRow & {
-    marketplace_sellers: { shop_name: string; slug: string };
+    marketplace_sellers: {
+      shop_name: string;
+      slug: string;
+      country: string | null;
+      organization_id: string | null;
+    };
     marketplace_categories: { name: string } | null;
   };
   const { data: reviews } = await admin
@@ -369,6 +410,17 @@ export async function getPublicMarketplaceProduct(
     .eq("is_hidden", false)
     .order("created_at", { ascending: false })
     .limit(20);
+
+  const { currencyFromCountry } = await import("@/lib/currency/from-country");
+  let country = p.marketplace_sellers.country;
+  if (!country && p.marketplace_sellers.organization_id) {
+    const { data: org } = await admin
+      .from("organizations")
+      .select("country")
+      .eq("id", p.marketplace_sellers.organization_id)
+      .maybeSingle();
+    country = org?.country ?? null;
+  }
 
   const list = reviews ?? [];
   const avg =
@@ -381,6 +433,7 @@ export async function getPublicMarketplaceProduct(
     category_name: p.marketplace_categories?.name ?? null,
     avg_rating: avg,
     review_count: list.length,
+    currency: currencyFromCountry(country).code,
     reviews: list as Database["public"]["Tables"]["marketplace_reviews"]["Row"][],
   };
 }
@@ -429,7 +482,7 @@ export async function placeMarketplaceCodOrder(input: {
   const { data: products } = await admin
     .from("marketplace_products")
     .select(
-      "id, title, price, sale_price, stock, seller_id, status, marketplace_sellers!inner(status)"
+      "id, title, price, sale_price, stock, seller_id, status, marketplace_sellers!inner(status, country, organization_id)"
     )
     .in("id", productIds);
 
@@ -443,9 +496,26 @@ export async function placeMarketplaceCodOrder(input: {
     stock: number;
     seller_id: string;
     status: string;
-    marketplace_sellers: { status: string };
+    marketplace_sellers: {
+      status: string;
+      country: string | null;
+      organization_id: string | null;
+    };
   };
   const byId = new Map((products as unknown as P[]).map((p) => [p.id, p]));
+
+  const { currencyFromCountry } = await import("@/lib/currency/from-country");
+  const firstSeller = (products as unknown as P[])[0]?.marketplace_sellers;
+  let orderCountry = firstSeller?.country ?? null;
+  if (!orderCountry && firstSeller?.organization_id) {
+    const { data: org } = await admin
+      .from("organizations")
+      .select("country")
+      .eq("id", firstSeller.organization_id)
+      .maybeSingle();
+    orderCountry = org?.country ?? null;
+  }
+  const orderCurrency = currencyFromCountry(orderCountry).code;
 
   const variantIds = [
     ...new Set(input.items.map((i) => i.variantId).filter(Boolean)),
@@ -540,7 +610,7 @@ export async function placeMarketplaceCodOrder(input: {
       payment_status: paymentStatus,
       payment_provider: payment.name,
       idempotency_key: idempotencyKey,
-      currency: "PKR",
+      currency: orderCurrency,
       subtotal,
       total: subtotal,
     })
@@ -589,7 +659,7 @@ export async function placeMarketplaceCodOrder(input: {
   const intent = await payment.createPayment({
     orderId: order.id,
     amount: subtotal,
-    currency: "PKR",
+    currency: orderCurrency,
     idempotencyKey,
   });
   try {
@@ -643,6 +713,7 @@ export async function placeMarketplaceCodOrder(input: {
         buyerName: name,
         orderNumber: order.order_number,
         total: subtotal,
+        currency: orderCurrency,
         paymentMethod,
         paymentStatus,
         lines: lines.map((l) => ({
@@ -719,12 +790,14 @@ export async function markMarketplaceOrderPaid(
           buyerName: order.buyer_name,
           orderNumber: order.order_number,
           total: Number(order.total),
+          currency: order.currency ?? "PKR",
         });
         await notifyMarketplaceOrderInvoice({
           to: email,
           buyerName: order.buyer_name,
           orderNumber: order.order_number,
           total: Number(order.total),
+          currency: order.currency ?? "PKR",
           paymentMethod: order.payment_method,
           paymentStatus: "paid",
           lines: (items ?? []).map((l) => ({

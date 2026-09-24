@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   const { data: orgRow } = await admin
     .from("organizations")
-    .select("name, address, city, phone, whatsapp_phone")
+    .select("name, address, city, country, phone, whatsapp_phone")
     .eq("id", device.organization_id)
     .single();
 

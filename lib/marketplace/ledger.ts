@@ -70,16 +70,18 @@ export async function recordDeliveryLedger(input: {
   commissionAmount: number;
   commissionId?: string | null;
   createdBy?: string | null;
+  currency?: string | null;
 }): Promise<{ error?: string }> {
   const sellerNet = Math.round((input.grossAmount - input.commissionAmount) * 100) / 100;
   const creditKey = `deliver_credit:${input.sellerOrderId}`;
   const commissionKey = `deliver_commission:${input.sellerOrderId}`;
+  const currency = (input.currency ?? "PKR").toUpperCase();
 
   const credit = await appendSellerLedger({
     seller_id: input.sellerId,
     entry_type: "SELLER_CREDIT" as LedgerEntryType,
     amount: sellerNet,
-    currency: "PKR",
+    currency,
     order_id: input.orderId,
     seller_order_id: input.sellerOrderId,
     commission_id: input.commissionId ?? null,
@@ -94,7 +96,7 @@ export async function recordDeliveryLedger(input: {
       seller_id: input.sellerId,
       entry_type: "COMMISSION" as LedgerEntryType,
       amount: input.commissionAmount,
-      currency: "PKR",
+      currency,
       order_id: input.orderId,
       seller_order_id: input.sellerOrderId,
       commission_id: input.commissionId ?? null,

@@ -351,22 +351,25 @@ export async function notifyMarketplaceOrderInvoice(input: {
   buyerName: string;
   orderNumber: string;
   total: number;
+  currency?: string;
   paymentMethod: string;
   paymentStatus: string;
   lines: { title: string; quantity: number; lineTotal: number }[];
 }): Promise<SendEmailResult> {
   const { marketplaceOrderInvoiceEmail } = await import("@/lib/email/templates");
   const { getEmailLinkBaseUrl } = await import("@/lib/email/config");
+  const { formatCurrency } = await import("@/lib/format");
+  const currency = input.currency || "PKR";
   const linesHtml = input.lines
     .map(
       (l) =>
-        `<div style="margin:0 0 6px;font-size:14px;">${escapeForInvoice(l.title)} × ${l.quantity} — Rs ${l.lineTotal.toLocaleString("en-PK")}</div>`
+        `<div style="margin:0 0 6px;font-size:14px;">${escapeForInvoice(l.title)} × ${l.quantity} — ${formatCurrency(l.lineTotal, { currency })}</div>`
     )
     .join("");
   const content = marketplaceOrderInvoiceEmail({
     buyerName: input.buyerName,
     orderNumber: input.orderNumber,
-    totalLabel: `Rs ${input.total.toLocaleString("en-PK")}`,
+    totalLabel: formatCurrency(input.total, { currency }),
     paymentMethod: input.paymentMethod,
     paymentStatus: input.paymentStatus,
     linesHtml,
@@ -388,13 +391,16 @@ export async function notifyMarketplacePaymentReceipt(input: {
   buyerName: string;
   orderNumber: string;
   total: number;
+  currency?: string;
 }): Promise<SendEmailResult> {
   const { marketplacePaymentReceiptEmail } = await import("@/lib/email/templates");
   const { getEmailLinkBaseUrl } = await import("@/lib/email/config");
+  const { formatCurrency } = await import("@/lib/format");
+  const currency = input.currency || "PKR";
   const content = marketplacePaymentReceiptEmail({
     buyerName: input.buyerName,
     orderNumber: input.orderNumber,
-    totalLabel: `Rs ${input.total.toLocaleString("en-PK")}`,
+    totalLabel: formatCurrency(input.total, { currency }),
     shopUrl: `${getEmailLinkBaseUrl()}/shop`,
   });
   return sendTransactionalEmail({

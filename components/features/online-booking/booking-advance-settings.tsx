@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/format";
+import { useCurrencyCode } from "@/lib/currency/labels";
 
 type Props = {
   settings: {
@@ -21,6 +23,8 @@ type Props = {
 export function BookingAdvanceSettings({ settings }: Props) {
   const [state, formAction, pending] = useActionState(saveBookingAdvanceSettings, {} as ActionResult);
   useActionToast(state, { successMessage: "Settings saved." });
+  const currencyCode = useCurrencyCode();
+  const example = formatCurrency(500);
 
   return (
     <Card>
@@ -36,7 +40,7 @@ export function BookingAdvanceSettings({ settings }: Props) {
       <CardContent>
         <form action={formAction} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="booking_advance_amount">Fixed advance</Label>
+            <Label htmlFor="booking_advance_amount">Fixed advance ({currencyCode})</Label>
             <Input
               id="booking_advance_amount"
               name="booking_advance_amount"
@@ -46,7 +50,7 @@ export function BookingAdvanceSettings({ settings }: Props) {
               defaultValue={settings?.booking_advance_amount ?? 0}
             />
             <p className="text-xs text-muted-foreground">
-              Shown as-is on the booking page (e.g. 500 → Rs 500).
+              Shown as-is on the booking page (e.g. 500 → {example}).
             </p>
           </div>
           <div className="space-y-2">

@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { priceFieldLabel } from "@/lib/currency/labels";
 
 type Category = Database["public"]["Tables"]["marketplace_categories"]["Row"];
 
@@ -152,7 +153,7 @@ export function SellerProductStudio({ categories }: { categories: Category[] }) 
               <Input id="title" name="title" required className="h-11 text-base" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="price">Price</Label>
+              <Label htmlFor="price">{priceFieldLabel("Price")}</Label>
               <Input id="price" name="price" type="number" min={0} step="0.01" required defaultValue={0} />
             </div>
             <div className="space-y-2">

@@ -361,7 +361,7 @@ export async function getProductCatalogDetail(productId: string) {
   const { data: product } = await admin
     .from("marketplace_products")
     .select(
-      "*, marketplace_sellers!inner(shop_name, slug, status, logo_url, city), marketplace_categories(name, slug)"
+      "*, marketplace_sellers!inner(shop_name, slug, status, logo_url, city, country), marketplace_categories(name, slug)"
     )
     .eq("id", productId)
     .eq("status", "published")

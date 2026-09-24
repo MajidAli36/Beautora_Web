@@ -2,7 +2,8 @@ import { APP_TIMEZONE, getLocalHour } from "@/lib/dates/local";
 import {
   currencyFromCode,
   currencyFromCountry,
-  DEFAULT_CURRENCY,
+  currencyUsesSpacedSymbol,
+  formatCurrencyAmount,
 } from "@/lib/currency/from-country";
 import { getCurrencyConfig } from "@/lib/currency/runtime";
 
@@ -19,7 +20,10 @@ function resolveFormatCurrency(opts?: FormatCurrencyOptions) {
   return getCurrencyConfig();
 }
 
-/** Money display — store-country currency, always 2 decimal places. */
+/**
+ * Money display — store-country currency with explicit symbol.
+ * Examples: Rs 1,500.00 · ₹1,500.00 · AED 1,500.00 · $1,500.00
+ */
 export function formatCurrency(
   amount: number | string,
   opts?: FormatCurrencyOptions
@@ -27,22 +31,9 @@ export function formatCurrency(
   const value = typeof amount === "string" ? parseFloat(amount) : amount;
   const safe = Number.isNaN(value) ? 0 : value;
   const config = resolveFormatCurrency(opts);
-
-  try {
-    return new Intl.NumberFormat(config.locale, {
-      style: "currency",
-      currency: config.code,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(safe);
-  } catch {
-    return new Intl.NumberFormat(DEFAULT_CURRENCY.locale, {
-      style: "currency",
-      currency: DEFAULT_CURRENCY.code,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(safe);
-  }
+  const body = formatCurrencyAmount(safe, config);
+  const spaced = currencyUsesSpacedSymbol(config.code);
+  return spaced ? `${config.symbol} ${body}` : `${config.symbol}${body}`;
 }
 
 export function formatCurrencyCompact(
@@ -51,13 +42,13 @@ export function formatCurrencyCompact(
 ) {
   const config = resolveFormatCurrency(opts);
   try {
-    return new Intl.NumberFormat(config.locale, {
-      style: "currency",
-      currency: config.code,
+    const body = new Intl.NumberFormat(config.locale, {
       notation: Math.abs(amount) >= 1000 ? "compact" : "standard",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+    const spaced = currencyUsesSpacedSymbol(config.code);
+    return spaced ? `${config.symbol} ${body}` : `${config.symbol}${body}`;
   } catch {
     return formatCurrency(amount, opts);
   }

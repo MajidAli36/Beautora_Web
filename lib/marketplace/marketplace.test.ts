@@ -25,9 +25,20 @@ describe("effectiveProductPrice", () => {
 });
 
 describe("formatMarketplaceMoney", () => {
-  it("formats PKR-style", () => {
-    assert.match(formatMarketplaceMoney(1500), /Rs/);
-    assert.match(formatMarketplaceMoney(1500), /1,?500/);
+  it("formats with country currency symbols", () => {
+    const pkr = formatMarketplaceMoney(1500, "PKR");
+    assert.match(pkr, /Rs/);
+    assert.match(pkr, /1,?500/);
+
+    const inr = formatMarketplaceMoney(1500, "INR");
+    assert.match(inr, /₹/);
+
+    const usd = formatMarketplaceMoney(15, "USD");
+    assert.match(usd, /\$/);
+    assert.match(usd, /15/);
+
+    const aed = formatMarketplaceMoney(1500, "AED");
+    assert.match(aed, /AED/);
   });
 });
 

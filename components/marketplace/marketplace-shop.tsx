@@ -287,7 +287,7 @@ export function MarketplaceShop({
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{i.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatMarketplaceMoney(i.price)}
+                          {formatMarketplaceMoney(i.price, i.currency)}
                         </p>
                         <div className="mt-2 flex items-center gap-2">
                           <Button
@@ -326,7 +326,7 @@ export function MarketplaceShop({
           <SheetFooter className="border-t bg-muted/30 p-4 sm:flex-col sm:space-y-2">
             <div className="flex w-full items-center justify-between text-sm font-semibold">
               <span>Subtotal</span>
-              <span>{formatMarketplaceMoney(subtotal)}</span>
+              <span>{formatMarketplaceMoney(subtotal, cart[0]?.currency)}</span>
             </div>
             <Button
               className="w-full"
@@ -347,7 +347,8 @@ export function MarketplaceShop({
           <SheetHeader className="border-b px-5 py-4">
             <SheetTitle>Place COD order</SheetTitle>
             <SheetDescription>
-              Pay when your order is delivered. Total {formatMarketplaceMoney(subtotal)}.
+              Pay when your order is delivered. Total{" "}
+              {formatMarketplaceMoney(subtotal, cart[0]?.currency)}.
             </SheetDescription>
           </SheetHeader>
           <form

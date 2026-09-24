@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   listPlatformMarketplaceCommissions,
   listPlatformMarketplaceReviews,
@@ -56,40 +57,118 @@ export function PlatformMarketplacePanel({
   products,
   commissions,
   reviews,
+  previewLimit,
+  enableSearch = false,
+  viewAllHref,
+  compact = false,
 }: {
   sellers: Seller[];
   products: Product[];
   commissions: Commission[];
   reviews: Review[];
+  previewLimit?: number;
+  enableSearch?: boolean;
+  viewAllHref?: string;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sellerQ, setSellerQ] = useState("");
+  const [productQ, setProductQ] = useState("");
+
+  const filteredSellers = useMemo(() => {
+    const q = sellerQ.trim().toLowerCase();
+    if (!q) return sellers;
+    return sellers.filter((s) =>
+      [
+        s.shop_name,
+        s.slug,
+        s.ownerEmail ?? "",
+        SellerContactPhone(s) ?? "",
+        s.status,
+        s.organizationName ?? "",
+        s.organizationCity ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [sellers, sellerQ]);
+
+  const filteredProducts = useMemo(() => {
+    const q = productQ.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => {
+      const seller = (
+        p as Product & { marketplace_sellers?: { shop_name: string } | null }
+      ).marketplace_sellers;
+      return [p.title, seller?.shop_name ?? "", p.status]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [products, productQ]);
+
+  const sellerList =
+    previewLimit != null && !enableSearch
+      ? filteredSellers.slice(0, previewLimit)
+      : filteredSellers;
+  const productList =
+    previewLimit != null && !enableSearch
+      ? filteredProducts.slice(0, previewLimit)
+      : filteredProducts;
+  const sellersPreview =
+    previewLimit != null && !enableSearch && sellers.length > previewLimit;
 
   function refresh() {
     router.refresh();
   }
 
   return (
-    <section className="mt-10 space-y-6 border-t pt-8">
-      <div>
-        <h2 className="text-lg font-semibold">Marketplace moderation</h2>
-        <p className="text-sm text-muted-foreground">
-          Review each seller carefully before approving. Check shop phone, owner login,
-          linked salon, and bio. Completely separate from salon SaaS billing and POS.
-        </p>
+    <section className={compact ? "space-y-6" : "mt-10 space-y-6 border-t pt-8"}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Marketplace moderation</h2>
+          <p className="text-sm text-muted-foreground">
+            Review each seller carefully before approving. Check shop phone, owner login,
+            linked salon, and bio. Completely separate from salon SaaS billing and POS.
+          </p>
+        </div>
+        {viewAllHref ? (
+          <Link
+            href={viewAllHref}
+            className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+          >
+            View all marketplace ({sellers.length})
+          </Link>
+        ) : null}
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Sellers
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Sellers
+          </h3>
+          {enableSearch ? (
+            <input
+              type="search"
+              value={sellerQ}
+              onChange={(e) => setSellerQ(e.target.value)}
+              placeholder="Search sellers…"
+              className="h-9 w-full max-w-xs rounded-md border border-input bg-transparent px-3 text-sm"
+              aria-label="Search sellers"
+            />
+          ) : null}
+        </div>
         <ul className="divide-y rounded-lg border">
-          {sellers.length === 0 ? (
-            <li className="p-3 text-sm text-muted-foreground">No sellers yet.</li>
+          {sellerList.length === 0 ? (
+            <li className="p-3 text-sm text-muted-foreground">
+              {sellerQ ? "No sellers match your search." : "No sellers yet."}
+            </li>
           ) : (
-            sellers.map((s) => {
+            sellerList.map((s) => {
               const contactPhone = SellerContactPhone(s);
               const open = openId === s.id;
               return (
@@ -256,17 +335,42 @@ export function PlatformMarketplacePanel({
             })
           )}
         </ul>
+        {sellersPreview && viewAllHref ? (
+          <p className="text-xs text-muted-foreground">
+            Showing {sellerList.length} of {sellers.length} sellers.{" "}
+            <Link
+              href={viewAllHref}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Search and moderate all →
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Products
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Products
+          </h3>
+          {enableSearch ? (
+            <input
+              type="search"
+              value={productQ}
+              onChange={(e) => setProductQ(e.target.value)}
+              placeholder="Search products…"
+              className="h-9 w-full max-w-xs rounded-md border border-input bg-transparent px-3 text-sm"
+              aria-label="Search products"
+            />
+          ) : null}
+        </div>
         <ul className="divide-y rounded-lg border">
-          {products.length === 0 ? (
-            <li className="p-3 text-sm text-muted-foreground">No products.</li>
+          {productList.length === 0 ? (
+            <li className="p-3 text-sm text-muted-foreground">
+              {productQ ? "No products match your search." : "No products."}
+            </li>
           ) : (
-            products.map((p) => {
+            productList.map((p) => {
               const seller = (
                 p as Product & { marketplace_sellers?: { shop_name: string } | null }
               ).marketplace_sellers;
@@ -336,6 +440,8 @@ export function PlatformMarketplacePanel({
         </ul>
       </div>
 
+      {!compact ? (
+        <>
       <div className="space-y-3">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Commissions owed
@@ -450,6 +556,8 @@ export function PlatformMarketplacePanel({
           )}
         </ul>
       </div>
+        </>
+      ) : null}
     </section>
   );
 }

@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ActionResult } from "@/lib/actions/customers";
+import { priceFieldLabel } from "@/lib/currency/labels";
 import type { ServiceCategory } from "@/types";
 import type { UsageRecipeRow } from "@/components/features/services/service-usage-recipe-fields";
 
@@ -140,7 +141,7 @@ function EditServiceForm({
         </select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor={`edit_svc_price_${service.id}`}>Price (PKR) *</Label>
+        <Label htmlFor={`edit_svc_price_${service.id}`}>{priceFieldLabel("Price", true)}</Label>
         <Input
           id={`edit_svc_price_${service.id}`}
           name="price"

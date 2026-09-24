@@ -9,6 +9,8 @@ export type MarketplaceCartItem = {
   sellerId: string;
   sellerName?: string;
   stock: number;
+  /** ISO currency from seller country */
+  currency?: string;
 };
 
 export const MARKETPLACE_CART_KEY = "beautora_marketplace_cart_v1";
