@@ -1,0 +1,18 @@
+{
+  "startedAt": "2026-10-01T01:11:35.919Z",
+  "host": "192.168.1.201",
+  "port": 4370,
+  "appUrl": "http://localhost:3000",
+  "connected": false,
+  "packetCount": 0,
+  "ackCount": 0,
+  "eventCount": 0,
+  "punchCount": 0,
+  "lastPacketAt": null,
+  "lastPacketHex": null,
+  "lastPunchUserId": null,
+  "lastPunchAt": null,
+  "lastPushOk": null,
+  "lastError": "{\"err\":{\"err\":{\"errno\":-4039,\"code\":\"ETIMEDOUT\",\"syscall\":\"connect\",\"address\":\"192.168.1.201\",\"port\":4370},\"ip\":\"192.168.1.201\",\"command\":\"TCP CONNECT\"},\"ip\":\"192.168.1.201\",\"command\":\"TCP CONNECT\"}",
+  "message": "fatal: {\"err\":{\"err\":{\"errno\":-4039,\"code\":\"ETIMEDOUT\",\"syscall\":\"connect\",\"address\":\"192.168.1.201\",\"port\":4370},\"ip\":\"192.168.1.201\",\"command\":\"TCP CONNECT\"},\"ip\":\"192.168.1.201\",\"command\":\"TCP CONNECT\"}"
+}

@@ -19,11 +19,15 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { pinCode, staffId, thumbId, action } = body as {
+  const { pinCode, staffId, thumbId, action, at, externalKey } = body as {
     pinCode?: string;
     staffId?: string;
     thumbId?: string;
     action?: "check_in" | "check_out" | "toggle";
+    /** Device punch time (ISO) — used when SyncOps agent syncs ZKTeco logs. */
+    at?: string;
+    /** Idempotency key from SyncOps agent, e.g. userId@unixMs */
+    externalKey?: string;
   };
 
   if (!action) return NextResponse.json({ error: "action required (check_in, check_out, or toggle)" }, { status: 400 });
@@ -45,6 +49,8 @@ export async function POST(request: Request) {
     method: resolved.method,
     deviceId: device.id,
     action,
+    at,
+    externalKey,
   });
 
   if ("error" in result) {

@@ -201,11 +201,13 @@ export async function registerAccount(input: {
       ? await sendCustomerSignupVerificationEmail({
           email,
           fullName: fullName || null,
+          password,
           userId: data.user.id,
         })
       : await sendSalonSignupVerificationEmail({
           email,
           salonName,
+          password,
           userId: data.user.id,
         });
 

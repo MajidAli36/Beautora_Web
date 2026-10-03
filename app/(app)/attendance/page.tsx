@@ -34,7 +34,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
     <div className="space-y-6">
       <PageHeader
         title="Attendance"
-        description="Thumb impression at the entrance, or manual check-in when needed. Enroll staff, open the kiosk, and review hours here."
+        description="Thumb: 1st press check-in, next press check-out. Manual In/Out is backup only."
       />
 
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>

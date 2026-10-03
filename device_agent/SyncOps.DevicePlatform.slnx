@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Beautora.DeviceAgent/Beautora.DeviceAgent.csproj" />
+    <Project Path="src/SyncOps.DeviceSDK/SyncOps.DeviceSDK.csproj" />
+  </Folder>
+  <Folder Name="/src/SyncOps.DeviceAdapters/" />
+  <Folder Name="/src/SyncOps.DeviceAdapters/CashDrawers/">
+    <Project Path="src/SyncOps.DeviceAdapters/CashDrawers/SyncOps.DeviceAdapters.CashDrawers.csproj" />
+  </Folder>
+  <Folder Name="/src/SyncOps.DeviceAdapters/Fingerprint/">
+    <Project Path="src/SyncOps.DeviceAdapters/Fingerprint/SyncOps.DeviceAdapters.Fingerprint.csproj" />
+  </Folder>
+  <Folder Name="/src/SyncOps.DeviceAdapters/Printers/">
+    <Project Path="src/SyncOps.DeviceAdapters/Printers/SyncOps.DeviceAdapters.Printers.csproj" />
+  </Folder>
+  <Folder Name="/src/SyncOps.DeviceAdapters/ZKTeco/">
+    <Project Path="src/SyncOps.DeviceAdapters/ZKTeco/SyncOps.DeviceAdapters.ZKTeco.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Beautora.DeviceAgent.Tests/Beautora.DeviceAgent.Tests.csproj" />
+    <Project Path="tests/SyncOps.DeviceAdapters.ZKTeco.Tests/SyncOps.DeviceAdapters.ZKTeco.Tests.csproj" />
+    <Project Path="tests/SyncOps.DeviceSDK.Tests/SyncOps.DeviceSDK.Tests.csproj" />
+  </Folder>
+</Solution>

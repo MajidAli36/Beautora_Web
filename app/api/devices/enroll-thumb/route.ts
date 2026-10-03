@@ -28,6 +28,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "thumbId required" }, { status: 400 });
   }
 
+  const cleaned = thumbId.trim();
+  if (/^web-/i.test(cleaned)) {
+    return NextResponse.json(
+      { error: "Invalid thumbId — use the real machine user ID from a device punch" },
+      { status: 400 }
+    );
+  }
+
   const admin = createAdminClient();
   let resolvedStaffId = staffId;
 
@@ -51,7 +59,7 @@ export async function POST(request: Request) {
     .from("staff")
     .select("id, full_name")
     .eq("organization_id", device.organization_id)
-    .eq("thumb_id", thumbId.trim())
+    .eq("thumb_id", cleaned)
     .maybeSingle();
 
   if (existingThumb && existingThumb.id !== resolvedStaffId) {
@@ -64,7 +72,7 @@ export async function POST(request: Request) {
   const { data: staff, error } = await admin
     .from("staff")
     .update({
-      thumb_id: thumbId.trim(),
+      thumb_id: cleaned,
       thumb_enrolled_at: new Date().toISOString(),
     })
     .eq("organization_id", device.organization_id)

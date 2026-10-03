@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AttendanceButtons } from "@/components/features/staff/staff-forms";
-import { ManualAttendancePanel } from "@/components/features/attendance/manual-attendance-panel";
-import { ThumbEnrollmentPanel } from "@/components/features/attendance/thumb-enrollment-panel";
+import { AttendanceDesk } from "@/components/features/attendance/attendance-desk";
 import type { AttendanceOverview, AttendanceReport } from "@/lib/actions/attendance";
 import { attendanceMethodLabel } from "@/lib/attendance/labels";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PaginatedList } from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
+import { formatAttendanceMinutes } from "@/lib/attendance/duration";
 import { addLocalDays, getLocalDateString, startOfLocalMonth } from "@/lib/dates/local";
-import { ExternalLink, Fingerprint, Monitor } from "lucide-react";
+import { Fingerprint } from "lucide-react";
 
 type StaffMember = {
   id: string;
@@ -36,14 +35,6 @@ type AttendanceDashboardProps = {
   to: string;
   view: string;
 };
-
-function formatDuration(mins: number | null) {
-  if (mins == null) return "—";
-  if (mins < 60) return `${mins}m`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
 
 function MethodBadge({ method }: { method: string }) {
   const isThumb = method === "BIOMETRIC";
@@ -82,11 +73,8 @@ export function AttendanceDashboard({
   function setPreset(preset: "today" | "week" | "month") {
     const toStr = getLocalDateString();
     let fromStr = toStr;
-    if (preset === "week") {
-      fromStr = addLocalDays(toStr, -6);
-    } else if (preset === "month") {
-      fromStr = startOfLocalMonth(toStr);
-    }
+    if (preset === "week") fromStr = addLocalDays(toStr, -6);
+    else if (preset === "month") fromStr = startOfLocalMonth(toStr);
     setParams({ from: fromStr, to: toStr, view: preset === "today" ? "daily" : "range" });
   }
 
@@ -95,42 +83,19 @@ export function AttendanceDashboard({
     () => new Set(overview.onDuty.map((s) => s.staffId)),
     [overview.onDuty]
   );
-  const activeStaff = useMemo(
-    () => staffList.map((s) => ({ id: s.id, full_name: s.full_name })),
-    [staffList]
-  );
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-        <Card className="border-teal-500/20 bg-gradient-to-br from-teal-500/5 to-transparent">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Fingerprint className="size-5 text-teal-600" />
-              Thumb impression attendance
-            </CardTitle>
-            <CardDescription>
-              Primary check-in method — staff scan their thumb on the biometric terminal.{" "}
-              {overview.enrolledCount} of {overview.activeStaffCount} stylists enrolled. Enroll
-              thumb IDs below, open the kiosk (USB scanners), or use the device agent bridge for SDK
-              scanners. Manual check-in is available if the scanner is offline.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button render={<Link href="/kiosk/attendance" target="_blank" />}>
-              <Monitor className="mr-2 size-4" />
-              Open kiosk display
-            </Button>
-            {canManage && (
-              <Button variant="outline" render={<Link href="/devices" />}>
-                <ExternalLink className="mr-2 size-4" />
-                Attendance devices
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+      {canManage && (
+        <AttendanceDesk
+          staff={staffList}
+          onDuty={overview.onDuty}
+          enrolledCount={overview.enrolledCount}
+        />
+      )}
 
-        <Card className="min-w-[240px]">
+      {!canManage && (
+        <Card>
           <CardHeader className="pb-2">
             <CardDescription>On duty now</CardDescription>
             <CardTitle className="text-2xl">{overview.onDuty.length}</CardTitle>
@@ -139,34 +104,15 @@ export function AttendanceDashboard({
             {overview.onDuty.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nobody checked in yet.</p>
             ) : (
-              <>
-                {overview.onDuty.slice(0, 5).map((s) => (
-                  <div key={s.staffId} className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{s.staffName}</span>
-                    <MethodBadge method={s.method} />
-                  </div>
-                ))}
-                {overview.onDuty.length > 5 && (
-                  <p className="text-xs text-muted-foreground">
-                    +{overview.onDuty.length - 5} more
-                  </p>
-                )}
-              </>
+              overview.onDuty.map((s) => (
+                <div key={s.staffId} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{s.staffName}</span>
+                  <MethodBadge method={s.method} />
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {canManage && (
-        <ManualAttendancePanel staff={activeStaff} onDuty={overview.onDuty} />
-      )}
-
-      {canManage && (
-        <ThumbEnrollmentPanel
-          staff={staffList}
-          canManage={canManage}
-          enrolledCount={overview.enrolledCount}
-        />
       )}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -233,18 +179,17 @@ export function AttendanceDashboard({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         {[
           { label: "Sessions", value: report.stats.totalSessions },
-          { label: "Thumb scans", value: thumbScans },
-          { label: "Completed", value: report.stats.completedSessions },
-          { label: "Still on duty", value: report.stats.openSessions },
+          { label: "Thumb", value: thumbScans },
+          { label: "On duty", value: report.stats.openSessions },
           { label: "Staff-days", value: report.stats.uniqueStaffDays },
         ].map((s) => (
           <Card key={s.label}>
-            <CardHeader className="pb-2">
+            <CardHeader className="py-3 pb-2">
               <CardDescription>{s.label}</CardDescription>
-              <CardTitle className="text-2xl">{s.value}</CardTitle>
+              <CardTitle className="text-xl">{s.value}</CardTitle>
             </CardHeader>
           </Card>
         ))}
@@ -254,21 +199,14 @@ export function AttendanceDashboard({
         <Card>
           <CardHeader>
             <CardTitle>Staff summary</CardTitle>
-            <CardDescription>Working days and hours for selected period</CardDescription>
+            <CardDescription>Hours for selected period</CardDescription>
           </CardHeader>
           <CardContent>
             <PaginatedList
               items={report.summaries}
               search={{
                 placeholder: "Search staff…",
-                getText: (s) =>
-                  [
-                    s.staffName,
-                    String(s.sessions),
-                    String(s.workingDays),
-                    String(s.totalHours),
-                    String(s.avgHoursPerDay),
-                  ].join(" "),
+                getText: (s) => s.staffName,
                 emptyFiltered: (
                   <p className="text-sm text-muted-foreground">No staff match your search.</p>
                 ),
@@ -280,8 +218,8 @@ export function AttendanceDashboard({
                     <TableRow>
                       <TableHead>Staff</TableHead>
                       <TableHead>Sessions</TableHead>
-                      <TableHead>Working days</TableHead>
-                      <TableHead>Total hours</TableHead>
+                      <TableHead>Days</TableHead>
+                      <TableHead>Hours</TableHead>
                       <TableHead>Avg / day</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -305,7 +243,7 @@ export function AttendanceDashboard({
 
       <Card>
         <CardHeader>
-          <CardTitle>Attendance log</CardTitle>
+          <CardTitle>Log</CardTitle>
           <CardDescription>{from === to ? from : `${from} → ${to}`}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -333,11 +271,11 @@ export function AttendanceDashboard({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Staff</TableHead>
-                    <TableHead>Check in</TableHead>
-                    <TableHead>Check out</TableHead>
+                    <TableHead>In</TableHead>
+                    <TableHead>Out</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Method</TableHead>
-                    {canManage && <TableHead>Manual</TableHead>}
+                    {canManage && <TableHead></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -352,7 +290,7 @@ export function AttendanceDashboard({
                           <Badge variant="secondary">On duty</Badge>
                         )}
                       </TableCell>
-                      <TableCell>{formatDuration(a.durationMinutes)}</TableCell>
+                      <TableCell>{formatAttendanceMinutes(a.durationMinutes)}</TableCell>
                       <TableCell>
                         <MethodBadge method={a.method} />
                       </TableCell>

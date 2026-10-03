@@ -1,16 +1,34 @@
-# Beautora Device Agent
+# SyncOps Device Platform
 
-Local Windows hardware agent for Beautora POS.
+Local Windows hardware platform for Beautora POS and future SyncOps products.
 
-**Responsibilities:** printer, cash drawer, fingerprint (hardware only).  
-**Not responsible:** invoices, tokens, customers, money, or any Beautora business logic.
+**Packages:** SyncOps Device SDK + Device Agent + Device Adapters
+
+## Architecture
+
+```text
+Beautora / apps  →  Device Agent (HTTP)  →  Device SDK  →  Adapters  →  Hardware
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/INTEGRATION.md](docs/INTEGRATION.md).
+
+## Projects
+
+| Project | Role |
+|---------|------|
+| `SyncOps.DeviceSDK` | Vendor-neutral contracts, manager, discovery, registry, transports |
+| `SyncOps.DeviceAdapters.Printers` | Windows / ESC/POS printers |
+| `SyncOps.DeviceAdapters.CashDrawers` | Printer-kick cash drawers |
+| `SyncOps.DeviceAdapters.Fingerprint` | Mock fingerprint adapter |
+| `SyncOps.DeviceAdapters.ZKTeco` | ZKTeco attendance terminal adapter |
+| `Beautora.DeviceAgent` | Windows host (service + tray + local API) — assembly name kept for compatibility |
 
 ## Requirements
 
 - Windows 10/11
-- .NET 8 SDK (project targets `net8.0-windows`; .NET 9 was requested but this machine has 8/10 — 8 LTS is used)
+- .NET 8 SDK
 
-## Run locally (dev)
+## Run locally
 
 ```powershell
 cd D:\Projects\SaaS_Salon\device_agent\src\Beautora.DeviceAgent
@@ -20,77 +38,82 @@ dotnet run
 Default:
 
 - URL: `http://127.0.0.1:17890`
-- MockMode: `true` (safe without hardware)
-- API key: see `appsettings.json` → `DeviceAgent:ApiKey`
+- MockMode: `true`
+- API key: `appsettings.json` → `DeviceAgent:ApiKey`
+- Auth headers: `X-Beautora-Agent-Key` or `X-SyncOps-Agent-Key`
 
-Health (no auth):
+## ZKTeco
 
-```powershell
-curl http://127.0.0.1:17890/api/health
-```
+Configured device (example):
 
-## Configure
-
-Edit `appsettings.json`:
+- Device: `192.168.1.201:4370`
+- PC: `192.168.1.100`
 
 ```json
-{
-  "DeviceAgent": {
-    "Host": "127.0.0.1",
-    "Port": 17890,
-    "ApiKey": "your-long-secret",
-    "MockMode": false,
-    "DefaultPrinterId": "",
-    "AllowedOrigins": [
-      "http://localhost:3000",
-      "https://www.beautora.app",
-      "https://beautora.app"
-    ]
-  }
+"Zkteco": {
+  "Enabled": true,
+  "ProtocolMode": "mock",
+  "Host": "192.168.1.201",
+  "Port": 4370
 }
 ```
 
-Set `MockMode` to `false` on a salon POS PC with a real printer.
+`ProtocolMode` values:
 
-## Test printer
+- `mock` — full API without hardware
+- `tcp-probe` — verifies TCP reachability; data ops need vendor SDK
+- `vendor-sdk` — placeholder until Standalone SDK DLLs are linked inside the ZKTeco adapter
 
-```powershell
-$headers = @{ "X-Beautora-Agent-Key" = "change-me-local-dev-key" }
-Invoke-RestMethod http://127.0.0.1:17890/api/printer/list -Headers $headers
-Invoke-RestMethod http://127.0.0.1:17890/api/printer/print -Method POST -Headers $headers -ContentType "application/json" -Body '{"contentType":"text","content":"Beautora test\n","copies":1}'
+## Beautora attendance (thumb → `/attendance`)
+
+1. In Beautora **Devices**, create an **Attendance terminal** and copy its API key.
+2. On **Attendance**, enroll each stylist’s ZK user id as their **Thumb ID** (mock users: `1`, `2`).
+3. In `appsettings.json`:
+
+```json
+"Beautora": {
+  "AppUrl": "http://localhost:3000",
+  "AttendanceApiKey": "<attendance-terminal-api-key>",
+  "AttendanceSyncEnabled": true
+}
 ```
 
-## Test drawer (separate from print)
+4. Run the agent (`dotnet run`), open `http://localhost:3000/attendance`, use **Discover terminal** / **Punch thumb** / **Sync punches to web**.
+5. Manual check-in on the same page still works if the agent or scanner is offline.
+
+Hardware integration test:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:17890/api/drawer/list -Headers $headers
-Invoke-RestMethod http://127.0.0.1:17890/api/drawer/drawer-mock/open -Method POST -Headers $headers
+$env:SYNCOPS_ZKTECO_INTEGRATION = "1"
+dotnet test tests/SyncOps.DeviceAdapters.ZKTeco.Tests
 ```
-
-Printing never opens the drawer. Beautora must call drawer open explicitly for cash POS only.
-
-## Test fingerprint (mock)
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:17890/api/fingerprint/list -Headers $headers
-Invoke-RestMethod http://127.0.0.1:17890/api/fingerprint/fingerprint-mock/scan -Method POST -Headers $headers
-```
-
-ZKTeco / DigitalPersona are adapter stubs until vendor SDKs are linked.
 
 ## Tests
 
 ```powershell
 cd D:\Projects\SaaS_Salon\device_agent
-dotnet test
+dotnet test SyncOps.DevicePlatform.slnx
 ```
 
 ## Windows Service
 
-See `installer/install-service.ps1`.
+```powershell
+.\installer\install-service.ps1
+```
 
-## Architecture
+## Backward compatibility
 
-See `docs/INTEGRATION.md`.
+Legacy Beautora routes still work:
 
-Legacy Node agent (`scripts/device-agent.mjs` in the Beautora repo) remains available; this C# agent is the new standalone product under `device_agent/`.
+- `/api/printer/*`, `/api/drawer/*`, `/api/fingerprint/*`
+- `/api/health`, `/api/devices`, `/api/devices/refresh`
+
+New SyncOps routes:
+
+- `/api/devices/{id}/connect|disconnect|status|capabilities|info`
+- `/api/devices/discover`
+- `/api/devices/{id}/print`
+- `/api/devices/{id}/cash-drawer/open`
+- `/api/devices/{id}/users`
+- `/api/devices/{id}/attendance`
+- `/api/devices/{id}/time`

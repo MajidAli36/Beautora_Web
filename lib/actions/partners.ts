@@ -235,6 +235,7 @@ export async function applyAsPartner(input: {
     email,
     username,
     fullName,
+    password,
     userId: created.user.id,
   });
 

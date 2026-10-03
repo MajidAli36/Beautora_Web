@@ -177,5 +177,6 @@ public class AuthTests
     public void HeaderName_IsStable()
     {
         Assert.Equal("X-Beautora-Agent-Key", Beautora.DeviceAgent.Security.LocalApiAuthentication.HeaderName);
+        Assert.Equal("X-SyncOps-Agent-Key", Beautora.DeviceAgent.Security.LocalApiAuthentication.SyncOpsHeaderName);
     }
 }

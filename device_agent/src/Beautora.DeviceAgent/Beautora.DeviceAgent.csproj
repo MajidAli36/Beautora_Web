@@ -8,14 +8,22 @@
     <RootNamespace>Beautora.DeviceAgent</RootNamespace>
     <AssemblyName>Beautora.DeviceAgent</AssemblyName>
     <Version>1.0.0</Version>
-    <Description>Local Windows hardware agent for Beautora POS (printer, cash drawer, fingerprint)</Description>
+    <Description>SyncOps Device Agent — local Windows hardware bridge (Beautora-compatible)</Description>
     <Authors>SyncOps</Authors>
-    <Product>Beautora Device Agent</Product>
+    <Product>SyncOps Device Agent</Product>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
     <PackageReference Include="System.Drawing.Common" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SyncOps.DeviceSDK\SyncOps.DeviceSDK.csproj" />
+    <ProjectReference Include="..\SyncOps.DeviceAdapters\Printers\SyncOps.DeviceAdapters.Printers.csproj" />
+    <ProjectReference Include="..\SyncOps.DeviceAdapters\CashDrawers\SyncOps.DeviceAdapters.CashDrawers.csproj" />
+    <ProjectReference Include="..\SyncOps.DeviceAdapters\Fingerprint\SyncOps.DeviceAdapters.Fingerprint.csproj" />
+    <ProjectReference Include="..\SyncOps.DeviceAdapters\ZKTeco\SyncOps.DeviceAdapters.ZKTeco.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Beautora.DeviceAgent/Beautora.DeviceAgent.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Beautora.DeviceAgent.Tests/Beautora.DeviceAgent.Tests.csproj" />
-  </Folder>
-</Solution>

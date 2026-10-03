@@ -4,3 +4,7 @@ publish/
 **/obj/
 *.user
 .vs/
+**/data/
+*.db
+*.db-shm
+*.db-wal

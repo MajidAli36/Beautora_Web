@@ -1,10 +1,16 @@
-param([string]$ServiceName = "BeautoraDeviceAgent")
+param(
+  [string]$ServiceName = "SyncOpsDeviceAgent",
+  [string]$LegacyServiceName = "BeautoraDeviceAgent"
+)
 $ErrorActionPreference = "Stop"
-$svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-if ($svc) {
-  Stop-Service $ServiceName -Force -ErrorAction SilentlyContinue
-  sc.exe delete $ServiceName | Out-Null
-  Write-Host "Removed service $ServiceName"
-} else {
-  Write-Host "Service not found: $ServiceName"
+
+foreach ($name in @($ServiceName, $LegacyServiceName)) {
+  $svc = Get-Service -Name $name -ErrorAction SilentlyContinue
+  if ($svc) {
+    Stop-Service $name -Force -ErrorAction SilentlyContinue
+    sc.exe delete $name | Out-Null
+    Write-Host "Removed service $name"
+  } else {
+    Write-Host "Service not found: $name"
+  }
 }

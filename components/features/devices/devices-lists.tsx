@@ -17,6 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/format";
+import {
+  appDeviceConnectionLabel,
+  getAppDeviceConnection,
+  type AppDeviceConnection,
+} from "@/lib/devices/connection-status";
+import { cn } from "@/lib/utils";
 
 type DeviceRow = {
   id: string;
@@ -27,6 +33,35 @@ type DeviceRow = {
   auto_registered: boolean;
   is_active?: boolean;
 };
+
+function AppConnectionBadge({ status }: { status: AppDeviceConnection }) {
+  return (
+    <Badge
+      variant={status === "live" ? "default" : "outline"}
+      className={cn(
+        status === "live" && "bg-teal-600 hover:bg-teal-600",
+        status === "idle" && "border-amber-500/40 text-amber-800 dark:text-amber-200"
+      )}
+    >
+      {appDeviceConnectionLabel(status)}
+    </Badge>
+  );
+}
+
+function deviceTypeLabel(type: string) {
+  switch (type) {
+    case "ATTENDANCE":
+      return "Attendance";
+    case "DRAWER":
+      return "Cash drawer";
+    case "PRINTER":
+      return "Printer";
+    case "TOKEN_KIOSK":
+      return "Token kiosk";
+    default:
+      return type;
+  }
+}
 
 type CommandRow = {
   id: string;
@@ -46,7 +81,19 @@ export function DevicesTable({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
+  const liveCount = devices.filter(
+    (d) => d.is_active !== false && getAppDeviceConnection(d.last_seen_at) === "live"
+  ).length;
+
   return (
+    <div className="space-y-3">
+      {devices.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{liveCount}</span> of{" "}
+          {devices.filter((d) => d.is_active !== false).length} active device(s) connected to the
+          app right now (API or kiosk used in the last 3 minutes).
+        </p>
+      )}
     <PaginatedList
       items={devices}
       empty={<p className="text-sm text-muted-foreground">No devices registered yet.</p>}
@@ -56,8 +103,10 @@ export function DevicesTable({
           [
             d.name,
             d.type,
+            deviceTypeLabel(d.type),
             d.location ?? "",
             d.is_active !== false ? "active" : "inactive",
+            appDeviceConnectionLabel(getAppDeviceConnection(d.last_seen_at)),
             d.auto_registered ? "auto registered" : "",
           ].join(" "),
         emptyFiltered: (
@@ -73,27 +122,36 @@ export function DevicesTable({
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Location</TableHead>
+                <TableHead>App connection</TableHead>
                 <TableHead>Last seen</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Registered</TableHead>
                 {canManage && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {slice.map((d) => {
                 const active = d.is_active !== false;
+                const connection = getAppDeviceConnection(d.last_seen_at);
                 return (
                   <TableRow key={d.id}>
                     <TableCell className="font-medium">{d.name}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{d.type}</Badge>
+                      <Badge variant="secondary">{deviceTypeLabel(d.type)}</Badge>
                     </TableCell>
                     <TableCell>{d.location ?? "—"}</TableCell>
+                    <TableCell>
+                      {active ? (
+                        <AppConnectionBadge status={connection} />
+                      ) : (
+                        <Badge variant="secondary">Disabled</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {d.last_seen_at ? formatDateTime(d.last_seen_at) : "Never"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={active ? "default" : "secondary"}>
-                        {active ? "Active" : "Inactive"}
+                      <Badge variant={active ? "outline" : "secondary"}>
+                        {active ? (d.auto_registered ? "Auto" : "Manual") : "Inactive"}
                       </Badge>
                     </TableCell>
                     {canManage && (
@@ -144,6 +202,7 @@ export function DevicesTable({
         </div>
       )}
     </PaginatedList>
+    </div>
   );
 }
 

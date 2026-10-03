@@ -303,6 +303,13 @@ export async function enrollStaffThumb(
   const supabase = await createClient();
   const thumbId = parsed.data.thumb_id.trim();
 
+  // Allow numeric / short ZK user IDs typed manually. Block only website-invented prefixes.
+  if (/^web-/i.test(thumbId)) {
+    return {
+      error: "Invalid ID. Use the ZK User ID from the machine menu (e.g. 1 or 2).",
+    };
+  }
+
   const { data: existing } = await supabase
     .from("staff")
     .select("id, full_name")
@@ -341,4 +348,217 @@ export async function removeStaffThumb(staffId: string): Promise<ActionResult> {
   revalidatePath("/staff");
   revalidatePath("/attendance");
   return { success: true };
+}
+
+/**
+ * Thumb attendance (primary path).
+ *
+ * action "toggle" (default for scanners / kiosk / Press thumb):
+ *   - no open session → check_in
+ *   - open session    → check_out (+ durationMinutes)
+ *
+ * Explicit check_in / check_out used when the device reports in/out mode.
+ * externalKey makes device sync idempotent (safe while receptionist is on any screen).
+ */
+export async function recordThumbAttendance(
+  thumbId: string,
+  action: "toggle" | "check_in" | "check_out" = "toggle",
+  atIso?: string | null,
+  externalKey?: string | null
+): Promise<
+  ActionResult & {
+    action?: "check_in" | "check_out";
+    staffName?: string;
+    staffId?: string;
+    at?: string;
+    durationMinutes?: number;
+    deduped?: boolean;
+  }
+> {
+  const org = await requireAction("attendance.manage");
+  const id = thumbId.trim();
+  if (!id) return { error: "Thumb ID required" };
+
+  const supabase = await createClient();
+  const { data: staff } = await supabase
+    .from("staff")
+    .select("id, full_name, is_active")
+    .eq("organization_id", org.organizationId)
+    .eq("thumb_id", id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!staff) {
+    return { error: "Thumb not enrolled — register thumb for this staff first" };
+  }
+
+  const { data: open } = await supabase
+    .from("staff_attendance")
+    .select("id, check_in_at")
+    .eq("staff_id", staff.id)
+    .eq("organization_id", org.organizationId)
+    .is("check_out_at", null)
+    .order("check_in_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let resolved: "check_in" | "check_out" =
+    action === "toggle" ? (open ? "check_out" : "check_in") : action;
+
+  const at = atIso?.trim() ? new Date(atIso) : new Date();
+  if (Number.isNaN(at.getTime())) return { error: "Invalid punch time" };
+  const iso = at.toISOString();
+  const key = externalKey?.trim() || null;
+  const notes = key ? `sdk:${key}` : `sdk-web:${id}`;
+
+  if (key) {
+    const { data: prior } = await supabase
+      .from("staff_attendance")
+      .select("id, check_in_at, check_out_at")
+      .eq("organization_id", org.organizationId)
+      .eq("staff_id", staff.id)
+      .eq("notes", notes)
+      .maybeSingle();
+    if (prior) {
+      const durationMinutes =
+        prior.check_out_at && prior.check_in_at
+          ? Math.max(
+              0,
+              Math.round(
+                (new Date(prior.check_out_at).getTime() -
+                  new Date(prior.check_in_at).getTime()) /
+                  60000
+              )
+            )
+          : undefined;
+      return {
+        success: true,
+        action: prior.check_out_at ? "check_out" : "check_in",
+        staffName: staff.full_name,
+        staffId: staff.id,
+        at: prior.check_out_at ?? prior.check_in_at,
+        durationMinutes,
+        deduped: true,
+      };
+    }
+  }
+
+  if (resolved === "check_in") {
+    if (open) return { error: `${staff.full_name} is already checked in` };
+    const { error } = await supabase.from("staff_attendance").insert({
+      organization_id: org.organizationId,
+      staff_id: staff.id,
+      method: "BIOMETRIC",
+      check_in_at: iso,
+      notes,
+    });
+    if (error) return { error: error.message };
+    revalidatePath("/attendance");
+    return {
+      success: true,
+      action: "check_in",
+      staffName: staff.full_name,
+      staffId: staff.id,
+      at: iso,
+    };
+  }
+
+  if (!open) return { error: `${staff.full_name} has no open check-in` };
+  if (at.getTime() <= new Date(open.check_in_at).getTime()) {
+    return { error: "Check-out must be after the current check-in time" };
+  }
+
+  const { error } = await supabase
+    .from("staff_attendance")
+    .update({ check_out_at: iso, notes })
+    .eq("id", open.id);
+  if (error) return { error: error.message };
+
+  const durationMinutes = Math.max(
+    0,
+    Math.round((at.getTime() - new Date(open.check_in_at).getTime()) / 60000)
+  );
+
+  revalidatePath("/attendance");
+  return {
+    success: true,
+    action: "check_out",
+    staffName: staff.full_name,
+    staffId: staff.id,
+    at: iso,
+    durationMinutes,
+  };
+}
+
+/**
+ * Batch ingest from the live device watcher (receptionist can be on any screen).
+ * Uses the same 1st=in / 2nd=out toggle rules + idempotency keys.
+ */
+export async function ingestThumbPunches(
+  punches: Array<{
+    thumbId: string;
+    at?: string;
+    action?: "toggle" | "check_in" | "check_out";
+    externalKey?: string;
+  }>
+): Promise<{
+  applied: number;
+  skipped: number;
+  results: Array<{
+    thumbId: string;
+    ok: boolean;
+    action?: string;
+    staffName?: string;
+    durationMinutes?: number;
+    error?: string;
+    deduped?: boolean;
+  }>;
+}> {
+  const results: Array<{
+    thumbId: string;
+    ok: boolean;
+    action?: string;
+    staffName?: string;
+    durationMinutes?: number;
+    error?: string;
+    deduped?: boolean;
+  }> = [];
+  let applied = 0;
+  let skipped = 0;
+
+  for (const punch of punches) {
+    const result = await recordThumbAttendance(
+      punch.thumbId,
+      punch.action ?? "toggle",
+      punch.at,
+      punch.externalKey
+    );
+    if (result.error) {
+      skipped++;
+      results.push({ thumbId: punch.thumbId, ok: false, error: result.error });
+      continue;
+    }
+    if (result.deduped) {
+      skipped++;
+      results.push({
+        thumbId: punch.thumbId,
+        ok: true,
+        action: result.action,
+        staffName: result.staffName,
+        durationMinutes: result.durationMinutes,
+        deduped: true,
+      });
+      continue;
+    }
+    applied++;
+    results.push({
+      thumbId: punch.thumbId,
+      ok: true,
+      action: result.action,
+      staffName: result.staffName,
+      durationMinutes: result.durationMinutes,
+    });
+  }
+
+  return { applied, skipped, results };
 }

@@ -41,7 +41,7 @@ public sealed class TrayHostedService : IHostedService
         _uiThread = new Thread(RunTray)
         {
             IsBackground = true,
-            Name = "Beautora.DeviceAgent.Tray"
+            Name = "SyncOps.DeviceAgent.Tray"
         };
         _uiThread.SetApartmentState(ApartmentState.STA);
         _uiThread.Start();
@@ -72,13 +72,16 @@ public sealed class TrayHostedService : IHostedService
         Application.EnableVisualStyles();
 
         _menu = new ContextMenuStrip();
-        _menu.Items.Add("Beautora Device Agent", null, (_, _) => { });
+        _menu.Items.Add(_options.AgentName, null, (_, _) => { });
         _menu.Items.Add($"Listening: {_options.ListenUrl}", null, (_, _) => { });
         _menu.Items.Add(new ToolStripSeparator());
+        // Tray talks to the local HTTP agent rather than owning hardware directly.
         _menu.Items.Add("Refresh devices", null, async (_, _) =>
         {
             try
             {
+                using var http = CreateLocalClient();
+                await http.PostAsync("/api/devices/discover", new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
                 using var scope = _services.CreateScope();
                 await scope.ServiceProvider.GetRequiredService<IDeviceManager>().RefreshAsync();
             }
@@ -122,11 +125,18 @@ public sealed class TrayHostedService : IHostedService
         {
             MessageBox.Show(
                 $"{_options.AgentName}\n\nStatus: Running\n{_options.ListenUrl}\nMockMode: {_options.MockMode}",
-                "Beautora Device Agent",
+                _options.AgentName,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         };
 
         Application.Run();
+    }
+
+    private HttpClient CreateLocalClient()
+    {
+        var http = new HttpClient { BaseAddress = new Uri(_options.ListenUrl) };
+        http.DefaultRequestHeaders.Add(Security.LocalApiAuthentication.HeaderName, _options.ApiKey);
+        return http;
     }
 }

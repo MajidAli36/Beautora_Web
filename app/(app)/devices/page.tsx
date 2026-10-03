@@ -7,6 +7,7 @@ import {
   DeviceCommandsTable,
   DevicesTable,
 } from "@/components/features/devices/devices-lists";
+import { SdkDevicesPanel } from "@/components/features/devices/sdk-devices-panel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function DevicesPage() {
@@ -19,8 +20,10 @@ export default async function DevicesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Devices"
-        description="Attendance terminals, cash drawers, and printers. Devices can also auto-register via API."
+        description="Connect salon hardware via SyncOps SDK on this PC, and manage cloud API keys for kiosk and remote attendance."
       />
+
+      {caps.visible && <SdkDevicesPanel canManage={caps.canManage} />}
 
       {caps.canCreate && (
         <Card>
@@ -36,7 +39,11 @@ export default async function DevicesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Connected devices</CardTitle>
+          <CardTitle>Cloud API keys</CardTitle>
+          <CardDescription>
+            Keys for kiosk, attendance API, and command polling (separate from SDK connect above).{" "}
+            <strong>Connected</strong> = app heard from this key in the last 3 minutes.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <DevicesTable devices={devices} canManage={caps.canManage} />
@@ -98,7 +105,9 @@ export default async function DevicesPage() {
             </li>
             <li>
               On <strong>Attendance</strong>, enroll each stylist’s scanner user/slot ID as their
-              thumb ID (or use <code className="text-xs">POST /api/devices/enroll-thumb</code>).
+              thumb ID (mock ZKTeco users are usually <code className="text-xs">1</code> /{" "}
+              <code className="text-xs">2</code>), then use the <strong>SyncOps Device Agent</strong>{" "}
+              panel (real SDK in <code className="text-xs">device_agent</code>) or the kiosk.
             </li>
             <li>
               <strong>USB keyboard-wedge scanners</strong> (most common): open{" "}

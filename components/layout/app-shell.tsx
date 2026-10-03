@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { NavigationLoader } from "@/components/layout/navigation-loader";
 import { NavRouteGuard } from "@/components/layout/nav-route-guard";
 import { QuickActionFab } from "@/components/dashboard/quick-action-fab";
+import { ThumbAttendanceLiveSync } from "@/components/features/attendance/thumb-attendance-live-sync";
 import { CurrencyProvider } from "@/components/providers/currency-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import type { NavPermissionsConfig } from "@/lib/permissions/nav";
@@ -76,6 +77,7 @@ export function AppShell({
           >
             <div className="app-main relative flex-1 overflow-x-hidden overscroll-x-contain p-4 sm:p-6 lg:p-8">
               <NavigationLoader />
+              {!isMarketplace ? <ThumbAttendanceLiveSync /> : null}
               {children}
             </div>
             {!isMarketplace ? (

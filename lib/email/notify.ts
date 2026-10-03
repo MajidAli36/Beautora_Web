@@ -27,11 +27,13 @@ import { isPlatformAdminEmail } from "@/lib/billing/subscription";
 export async function sendSalonSignupVerificationEmail(input: {
   email: string;
   salonName: string;
+  password: string;
   userId?: string;
 }) {
   const link = await generateAuthActionLink({
     email: input.email,
-    type: "magiclink",
+    type: "signup",
+    password: input.password,
     nextPath: "/onboarding",
   });
   if (!link.ok) {
@@ -61,11 +63,13 @@ export async function sendSalonSignupVerificationEmail(input: {
 export async function sendCustomerSignupVerificationEmail(input: {
   email: string;
   fullName?: string | null;
+  password: string;
   userId?: string;
 }) {
   const link = await generateAuthActionLink({
     email: input.email,
-    type: "magiclink",
+    type: "signup",
+    password: input.password,
     nextPath: "/shop",
   });
   if (!link.ok) {
@@ -95,11 +99,13 @@ export async function sendPartnerSignupVerificationEmail(input: {
   email: string;
   username: string;
   fullName?: string | null;
+  password: string;
   userId?: string;
 }) {
   const link = await generateAuthActionLink({
     email: input.email,
-    type: "magiclink",
+    type: "signup",
+    password: input.password,
     nextPath: "/partner/dashboard",
   });
   if (!link.ok) {

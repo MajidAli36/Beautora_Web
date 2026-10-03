@@ -30,6 +30,121 @@ public static class AgentEndpoints
             });
         });
 
+        // Does machine thumb hit SDK/C#? — live diagnostics from watch.mjs
+        api.MapGet("/zkteco/watcher", (IHostEnvironment env, IOptions<DeviceAgentOptions> options) =>
+        {
+            var snap = SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoWatcherDiagnostics.Snapshot();
+            string? statusJson = null;
+            string? logTail = null;
+            try
+            {
+                var roots = new[]
+                {
+                    Path.Combine(env.ContentRootPath, "logs"),
+                    Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "..", "logs")),
+                    Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "..", "..", "logs")),
+                };
+                var logDir = roots.FirstOrDefault(Directory.Exists);
+                if (logDir is not null)
+                {
+                    var statusPath = Path.Combine(logDir, "zk-watcher-status.json");
+                    var logPath = Path.Combine(logDir, "zk-watcher.log");
+                    if (File.Exists(statusPath))
+                        statusJson = File.ReadAllText(statusPath);
+                    if (File.Exists(logPath))
+                    {
+                        var lines = File.ReadAllLines(logPath);
+                        logTail = string.Join("\n", lines.TakeLast(40));
+                    }
+                }
+            }
+            catch
+            {
+                /* ignore disk errors */
+            }
+
+            var lanIp = Beautora.DeviceAgent.Security.LanAddressHelper.GetPreferredLanIPv4() ?? "192.168.1.100";
+            var port = options.Value.Port;
+
+            return Results.Json(new
+            {
+                ok = true,
+                host = options.Value.Zkteco.Host,
+                port = options.Value.Zkteco.Port,
+                flowTcp = "Machine → TCP SDK (watch.mjs) → C# — often silent on this model",
+                flowCloud = $"Machine Cloud → http://{lanIp}:{port}/iclock → C# → website",
+                cloudServerMustBe = new { address = lanIp, port, proxy = "OFF", mode = "ADMS", domainName = "OFF" },
+                checklist = new[]
+                {
+                    $"1. Device Cloud Server Address = {lanIp} (NOT 192.166.x.x)",
+                    $"2. Device Cloud Server Port = {port}",
+                    "3. Enable Proxy Server = OFF",
+                    "4. Server mode = ADMS, Domain Name = OFF",
+                    "5. Save settings, then REBOOT the ZK device",
+                    "6. Keep agent running (dotnet run). Press thumb.",
+                    "7. This page must show cloudAdms.requestCount > 0",
+                    "8. If still 0: run installer/open-firewall.ps1 as Administrator"
+                },
+                diagnostics = snap,
+                statusFile = statusJson is null ? null : System.Text.Json.JsonSerializer.Deserialize<object>(statusJson),
+                logTail,
+                readThis =
+                    "Ignore TCP punchCount=0 if Cloud is used. Check diagnostics.cloudAdms.connected — must become true after you save Cloud Server + reboot ZK."
+            });
+        });
+
+        // Simulate device ATTLOG (proves C# → Beautora path without hardware cloud).
+        api.MapPost("/zkteco/simulate-adms-punch", async (SimulateAdmsBody body, HttpRequest http, CancellationToken ct) =>
+        {
+            var userId = string.IsNullOrWhiteSpace(body.UserId) ? "1" : body.UserId.Trim();
+            var at = body.At ?? DateTimeOffset.Now;
+            var line = $"{userId}\t{at.ToLocalTime():yyyy-MM-dd HH:mm:ss}\t0\t1\t0\t0\t0";
+            // Reuse parser + store via a minimal synthetic call
+            SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoAttendancePunchStore.Add(userId, at, 0, 1, "simulate");
+            SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoWatcherDiagnostics.NoteAdmsPunch(userId);
+            SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoWatcherDiagnostics.NoteAdmsRequest($"SIMULATE {line}");
+
+            var services = http.HttpContext.RequestServices;
+            var options = services.GetRequiredService<IOptions<DeviceAgentOptions>>().Value;
+            var appUrl = (options.Beautora.AppUrl ?? "").TrimEnd('/');
+            var pushed = false;
+            if (!string.IsNullOrWhiteSpace(appUrl))
+            {
+                try
+                {
+                    var factory = services.GetRequiredService<IHttpClientFactory>();
+                    var client = factory.CreateClient("BeautoraAttendance");
+                    using var request = new HttpRequestMessage(HttpMethod.Post, $"{appUrl}/api/agent/thumb-punch");
+                    request.Headers.TryAddWithoutValidation("X-Beautora-Agent-Key", options.ApiKey);
+                    request.Content = System.Net.Http.Json.JsonContent.Create(new
+                    {
+                        thumbId = userId,
+                        action = "toggle",
+                        at = at.ToUniversalTime().ToString("O"),
+                        externalKey = $"{userId}@{at.ToUnixTimeMilliseconds()}"
+                    });
+                    using var response = await client.SendAsync(request, ct);
+                    pushed = response.IsSuccessStatusCode;
+                }
+                catch
+                {
+                    pushed = false;
+                }
+            }
+
+            return Results.Json(new
+            {
+                success = true,
+                userId,
+                at,
+                storedLocally = true,
+                pushedToBeautora = pushed,
+                message = pushed
+                    ? "Simulated ADMS punch stored + pushed to Beautora"
+                    : "Simulated ADMS punch stored locally (Beautora push failed or AppUrl empty)"
+            });
+        });
+
         api.MapGet("/devices", async (IDeviceManager devices, IOptions<DeviceAgentOptions> options, CancellationToken ct) =>
         {
             var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
@@ -122,5 +237,11 @@ public static class AgentEndpoints
     public sealed class VerifyBody
     {
         public string? TemplateBase64 { get; set; }
+    }
+
+    public sealed class SimulateAdmsBody
+    {
+        public string? UserId { get; set; }
+        public DateTimeOffset? At { get; set; }
     }
 }

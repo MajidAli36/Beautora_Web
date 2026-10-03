@@ -8,24 +8,34 @@ namespace Beautora.DeviceAgent.Security;
 public static class LocalApiAuthentication
 {
     public const string HeaderName = "X-Beautora-Agent-Key";
+    public const string SyncOpsHeaderName = "X-SyncOps-Agent-Key";
 
     public static bool IsAuthorized(HttpRequest request, DeviceAgentOptions options)
     {
+        // Open mode: no API key required.
+        if (options.DisableSecurity)
+            return true;
+
         if (string.IsNullOrWhiteSpace(options.ApiKey))
             return false;
 
-        if (!request.Headers.TryGetValue(HeaderName, out var provided) ||
-            string.IsNullOrWhiteSpace(provided))
+        string? provided = null;
+
+        if (request.Headers.TryGetValue(HeaderName, out var beautora) && !string.IsNullOrWhiteSpace(beautora))
+            provided = beautora.ToString();
+        else if (request.Headers.TryGetValue(SyncOpsHeaderName, out var syncops) && !string.IsNullOrWhiteSpace(syncops))
+            provided = syncops.ToString();
+        else
         {
-            // Also accept Authorization: Bearer <key>
             var auth = request.Headers.Authorization.ToString();
             if (auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                 provided = auth["Bearer ".Length..].Trim();
-            else
-                return false;
         }
 
-        return FixedTimeEquals(provided.ToString(), options.ApiKey);
+        if (string.IsNullOrWhiteSpace(provided))
+            return false;
+
+        return FixedTimeEquals(provided, options.ApiKey);
     }
 
     private static bool FixedTimeEquals(string a, string b)
@@ -43,18 +53,15 @@ public static class LocalApiAuthentication
     }
 }
 
+/// <summary>
+/// When DeviceAgent:DisableSecurity=true (current default for ZK bring-up),
+/// every request from LAN/localhost is allowed — no API key, no loopback lock.
+/// </summary>
 public sealed class AgentAuthMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly DeviceAgentOptions _options;
     private readonly ILogger<AgentAuthMiddleware> _logger;
-
-    private static readonly PathString[] PublicPaths =
-    [
-        "/api/health",
-        "/swagger",
-        "/favicon.ico"
-    ];
 
     public AgentAuthMiddleware(RequestDelegate next, IOptions<DeviceAgentOptions> options, ILogger<AgentAuthMiddleware> logger)
     {
@@ -65,9 +72,17 @@ public sealed class AgentAuthMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var path = context.Request.Path;
+        // DEV / ZK bring-up: fully open — device on LAN must reach /iclock + APIs.
+        if (_options.DisableSecurity)
+        {
+            await _next(context);
+            return;
+        }
 
-        if (!LocalApiAuthentication.IsLoopback(context))
+        var path = context.Request.Path;
+        var isAdms = path.StartsWithSegments("/iclock");
+
+        if (!LocalApiAuthentication.IsLoopback(context) && !isAdms)
         {
             _logger.LogWarning("Rejected non-loopback request from {IP}", context.Connection.RemoteIpAddress);
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -75,13 +90,13 @@ public sealed class AgentAuthMiddleware
             return;
         }
 
-        if (PublicPaths.Any(p => path.StartsWithSegments(p)))
-        {
-            await _next(context);
-            return;
-        }
-
-        if (!path.StartsWithSegments("/api"))
+        if (path.StartsWithSegments("/api/health") ||
+            path.StartsWithSegments("/api/zkteco/watcher") ||
+            path.StartsWithSegments("/iclock") ||
+            path.StartsWithSegments("/swagger") ||
+            path.StartsWithSegments("/favicon.ico") ||
+            HttpMethods.IsOptions(context.Request.Method) ||
+            !path.StartsWithSegments("/api"))
         {
             await _next(context);
             return;
@@ -89,6 +104,7 @@ public sealed class AgentAuthMiddleware
 
         if (!LocalApiAuthentication.IsAuthorized(context.Request, _options))
         {
+            _logger.LogWarning("Authentication failure for {Path}", path);
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsJsonAsync(new { success = false, message = "Invalid or missing agent API key." });
             return;
