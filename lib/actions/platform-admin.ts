@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  classifyAuthMetadata,
+  type AuthAccountKind,
+} from "@/lib/auth/email-guards";
+import {
   isPlatformAdminEmail,
   resolveSubscription,
   SUBSCRIPTION,
@@ -644,4 +648,151 @@ export async function getPlatformAdminSummary() {
     pendingInvoices: payments.filter((p) => p.status === "pending").length,
     monthlyFee: SUBSCRIPTION.monthlyAmountPkr,
   };
+}
+
+export type PlatformUserStatus = "pending" | "active" | "banned";
+export type PlatformUserRole = AuthAccountKind;
+
+export type PlatformUserRow = {
+  id: string;
+  email: string;
+  status: PlatformUserStatus;
+  role: PlatformUserRole;
+  displayName: string | null;
+  partnerStatus: "pending" | "approved" | "rejected" | null;
+  organizationName: string | null;
+  createdAt: string;
+  lastSignInAt: string | null;
+  emailConfirmedAt: string | null;
+};
+
+function resolveUserStatus(user: {
+  email_confirmed_at?: string | null;
+  banned_until?: string | null;
+}): PlatformUserStatus {
+  if (user.banned_until) {
+    const until = new Date(user.banned_until).getTime();
+    if (!Number.isNaN(until) && until > Date.now()) return "banned";
+  }
+  if (!user.email_confirmed_at) return "pending";
+  return "active";
+}
+
+function displayNameFromMeta(meta: Record<string, unknown> | undefined): string | null {
+  if (!meta) return null;
+  for (const key of ["full_name", "salon_name", "partner_username", "name"]) {
+    const value = meta[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+/** All auth users with email / account / partner status for platform admin. */
+export async function listPlatformUsers(): Promise<PlatformUserRow[]> {
+  await requirePlatformAdmin();
+  const admin = createAdminClient();
+
+  const authUsers: Awaited<
+    ReturnType<typeof admin.auth.admin.listUsers>
+  >["data"]["users"] = [];
+
+  for (let page = 1; page <= 50; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+    if (error) throw new Error(error.message);
+    authUsers.push(...data.users);
+    if (data.users.length < 200) break;
+  }
+
+  const userIds = authUsers.map((u) => u.id);
+
+  const [{ data: partners }, { data: memberships }] = await Promise.all([
+    admin
+      .from("partners")
+      .select("user_id, status, username, full_name")
+      .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]),
+    admin
+      .from("organization_members")
+      .select("user_id, role, organization:organizations(name)")
+      .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]),
+  ]);
+
+  const partnerByUser = new Map(
+    (partners ?? []).map((p) => [
+      p.user_id as string,
+      {
+        status: p.status as "pending" | "approved" | "rejected",
+        username: p.username as string | null,
+        fullName: p.full_name as string | null,
+      },
+    ])
+  );
+
+  const orgByUser = new Map<string, string>();
+  for (const row of memberships ?? []) {
+    const org = row.organization as { name?: string } | null;
+    if (row.user_id && org?.name && !orgByUser.has(row.user_id)) {
+      orgByUser.set(row.user_id, org.name);
+    }
+  }
+
+  return authUsers
+    .map((user) => {
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      const role = classifyAuthMetadata(meta, user.email);
+      const partner = partnerByUser.get(user.id) ?? null;
+      const displayName =
+        displayNameFromMeta(meta) ||
+        partner?.fullName ||
+        (partner?.username ? `@${partner.username}` : null);
+
+      return {
+        id: user.id,
+        email: user.email ?? "(no email)",
+        status: resolveUserStatus(user),
+        role,
+        displayName,
+        partnerStatus: partner?.status ?? null,
+        organizationName: orgByUser.get(user.id) ?? null,
+        createdAt: user.created_at,
+        lastSignInAt: user.last_sign_in_at ?? null,
+        emailConfirmedAt: user.email_confirmed_at ?? null,
+      } satisfies PlatformUserRow;
+    })
+    .sort((a, b) => {
+      const rank = { pending: 0, banned: 1, active: 2 } as const;
+      const byStatus = rank[a.status] - rank[b.status];
+      if (byStatus !== 0) return byStatus;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+}
+
+/** Delete an unverified (pending) auth user so they can sign up again. */
+export async function deletePlatformPendingUser(
+  userId: string
+): Promise<ActionResult> {
+  await requirePlatformAdmin();
+  const admin = createAdminClient();
+
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  if (error || !data.user) return { error: "User not found" };
+  if (data.user.email_confirmed_at) {
+    return { error: "Only pending (unverified) users can be deleted here" };
+  }
+  if (isPlatformAdminEmail(data.user.email)) {
+    return { error: "Cannot delete platform admin" };
+  }
+
+  await admin.from("partners").delete().eq("user_id", userId);
+  await admin.from("organization_members").delete().eq("user_id", userId);
+  await admin.from("team_invitations").delete().eq("email", data.user.email ?? "");
+
+  const { error: delErr } = await admin.auth.admin.deleteUser(userId);
+  if (delErr) return { error: delErr.message };
+
+  revalidatePath("/platform");
+  revalidatePath("/platform/users");
+  return { success: true };
 }

@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { notify } from "@/lib/toast";
-import { confirmUserEmail, requestPasswordReset } from "@/lib/actions/auth";
+import {
+  confirmUserEmail,
+  requestPasswordReset,
+  resendSignupVerificationEmail,
+} from "@/lib/actions/auth";
 import { ensureHardcodedPlatformAdmin } from "@/lib/actions/platform-auth";
 import { PLATFORM_HARDCODED_ADMIN } from "@/lib/platform/admin";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +25,8 @@ export function LoginForm() {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     const preset = searchParams.get("email");
@@ -79,8 +85,9 @@ export function LoginForm() {
     }
 
     if (authError?.message?.toLowerCase().includes("email not confirmed")) {
+      setNeedsVerification(true);
       notify.error(
-        "Please verify your email first — open the link we sent from Beautora."
+        "Please verify your email first — open the link we sent, or resend it below."
       );
       setLoading(false);
       return;
@@ -140,6 +147,25 @@ export function LoginForm() {
     notify.success(
       "If an account exists for that email, password reset instructions were sent."
     );
+  }
+
+  async function handleResendVerification() {
+    if (!email.trim() || password.length < 8) {
+      notify.error("Enter your signup email and password, then resend.");
+      return;
+    }
+    setResending(true);
+    const result = await resendSignupVerificationEmail({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    setResending(false);
+    if (result.error) {
+      notify.error(result.error);
+      return;
+    }
+    setNeedsVerification(true);
+    notify.success("New verification email sent — open the newest message.");
   }
 
   return (
@@ -237,6 +263,23 @@ export function LoginForm() {
           {loading ? "Signing in…" : "Login"}
           {!loading && <ArrowRight className="size-4" />}
         </button>
+
+        {needsVerification ? (
+          <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+            <p className="text-xs leading-relaxed text-amber-950">
+              This account is waiting for email verification. Open the newest Beautora
+              email, or resend a fresh link.
+            </p>
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="text-sm font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline disabled:opacity-60"
+            >
+              {resending ? "Sending…" : "Resend verification email"}
+            </button>
+          </div>
+        ) : null}
       </form>
     </div>
   );

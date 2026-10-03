@@ -138,10 +138,17 @@ export async function getEmailBlockReason(
       existing.email
     );
 
+    // Unverified signups may restart / resend — do not hard-block.
+    const unverifiedRestart =
+      !existing.email_confirmed_at &&
+      (intent === "salon_signup" ||
+        intent === "customer_signup" ||
+        intent === "partner_apply");
+
     // Team invite: existing staff may join another salon via accept flow.
     if (intent === "team_invite" && kind === "staff") {
       // still check partner table below; allow continuing
-    } else {
+    } else if (!unverifiedRestart) {
       return messageForExistingAccount(kind, intent);
     }
   }

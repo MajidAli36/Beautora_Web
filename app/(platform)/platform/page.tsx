@@ -1,6 +1,7 @@
 import {
   listPlatformPayments,
   listPlatformStores,
+  listPlatformUsers,
 } from "@/lib/actions/platform-admin";
 import { listPlatformPartners } from "@/lib/actions/partners";
 import {
@@ -19,16 +20,25 @@ export const dynamic = "force-dynamic";
 
 export default async function PlatformAdminPage() {
   const user = await requireAuth();
-  const [stores, payments, partners, mpSellers, mpProducts, mpCommissions, mpReviews] =
-    await Promise.all([
-      listPlatformStores(),
-      listPlatformPayments("all"),
-      listPlatformPartners(),
-      listPlatformMarketplaceSellers(),
-      listPlatformPendingProducts(),
-      listPlatformMarketplaceCommissions(),
-      listPlatformMarketplaceReviews(),
-    ]);
+  const [
+    stores,
+    payments,
+    partners,
+    users,
+    mpSellers,
+    mpProducts,
+    mpCommissions,
+    mpReviews,
+  ] = await Promise.all([
+    listPlatformStores(),
+    listPlatformPayments("all"),
+    listPlatformPartners(),
+    listPlatformUsers(),
+    listPlatformMarketplaceSellers(),
+    listPlatformPendingProducts(),
+    listPlatformMarketplaceCommissions(),
+    listPlatformMarketplaceReviews(),
+  ]);
 
   const summary = {
     storeCount: stores.length,
@@ -36,6 +46,8 @@ export default async function PlatformAdminPage() {
     lifetimeCount: stores.filter((s) => s.lifetimeAccess && !s.adminDisabled).length,
     pendingInvoices: payments.filter((p) => p.status === "pending").length,
     pendingPartners: partners.filter((p) => p.status === "pending").length,
+    userCount: users.length,
+    pendingUsers: users.filter((u) => u.status === "pending").length,
     monthlyFee: SUBSCRIPTION.monthlyAmountPkr,
   };
 
@@ -46,6 +58,8 @@ export default async function PlatformAdminPage() {
         storesTotal={stores.length}
         payments={payments}
         partners={partners}
+        users={users.slice(0, PLATFORM_DASHBOARD_PREVIEW)}
+        usersTotal={users.length}
         summary={summary}
         adminEmail={user.email ?? ""}
       />

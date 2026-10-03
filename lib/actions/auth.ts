@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  classifyAuthMetadata,
   findAuthUserByEmail,
   getEmailBlockReason,
   normalizeEmail,
@@ -167,33 +168,73 @@ export async function registerAccount(input: {
     return { error: err instanceof Error ? err.message : "Registration check failed" };
   }
 
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: false,
-    user_metadata:
-      accountType === "customer"
-        ? {
-            account_type: "customer",
-            full_name: fullName || null,
-          }
-        : {
-            salon_name: salonName,
-            account_type: "owner",
-            ...(partnerReferral ? { partner_referral: partnerReferral } : {}),
-          },
-  });
+  const userMetadata =
+    accountType === "customer"
+      ? {
+          account_type: "customer" as const,
+          full_name: fullName || null,
+        }
+      : {
+          salon_name: salonName,
+          account_type: "owner" as const,
+          ...(partnerReferral ? { partner_referral: partnerReferral } : {}),
+        };
 
-  if (error) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
+  // Restart unverified signups instead of blocking "email already exists".
+  const existing = await findAuthUserByEmail(admin, email);
+  let userId: string;
+
+  if (existing) {
+    if (existing.email_confirmed_at) {
       return { error: "An account with this email already exists. Please sign in." };
     }
-    return { error: error.message };
-  }
+    const kind = classifyAuthMetadata(
+      existing.user_metadata as Record<string, unknown>,
+      existing.email
+    );
+    if (accountType === "owner" && kind === "customer") {
+      return {
+        error:
+          "This email is already a Marketplace shopper account. Sign in to shop, or use a different email to open a salon.",
+      };
+    }
+    if (accountType === "customer" && (kind === "owner" || kind === "staff")) {
+      return {
+        error:
+          "This email already belongs to a salon account. Sign in to your salon, or use a different email to shop.",
+      };
+    }
 
-  if (!data.user) {
-    return { error: "Could not create account" };
+    const { error: updateError } = await admin.auth.admin.updateUserById(
+      existing.id,
+      {
+        password,
+        email_confirm: false,
+        user_metadata: userMetadata,
+      }
+    );
+    if (updateError) return { error: updateError.message };
+    userId = existing.id;
+  } else {
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+      user_metadata: userMetadata,
+    });
+
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
+        return { error: "An account with this email already exists. Please sign in." };
+      }
+      return { error: error.message };
+    }
+
+    if (!data.user) {
+      return { error: "Could not create account" };
+    }
+    userId = data.user.id;
   }
 
   const mailed =
@@ -202,17 +243,20 @@ export async function registerAccount(input: {
           email,
           fullName: fullName || null,
           password,
-          userId: data.user.id,
+          userId,
         })
       : await sendSalonSignupVerificationEmail({
           email,
           salonName,
           password,
-          userId: data.user.id,
+          userId,
         });
 
   if (!mailed.ok) {
-    await admin.auth.admin.deleteUser(data.user.id);
+    // Only roll back brand-new users — keep restarted unverified accounts.
+    if (!existing) {
+      await admin.auth.admin.deleteUser(userId);
+    }
     return {
       error: mailed.skipped
         ? "Email is not configured on the server. Please try again later."
@@ -221,6 +265,95 @@ export async function registerAccount(input: {
   }
 
   return { success: true, needsEmailVerification: true };
+}
+
+/**
+ * Resend signup verification for an unconfirmed account.
+ * Password is required so we can mint a fresh signup link securely.
+ */
+export async function resendSignupVerificationEmail(input: {
+  email: string;
+  password: string;
+}): Promise<ActionResult> {
+  const email = normalizeEmail(input.email);
+  const password = input.password;
+
+  if (!email || !email.includes("@")) {
+    return { error: "Enter a valid email address" };
+  }
+  if (password.length < 8) {
+    return { error: "Enter the password you used at sign up (min 8 characters)" };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: "Server is missing SUPABASE_SERVICE_ROLE_KEY" };
+  }
+
+  try {
+    const user = await findAuthUserByEmail(admin, email);
+    if (!user) {
+      return { error: "No signup found for this email. Please sign up first." };
+    }
+    if (user.email_confirmed_at) {
+      return { error: "This email is already verified. Please sign in." };
+    }
+
+    const kind = classifyAuthMetadata(
+      user.user_metadata as Record<string, unknown>,
+      user.email
+    );
+    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+
+    // Refresh password so generateLink(type=signup) matches what the user typed.
+    const { error: updateError } = await admin.auth.admin.updateUserById(user.id, {
+      password,
+      email_confirm: false,
+    });
+    if (updateError) return { error: updateError.message };
+
+    if (kind === "customer") {
+      const mailed = await sendCustomerSignupVerificationEmail({
+        email,
+        fullName: typeof meta.full_name === "string" ? meta.full_name : null,
+        password,
+        userId: user.id,
+      });
+      if (!mailed.ok) {
+        return {
+          error: mailed.skipped
+            ? "Email is not configured on the server."
+            : mailed.error || "Could not resend verification email",
+        };
+      }
+      return { success: true };
+    }
+
+    const salonName =
+      typeof meta.salon_name === "string" && meta.salon_name.trim()
+        ? meta.salon_name.trim()
+        : "your salon";
+    const mailed = await sendSalonSignupVerificationEmail({
+      email,
+      salonName,
+      password,
+      userId: user.id,
+    });
+    if (!mailed.ok) {
+      return {
+        error: mailed.skipped
+          ? "Email is not configured on the server."
+          : mailed.error || "Could not resend verification email",
+      };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Could not resend verification email",
+    };
+  }
 }
 
 /**

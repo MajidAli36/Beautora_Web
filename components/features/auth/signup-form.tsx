@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, ShoppingBag, Store } from "lucide-react";
 import { notify } from "@/lib/toast";
 import {
   checkEmailAvailable,
   checkSalonNameAvailable,
   registerAccount,
+  resendSignupVerificationEmail,
 } from "@/lib/actions/auth";
 import { rememberPartnerReferral, getRememberedPartnerReferral } from "@/lib/actions/partners";
 import {
@@ -19,7 +20,6 @@ import type { SignupAccountType } from "@/lib/auth/account-types";
 import { cn } from "@/lib/utils";
 
 export function SignupForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [accountType, setAccountType] = useState<SignupAccountType>("owner");
   const [salonName, setSalonName] = useState("");
@@ -36,6 +36,8 @@ export function SignupForm() {
   const [emailOk, setEmailOk] = useState<boolean | null>(null);
   const [partnerRef, setPartnerRef] = useState<string | null>(null);
   const [refHint, setRefHint] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"form" | "verify">("form");
+  const [resending, setResending] = useState(false);
 
   const isOwner = accountType === "owner";
   const isCustomer = accountType === "customer";
@@ -208,8 +210,68 @@ export function SignupForm() {
         ? "Account created — check your email to verify, then shop and add to cart."
         : "Account created — check your email to verify and finish onboarding."
     );
-    router.push(`/login?verified=pending&email=${encodeURIComponent(trimmedEmail)}`);
+    setPhase("verify");
     setLoading(false);
+  }
+
+  async function handleResendVerification() {
+    setResending(true);
+    const result = await resendSignupVerificationEmail({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    setResending(false);
+    if (result.error) {
+      notify.error(result.error);
+      return;
+    }
+    notify.success("New verification email sent — open the newest message.");
+  }
+
+  if (phase === "verify") {
+    return (
+      <div className="auth-card border border-[var(--m-line)] bg-white/90 p-4 sm:p-7 lg:p-8">
+        <div className="space-y-3">
+          <h2 className="font-display text-[1.65rem] font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl">
+            Check your email
+          </h2>
+          <p className="text-sm leading-relaxed text-[var(--m-muted)]">
+            We sent a verification link to{" "}
+            <span className="font-semibold text-[var(--m-ink)]">
+              {email.trim().toLowerCase()}
+            </span>
+            . Open it, then click <strong>Continue</strong> on the confirmation page.
+          </p>
+          <p className="text-xs leading-relaxed text-[var(--m-muted)]">
+            Old links stop working after a new email is sent. Use the newest message only.
+          </p>
+        </div>
+        <div className="mt-6 space-y-3">
+          <button
+            type="button"
+            onClick={handleResendVerification}
+            disabled={resending}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 border border-[var(--m-ink)] bg-white text-sm font-semibold text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)] disabled:opacity-60"
+          >
+            {resending ? "Sending…" : "Resend verification email"}
+          </button>
+          <Link
+            href={`/login?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[var(--m-ink)] text-sm font-semibold text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]"
+          >
+            I verified — go to sign in
+            <ArrowRight className="size-4" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setPhase("form")}
+            className="w-full text-sm font-medium text-[var(--m-accent)] underline-offset-4 hover:underline"
+          >
+            Back to sign up form
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
