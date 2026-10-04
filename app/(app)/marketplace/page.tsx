@@ -35,7 +35,7 @@ export default async function MarketplaceDashboardPage() {
             <Badge
               variant={
                 seller.status === "approved"
-                  ? "default"
+                  ? "success"
                   : seller.status === "suspended"
                     ? "destructive"
                     : "secondary"
@@ -51,13 +51,13 @@ export default async function MarketplaceDashboardPage() {
         }
       />
 
-      {seller.status === "pending" && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+      {seller.status === "suspended" && (
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-base">Awaiting marketplace approval</CardTitle>
+            <CardTitle className="text-base">Marketplace seller suspended</CardTitle>
             <CardDescription>
-              Platform admin reviews new sellers before your catalog can go live on Beautora Shop.
-              You can still draft products while you wait.
+              Your shop is paused by platform admin. Contact Beautora support if you need this
+              reviewed.
             </CardDescription>
           </CardHeader>
         </Card>

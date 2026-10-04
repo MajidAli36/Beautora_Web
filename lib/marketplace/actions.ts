@@ -115,7 +115,8 @@ export async function registerMarketplaceSeller(
     slug,
     bio,
     phone: phoneResult.phone,
-    status: "pending",
+    // Auto-approve — no platform wait for new sellers.
+    status: "approved",
   });
 
   if (error) return { error: error.message };

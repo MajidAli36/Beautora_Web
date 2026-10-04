@@ -363,8 +363,9 @@ export function SellerStoreSettingsForm({
         <div className="space-y-2 rounded-xl border p-4">
           <p className="text-sm font-medium">Beautora Marketplace shop</p>
           <p className="text-xs text-muted-foreground">
-            Published products show on <code className="text-[11px]">/shop</code> after
-            approval. Status: <Badge variant="outline">{seller.status}</Badge>
+            Published products show on <code className="text-[11px]">/shop</code> when your
+            seller status is approved. Status:{" "}
+            <Badge variant="outline">{seller.status}</Badge>
           </p>
         </div>
         {canToggleOrgStore ? (
