@@ -21,9 +21,11 @@ const DEVICE_KEY = "salon-thumb-attendance-device-id-v3";
 const POLL_MS = 2000;
 
 /**
- * Runs on every authenticated app screen (POS, dashboard, attendance, …).
- * Staff only need to press their thumb on the ZK / attendance machine —
- * no "Press thumb" button. 1st press → check-in, next → check-out (+ minutes).
+ * Probes the local SyncOps Device Agent (127.0.0.1). Mount only on Attendance
+ * (and similar device screens) — Chrome will ask for “apps on this device”
+ * permission if this runs site-wide during onboarding/dashboard.
+ *
+ * Staff press thumb on the ZK machine: 1st → check-in, next → check-out.
  */
 export function ThumbAttendanceLiveSync() {
   const busy = useRef(false);

@@ -4,6 +4,7 @@ import { useMemo, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AttendanceButtons } from "@/components/features/staff/staff-forms";
 import { AttendanceDesk } from "@/components/features/attendance/attendance-desk";
+import { ThumbAttendanceLiveSync } from "@/components/features/attendance/thumb-attendance-live-sync";
 import type { AttendanceOverview, AttendanceReport } from "@/lib/actions/attendance";
 import { attendanceMethodLabel } from "@/lib/attendance/labels";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +87,8 @@ export function AttendanceDashboard({
 
   return (
     <div className="space-y-6">
+      {/* Only probe local Device Agent on Attendance — not during onboarding/dashboard. */}
+      <ThumbAttendanceLiveSync />
       {canManage && (
         <AttendanceDesk
           staff={staffList}

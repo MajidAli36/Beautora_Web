@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
 import type { BillingPaymentRow } from "@/lib/actions/billing";
+import type { User } from "@supabase/supabase-js";
 
 async function requirePlatformAdmin() {
   const supabase = await createClient();
@@ -692,9 +693,7 @@ export async function listPlatformUsers(): Promise<PlatformUserRow[]> {
   await requirePlatformAdmin();
   const admin = createAdminClient();
 
-  const authUsers: Awaited<
-    ReturnType<typeof admin.auth.admin.listUsers>
-  >["data"]["users"] = [];
+  const authUsers: User[] = [];
 
   for (let page = 1; page <= 50; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({
@@ -702,8 +701,8 @@ export async function listPlatformUsers(): Promise<PlatformUserRow[]> {
       perPage: 200,
     });
     if (error) throw new Error(error.message);
-    authUsers.push(...data.users);
-    if (data.users.length < 200) break;
+    authUsers.push(...(data.users ?? []));
+    if ((data.users?.length ?? 0) < 200) break;
   }
 
   const userIds = authUsers.map((u) => u.id);
