@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, ShoppingBag, Store } from "lucide-react";
 import { notify } from "@/lib/toast";
 import {
@@ -20,6 +20,7 @@ import type { SignupAccountType } from "@/lib/auth/account-types";
 import { cn } from "@/lib/utils";
 
 export function SignupForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [accountType, setAccountType] = useState<SignupAccountType>("owner");
   const [salonName, setSalonName] = useState("");
@@ -205,12 +206,21 @@ export function SignupForm() {
       return;
     }
 
-    notify.success(
-      isCustomer
-        ? "Account created — check your email to verify, then shop and add to cart."
-        : "Account created — check your email to verify and finish onboarding."
+    if (created.needsEmailVerification) {
+      notify.success(
+        isCustomer
+          ? "Account created — check your email to verify, then shop and add to cart."
+          : "Account created — check your email to verify and finish onboarding."
+      );
+      setPhase("verify");
+      setLoading(false);
+      return;
+    }
+
+    notify.success("Account ready — sign in with your password.");
+    router.push(
+      `/login?email=${encodeURIComponent(trimmedEmail)}&ready=1`
     );
-    setPhase("verify");
     setLoading(false);
   }
 

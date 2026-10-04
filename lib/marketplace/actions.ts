@@ -177,7 +177,8 @@ export async function upsertSellerProduct(
 
   const slug = slugify(title);
   const supabase = await createClient();
-  const status = submitForReview ? "pending" : "draft";
+  // Auto-publish on submit — no platform wait for marketplace listings.
+  const status = submitForReview ? "published" : "draft";
 
   if (id) {
     const patch: Database["public"]["Tables"]["marketplace_products"]["Update"] = {
@@ -197,7 +198,7 @@ export async function upsertSellerProduct(
       seo_description: seoDescription,
       updated_at: new Date().toISOString(),
     };
-    if (submitForReview) patch.status = "pending";
+    if (submitForReview) patch.status = "published";
     const { error } = await supabase
       .from("marketplace_products")
       .update(patch)

@@ -12,8 +12,8 @@ export default async function PlatformUsersPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8 sm:px-6">
       <PlatformAdminSubheader
-        title="All users"
-        description={`Every account on Beautora — ${active} active, ${pending} pending email verification, ${users.length} total.`}
+        title="Users"
+        description={`Separate users directory — ${active} active, ${pending} pending, ${users.length} total. Filter by role, store, city, and country. Send personal notes by email anytime.`}
       />
       <PlatformUsersPanel users={users} enableSearch />
     </div>

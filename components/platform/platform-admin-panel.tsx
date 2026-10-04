@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { notify } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
-import type {
-  PlatformStoreRow,
-  PlatformUserRow,
-} from "@/lib/actions/platform-admin";
+import type { PlatformStoreRow } from "@/lib/actions/platform-admin";
 import {
   reviewSubscriptionPayment,
   type BillingPaymentRow,
@@ -16,7 +13,6 @@ import {
 import { CustomerInvoicePreview } from "@/components/billing/customer-invoice-preview";
 import { PlatformPartnersPanel } from "@/components/platform/platform-partners-panel";
 import { PlatformStoresPanel } from "@/components/platform/platform-stores-panel";
-import { PlatformUsersPanel } from "@/components/platform/platform-users-panel";
 import type { PartnerRow } from "@/lib/actions/partners";
 import { PLATFORM_DASHBOARD_PREVIEW } from "@/lib/platform/dashboard-preview";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
@@ -29,7 +25,6 @@ export function PlatformAdminPanel({
   storesTotal,
   payments,
   partners,
-  users,
   usersTotal,
   summary,
   adminEmail,
@@ -39,7 +34,6 @@ export function PlatformAdminPanel({
   storesTotal?: number;
   payments: BillingPaymentRow[];
   partners: PartnerRow[];
-  users?: PlatformUserRow[];
   usersTotal?: number;
   summary: {
     storeCount: number;
@@ -128,11 +122,29 @@ export function PlatformAdminPanel({
         </div>
       ) : null}
 
-      <PlatformUsersPanel
-        users={users ?? []}
-        previewLimit={PLATFORM_DASHBOARD_PREVIEW}
-        viewAllHref="/platform/users"
-      />
+      <section className="rounded-lg border px-4 py-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Users</h2>
+            <p className="text-sm text-muted-foreground">
+              Separate directory — filter by salon owner, staff, store, city,
+              country. Send personal note emails anytime.
+            </p>
+            <p className="mt-2 text-sm">
+              <span className="font-semibold tabular-nums">
+                {summary.userCount ?? usersTotal ?? 0}
+              </span>{" "}
+              accounts
+              {(summary.pendingUsers ?? 0) > 0
+                ? ` · ${summary.pendingUsers} pending verification`
+                : ""}
+            </p>
+          </div>
+          <Button render={<Link href="/platform/users" />}>
+            Open users screen
+          </Button>
+        </div>
+      </section>
 
       <PlatformStoresPanel
         stores={stores}

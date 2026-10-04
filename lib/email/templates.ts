@@ -337,3 +337,75 @@ export function marketplacePaymentReceiptEmail(input: {
     }),
   };
 }
+
+export function platformAdminNoteEmail(input: {
+  name?: string | null;
+  subject: string;
+  note: string;
+  ctaUrl?: string;
+}) {
+  const name = escapeHtml(input.name || "there");
+  const noteHtml = escapeHtml(input.note).replace(/\n/g, "<br />");
+  return {
+    subject: input.subject.trim() || `Message from ${SYNCOPS.name}`,
+    ...renderEmailLayout({
+      preheader:
+        input.subject.trim() ||
+        `A personal note from ${SYNCOPS.name} platform admin.`,
+      title: input.subject.trim() || "Message from Beautora",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Hi ${name},</p>
+        <div style="margin:0 0 12px;padding:14px 16px;border:1px solid #E6EBE9;border-radius:8px;background:#FAFBFA;">
+          ${noteHtml}
+        </div>
+        <p style="margin:0;font-size:13px;color:#6B7672;">This note was sent by Beautora platform admin. Reply to this email if you need help.</p>
+      `,
+      ctaLabel: input.ctaUrl ? "Open Beautora" : undefined,
+      ctaUrl: input.ctaUrl,
+      footerNote: "Personal messages from Beautora platform admin.",
+    }),
+  };
+}
+
+export function salonWelcomeReadyEmail(input: {
+  name: string;
+  salonName: string;
+  loginUrl: string;
+}) {
+  const name = escapeHtml(input.name || "there");
+  const salon = escapeHtml(input.salonName);
+  return {
+    subject: `Welcome to ${SYNCOPS.name} — your account is ready`,
+    ...renderEmailLayout({
+      preheader: `${input.salonName} is ready. Sign in to continue onboarding.`,
+      title: "Your account is ready",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Hi ${name},</p>
+        <p style="margin:0 0 12px;">Welcome to <strong>${escapeHtml(SYNCOPS.name)}</strong>. Your store <strong>${salon}</strong> is ready — your email is already verified.</p>
+        <p style="margin:0;font-size:13px;color:#6B7672;">Sign in to finish setup and open your workspace.</p>
+      `,
+      ctaLabel: "Sign in & continue",
+      ctaUrl: input.loginUrl,
+    }),
+  };
+}
+
+export function customerWelcomeReadyEmail(input: {
+  name?: string | null;
+  loginUrl: string;
+}) {
+  const name = escapeHtml(input.name || "there");
+  return {
+    subject: `Welcome to ${SYNCOPS.name} — your account is ready`,
+    ...renderEmailLayout({
+      preheader: "Your shopper account is ready. Sign in to start shopping.",
+      title: "Your account is ready",
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Hi ${name},</p>
+        <p style="margin:0 0 12px;">Welcome to <strong>${escapeHtml(SYNCOPS.name)}</strong>. Your email is already verified — you can sign in and shop right away.</p>
+      `,
+      ctaLabel: "Sign in & shop",
+      ctaUrl: input.loginUrl,
+    }),
+  };
+}

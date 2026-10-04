@@ -34,6 +34,9 @@ export function LoginForm() {
     if (searchParams.get("verified") === "pending") {
       notify.success("Check your inbox for the Beautora verification link.");
     }
+    if (searchParams.get("ready") === "1") {
+      notify.success("Account ready — sign in with your password.");
+    }
     if (searchParams.get("reset") === "1") {
       notify.success("Password updated — sign in with your new password.");
     }

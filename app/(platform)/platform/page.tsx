@@ -58,7 +58,6 @@ export default async function PlatformAdminPage() {
         storesTotal={stores.length}
         payments={payments}
         partners={partners}
-        users={users.slice(0, PLATFORM_DASHBOARD_PREVIEW)}
         usersTotal={users.length}
         summary={summary}
         adminEmail={user.email ?? ""}

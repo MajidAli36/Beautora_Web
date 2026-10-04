@@ -87,7 +87,8 @@ export async function upsertSellerProductWithMedia(
 
   const admin = createAdminClient();
   const slug = slugify(title);
-  const status = submitForReview ? "pending" : "draft";
+  // Auto-publish on submit — no platform wait for marketplace listings.
+  const status = submitForReview ? "published" : "draft";
   const plain = descriptionHtml ? stripHtml(descriptionHtml) : null;
 
   const { data: product, error: insertErr } = await admin
@@ -250,8 +251,8 @@ async function finishMedia(
       success: true,
       productId,
       message:
-        status === "pending"
-          ? "Product submitted for approval."
+        status === "published"
+          ? "Product published to the marketplace."
           : "Draft saved with media.",
     };
   } catch (err) {

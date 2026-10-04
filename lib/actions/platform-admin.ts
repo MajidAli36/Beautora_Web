@@ -659,9 +659,14 @@ export type PlatformUserRow = {
   email: string;
   status: PlatformUserStatus;
   role: PlatformUserRole;
+  /** organization_members.role when linked to a salon */
+  memberRole: string | null;
   displayName: string | null;
   partnerStatus: "pending" | "approved" | "rejected" | null;
+  organizationId: string | null;
   organizationName: string | null;
+  city: string | null;
+  country: string | null;
   createdAt: string;
   lastSignInAt: string | null;
   emailConfirmedAt: string | null;
@@ -707,15 +712,18 @@ export async function listPlatformUsers(): Promise<PlatformUserRow[]> {
 
   const userIds = authUsers.map((u) => u.id);
 
+  const emptyId = "00000000-0000-0000-0000-000000000000";
   const [{ data: partners }, { data: memberships }] = await Promise.all([
     admin
       .from("partners")
       .select("user_id, status, username, full_name")
-      .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]),
+      .in("user_id", userIds.length ? userIds : [emptyId]),
     admin
       .from("organization_members")
-      .select("user_id, role, organization:organizations(name)")
-      .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]),
+      .select(
+        "user_id, role, organization:organizations(id, name, city, country)"
+      )
+      .in("user_id", userIds.length ? userIds : [emptyId]),
   ]);
 
   const partnerByUser = new Map(
@@ -729,32 +737,74 @@ export async function listPlatformUsers(): Promise<PlatformUserRow[]> {
     ])
   );
 
-  const orgByUser = new Map<string, string>();
+  const orgByUser = new Map<
+    string,
+    {
+      organizationId: string;
+      organizationName: string;
+      memberRole: string;
+      city: string | null;
+      country: string | null;
+    }
+  >();
   for (const row of memberships ?? []) {
-    const org = row.organization as { name?: string } | null;
-    if (row.user_id && org?.name && !orgByUser.has(row.user_id)) {
-      orgByUser.set(row.user_id, org.name);
+    const org = row.organization as {
+      id?: string;
+      name?: string;
+      city?: string | null;
+      country?: string | null;
+    } | null;
+    if (row.user_id && org?.id && org.name && !orgByUser.has(row.user_id)) {
+      orgByUser.set(row.user_id, {
+        organizationId: org.id,
+        organizationName: org.name,
+        memberRole: String(row.role ?? ""),
+        city: org.city ?? null,
+        country: org.country ?? null,
+      });
     }
   }
 
   return authUsers
     .map((user) => {
       const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-      const role = classifyAuthMetadata(meta, user.email);
+      let role = classifyAuthMetadata(meta, user.email);
       const partner = partnerByUser.get(user.id) ?? null;
+      const org = orgByUser.get(user.id) ?? null;
+      const memberRoleUpper = (org?.memberRole ?? "").toUpperCase();
+
+      if (role === "unknown" || role === "customer") {
+        if (memberRoleUpper === "OWNER") role = "owner";
+        else if (memberRoleUpper) role = "staff";
+      } else if (
+        role === "owner" &&
+        memberRoleUpper &&
+        memberRoleUpper !== "OWNER"
+      ) {
+        role = "staff";
+      }
+
       const displayName =
         displayNameFromMeta(meta) ||
         partner?.fullName ||
-        (partner?.username ? `@${partner.username}` : null);
+        (partner?.username ? `@${partner.username}` : null) ||
+        org?.organizationName ||
+        null;
 
       return {
         id: user.id,
         email: user.email ?? "(no email)",
         status: resolveUserStatus(user),
         role,
+        memberRole: org?.memberRole ?? null,
         displayName,
         partnerStatus: partner?.status ?? null,
-        organizationName: orgByUser.get(user.id) ?? null,
+        organizationId: org?.organizationId ?? null,
+        organizationName:
+          org?.organizationName ??
+          (typeof meta.salon_name === "string" ? meta.salon_name : null),
+        city: org?.city ?? null,
+        country: org?.country ?? null,
         createdAt: user.created_at,
         lastSignInAt: user.last_sign_in_at ?? null,
         emailConfirmedAt: user.email_confirmed_at ?? null,
@@ -766,6 +816,58 @@ export async function listPlatformUsers(): Promise<PlatformUserRow[]> {
       if (byStatus !== 0) return byStatus;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
+}
+
+/** Confirm email for any auth user (platform admin). */
+export async function confirmPlatformUserEmail(
+  userId: string
+): Promise<ActionResult> {
+  await requirePlatformAdmin();
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  if (error || !data.user) return { error: "User not found" };
+  if (data.user.email_confirmed_at) return { success: true };
+  const { error: updErr } = await admin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+  });
+  if (updErr) return { error: updErr.message };
+  revalidatePath("/platform/users");
+  revalidatePath("/platform");
+  return { success: true };
+}
+
+/** Send a personal note email to any user from platform admin. */
+export async function sendPlatformUserNote(input: {
+  userId: string;
+  subject: string;
+  note: string;
+}): Promise<ActionResult> {
+  await requirePlatformAdmin();
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.getUserById(input.userId);
+  if (error || !data.user?.email) return { error: "User not found" };
+
+  const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
+  const name =
+    (typeof meta.full_name === "string" && meta.full_name) ||
+    (typeof meta.salon_name === "string" && meta.salon_name) ||
+    null;
+
+  const { sendPlatformAdminNoteEmail } = await import("@/lib/email/notify");
+  const mailed = await sendPlatformAdminNoteEmail({
+    email: data.user.email,
+    name,
+    subject: input.subject,
+    note: input.note,
+  });
+  if (!mailed.ok) {
+    return {
+      error: mailed.skipped
+        ? "Email is not configured on the server."
+        : mailed.error || "Could not send note",
+    };
+  }
+  return { success: true };
 }
 
 /** Delete an unverified (pending) auth user so they can sign up again. */

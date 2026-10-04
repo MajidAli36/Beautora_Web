@@ -5,8 +5,11 @@ import {
   partnerStatusEmail,
   partnerWelcomeVerifyEmail,
   passwordResetEmail,
+  platformAdminNoteEmail,
   platformPaymentSubmittedEmail,
+  customerWelcomeReadyEmail,
   customerWelcomeVerifyEmail,
+  salonWelcomeReadyEmail,
   salonWelcomeVerifyEmail,
   subscriptionActivatedEmail,
   subscriptionDeactivatedEmail,
@@ -22,6 +25,83 @@ import {
 } from "@/lib/billing/subscription";
 import { PLATFORM_HARDCODED_ADMIN } from "@/lib/platform/admin";
 import { isPlatformAdminEmail } from "@/lib/billing/subscription";
+
+export async function sendSalonWelcomeReadyEmail(input: {
+  email: string;
+  salonName: string;
+  userId?: string;
+}) {
+  const loginUrl = `${getEmailLinkBaseUrl()}/login?email=${encodeURIComponent(input.email)}&ready=1`;
+  const content = salonWelcomeReadyEmail({
+    name: input.salonName,
+    salonName: input.salonName,
+    loginUrl,
+  });
+  return sendTransactionalEmail({
+    to: input.email,
+    toName: input.salonName,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
+    type: EmailType.SalonWelcomeVerify,
+    idempotencyKey: input.userId
+      ? `salon-ready:${input.userId}:${Math.floor(Date.now() / 60_000)}`
+      : `salon-ready:${input.email}:${Math.floor(Date.now() / 60_000)}`,
+  });
+}
+
+export async function sendCustomerWelcomeReadyEmail(input: {
+  email: string;
+  fullName?: string | null;
+  userId?: string;
+}) {
+  const loginUrl = `${getEmailLinkBaseUrl()}/login?email=${encodeURIComponent(input.email)}&ready=1`;
+  const content = customerWelcomeReadyEmail({
+    name: input.fullName,
+    loginUrl,
+  });
+  return sendTransactionalEmail({
+    to: input.email,
+    toName: input.fullName,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
+    type: EmailType.CustomerWelcomeVerify,
+    idempotencyKey: input.userId
+      ? `customer-ready:${input.userId}:${Math.floor(Date.now() / 60_000)}`
+      : `customer-ready:${input.email}:${Math.floor(Date.now() / 60_000)}`,
+  });
+}
+
+/** Personal note from platform admin to any user. */
+export async function sendPlatformAdminNoteEmail(input: {
+  email: string;
+  name?: string | null;
+  subject: string;
+  note: string;
+}): Promise<SendEmailResult> {
+  const subject = input.subject.trim();
+  const note = input.note.trim();
+  if (!subject) return { ok: false, error: "Subject is required" };
+  if (note.length < 2) return { ok: false, error: "Note is required" };
+
+  const content = platformAdminNoteEmail({
+    name: input.name,
+    subject,
+    note,
+    ctaUrl: getEmailLinkBaseUrl(),
+  });
+
+  return sendTransactionalEmail({
+    to: input.email,
+    toName: input.name,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
+    type: EmailType.PlatformAdminNote,
+    idempotencyKey: `admin-note:${input.email}:${Math.floor(Date.now() / 30_000)}`,
+  });
+}
 
 /** Fire-and-forget safe: never throws. */
 export async function sendSalonSignupVerificationEmail(input: {

@@ -14,8 +14,10 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendCustomerSignupVerificationEmail,
+  sendCustomerWelcomeReadyEmail,
   sendPasswordResetEmail,
   sendSalonSignupVerificationEmail,
+  sendSalonWelcomeReadyEmail,
 } from "@/lib/email/notify";
 import type { ActionResult } from "@/types/commerce";
 
@@ -209,7 +211,7 @@ export async function registerAccount(input: {
       existing.id,
       {
         password,
-        email_confirm: false,
+        email_confirm: true,
         user_metadata: userMetadata,
       }
     );
@@ -219,7 +221,7 @@ export async function registerAccount(input: {
     const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: userMetadata,
     });
 
@@ -237,34 +239,25 @@ export async function registerAccount(input: {
     userId = data.user.id;
   }
 
+  // Welcome email is best-effort — account is already verified and can sign in.
   const mailed =
     accountType === "customer"
-      ? await sendCustomerSignupVerificationEmail({
+      ? await sendCustomerWelcomeReadyEmail({
           email,
           fullName: fullName || null,
-          password,
           userId,
         })
-      : await sendSalonSignupVerificationEmail({
+      : await sendSalonWelcomeReadyEmail({
           email,
           salonName,
-          password,
           userId,
         });
 
   if (!mailed.ok) {
-    // Only roll back brand-new users — keep restarted unverified accounts.
-    if (!existing) {
-      await admin.auth.admin.deleteUser(userId);
-    }
-    return {
-      error: mailed.skipped
-        ? "Email is not configured on the server. Please try again later."
-        : `Could not send verification email: ${mailed.error}`,
-    };
+    console.error("[auth] welcome email failed", mailed.error);
   }
 
-  return { success: true, needsEmailVerification: true };
+  return { success: true, needsEmailVerification: false };
 }
 
 /**
