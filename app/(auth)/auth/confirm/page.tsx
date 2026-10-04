@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Intermediate step before verifyOtp.
- * Email clients / security scanners often prefetch links and burn one-time tokens;
- * requiring a real click here keeps the hash intact until the user continues.
+ * Lives under (auth) so marketing theme fonts/CSS variables apply (same as login/signup).
+ * Email scanners that prefetch the link do not burn the token until Continue is clicked.
  */
 export default async function AuthConfirmPage({
   searchParams,
@@ -28,26 +28,40 @@ export default async function AuthConfirmPage({
 
   return (
     <AuthShell>
-      <div className="space-y-6">
+      <div className="auth-card border border-[var(--m-line)] bg-white/90 p-4 sm:p-7 lg:p-8">
         <div className="space-y-2">
-          <h1 className="font-display text-3xl tracking-tight text-[var(--m-ink)]">
+          <h1 className="font-display text-[1.65rem] font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl">
             {valid ? "Confirm your email" : "Link invalid"}
           </h1>
-          <p className="text-sm leading-relaxed text-[var(--m-ink)]/65">
+          <p className="text-sm leading-relaxed text-[var(--m-muted)]">
             {valid
               ? "Click below to finish signing in. This protects your link from email scanners that open it automatically."
               : "This verification link is missing data. Request a new email from the sign-up page."}
           </p>
         </div>
-        {valid ? (
-          <Link href={href} className={cn(buttonVariants({ size: "lg" }), "w-full")}>
-            Continue
-          </Link>
-        ) : (
-          <Link href="/signup" className={cn(buttonVariants({ size: "lg" }), "w-full")}>
-            Back to sign up
-          </Link>
-        )}
+        <div className="mt-6">
+          {valid ? (
+            <Link
+              href={href}
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "h-12 w-full bg-[var(--m-ink)] text-[var(--m-paper)] hover:bg-[var(--m-ink-soft)]"
+              )}
+            >
+              Continue
+            </Link>
+          ) : (
+            <Link
+              href="/signup"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "h-12 w-full bg-[var(--m-ink)] text-[var(--m-paper)] hover:bg-[var(--m-ink-soft)]"
+              )}
+            >
+              Back to sign up
+            </Link>
+          )}
+        </div>
       </div>
     </AuthShell>
   );
