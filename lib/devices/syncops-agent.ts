@@ -151,6 +151,27 @@ export async function getAgentHealth() {
   }
 }
 
+export type ZktecoWaitPunch = {
+  userId: string;
+  timestamp: string;
+  inOutMode?: number | null;
+  deviceId?: string | null;
+};
+
+export type ZktecoWaitResult = {
+  ok: boolean;
+  version: number;
+  changed: boolean;
+  punches: ZktecoWaitPunch[];
+};
+
+/** Long-poll until a new ADMS/local punch arrives (or timeout ~25s). */
+export async function waitForZktecoPunch(sinceVersion = 0, signal?: AbortSignal) {
+  return agentFetch<ZktecoWaitResult>(`/api/zkteco/wait?since=${encodeURIComponent(String(sinceVersion))}`, {
+    signal,
+  });
+}
+
 export async function getBeautoraAttendanceStatus() {
   return agentFetch<BeautoraAttendanceBridgeStatus>("/api/beautora/attendance/status");
 }

@@ -110,7 +110,7 @@ export function NavigationLoader() {
 
       <div
         className={cn(
-          "flex flex-1 items-center justify-center bg-background/75 backdrop-blur-[2px]",
+          "flex flex-1 items-center justify-center bg-background/80",
           visible ? "pointer-events-auto" : "pointer-events-none"
         )}
       >

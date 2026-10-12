@@ -64,14 +64,15 @@ public static class ZktecoAdmsEndpoints
 
         if (HttpMethods.IsGet(request.Method))
         {
-            // Initial options exchange — tell device we accept ATTLOG.
+            // Realtime ADMS: device should POST ATTLOG immediately after each thumb.
+            // Keep Delay/ErrorDelay low so uploads are not batched for minutes.
             return Results.Text("GET OPTION FROM: " + (sn.Length > 0 ? sn : "SyncOps") + "\n" +
                                 "ATTLOGStamp=None\n" +
                                 "OPERLOGStamp=None\n" +
                                 "ATTPHOTOStamp=None\n" +
-                                "ErrorDelay=30\n" +
-                                "Delay=2\n" +
-                                "TransTimes=00:00;14:00\n" +
+                                "ErrorDelay=5\n" +
+                                "Delay=0\n" +
+                                "TransTimes=00:00;23:59\n" +
                                 "TransInterval=1\n" +
                                 "TransFlag=1111000000\n" +
                                 "TimeZone=5\n" +
@@ -89,7 +90,7 @@ public static class ZktecoAdmsEndpoints
         if (string.IsNullOrWhiteSpace(body))
             return Results.Text("OK");
 
-        var pushed = 0;
+        var pendingPush = new List<(string UserId, DateTimeOffset At, string ExternalKey)>();
         // ATTLOG lines, or raw stamp pushes.
         if (table.Equals("ATTLOG", StringComparison.OrdinalIgnoreCase) ||
             body.Contains('\t') ||
@@ -107,30 +108,56 @@ public static class ZktecoAdmsEndpoints
                     continue;
                 }
 
+                // Buffer first so UI long-poll wakes immediately; ACK device without waiting on web API.
                 ZktecoAttendancePunchStore.Add(userId, at, inOut, 1, string.IsNullOrWhiteSpace(sn) ? null : sn);
                 ZktecoWatcherDiagnostics.NoteAdmsPunch(userId);
-                var externalKey = $"{userId}@{at.ToUnixTimeMilliseconds()}";
-                try
-                {
-                    // Prefer direct agent→web ingest (works without Devices API key).
-                    var pushedOk = await PushAgentThumbPunchAsync(request.HttpContext.RequestServices, userId, at, externalKey, ct);
-                    if (pushedOk) { pushed++; continue; }
-
-                    var punch = await bridge.PunchAsync(userId, "toggle", at, externalKey, ct);
-                    if (punch.Success && !punch.Deduped) pushed++;
-                    log.LogInformation(
-                        "ADMS punch user={User} at={At} ok={Ok} action={Action} err={Err}",
-                        userId, at, punch.Success, punch.Action, punch.Error);
-                }
-                catch (Exception ex)
-                {
-                    log.LogWarning(ex, "ADMS punch failed for {User}", userId);
-                }
+                pendingPush.Add((userId, at, $"{userId}@{at.ToUnixTimeMilliseconds()}"));
             }
         }
 
-        // Device expects plain OK
-        return Results.Text(pushed > 0 ? $"OK: {pushed}" : "OK");
+        if (pendingPush.Count > 0)
+        {
+            var scopeFactory = request.HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
+            var snapshot = pendingPush.ToArray();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var sp = scope.ServiceProvider;
+                    var bgBridge = sp.GetRequiredService<IBeautoraAttendanceBridge>();
+                    var bgLog = sp.GetRequiredService<ILoggerFactory>().CreateLogger("ZktecoAdms");
+                    foreach (var (userId, at, externalKey) in snapshot)
+                    {
+                        try
+                        {
+                            var pushedOk = await PushAgentThumbPunchAsync(sp, userId, at, externalKey, CancellationToken.None);
+                            if (pushedOk)
+                            {
+                                bgLog.LogInformation("ADMS→Beautora ok user={User} at={At}", userId, at);
+                                continue;
+                            }
+
+                            var punch = await bgBridge.PunchAsync(userId, "toggle", at, externalKey, CancellationToken.None);
+                            bgLog.LogInformation(
+                                "ADMS punch user={User} at={At} ok={Ok} action={Action} err={Err}",
+                                userId, at, punch.Success, punch.Action, punch.Error);
+                        }
+                        catch (Exception ex)
+                        {
+                            bgLog.LogWarning(ex, "ADMS background punch failed for {User}", userId);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "ADMS background push loop failed");
+                }
+            });
+        }
+
+        // ACK device immediately — do not block on Next.js / Supabase latency.
+        return Results.Text(pendingPush.Count > 0 ? $"OK: {pendingPush.Count}" : "OK");
     }
 
     private static async Task<IResult> HandleJsonAttendanceAsync(
@@ -152,14 +179,17 @@ public static class ZktecoAdmsEndpoints
 
         ZktecoAttendancePunchStore.Add(userId, at, null, 1, "json");
         var externalKey = $"{userId}@{at.ToUnixTimeMilliseconds()}";
-        var pushedOk = await PushAgentThumbPunchAsync(request.HttpContext.RequestServices, userId, at, externalKey, ct);
-        if (pushedOk)
-            return Results.Json(new { success = true, action = "toggle", staffName = (string?)null });
-
-        var punch = await bridge.PunchAsync(userId, "toggle", at, externalKey, ct);
-        return punch.Success
-            ? Results.Json(new { success = true, action = punch.Action, staffName = punch.StaffName })
-            : Results.Json(new { success = false, error = punch.Error }, statusCode: 400);
+        var scopeFactory = request.HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
+        _ = Task.Run(async () =>
+        {
+            using var scope = scopeFactory.CreateScope();
+            var sp = scope.ServiceProvider;
+            var pushedOk = await PushAgentThumbPunchAsync(sp, userId, at, externalKey, CancellationToken.None);
+            if (pushedOk) return;
+            var bgBridge = sp.GetRequiredService<IBeautoraAttendanceBridge>();
+            await bgBridge.PunchAsync(userId, "toggle", at, externalKey, CancellationToken.None);
+        });
+        return Results.Json(new { success = true, action = "toggle", queued = true });
     }
 
     private static async Task<bool> PushAgentThumbPunchAsync(
@@ -172,12 +202,13 @@ public static class ZktecoAdmsEndpoints
         try
         {
             var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<Beautora.DeviceAgent.Configuration.DeviceAgentOptions>>().Value;
-            var appUrl = (options.Beautora.AppUrl ?? "").TrimEnd('/');
-            if (string.IsNullOrWhiteSpace(appUrl)) return false;
+            var punchUrl = Beautora.DeviceAgent.Configuration.BeautoraCloudUrls.Api(
+                options.Beautora.AppUrl,
+                "/api/agent/thumb-punch");
 
             var factory = services.GetRequiredService<IHttpClientFactory>();
             var client = factory.CreateClient("BeautoraAttendance");
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{appUrl}/api/agent/thumb-punch");
+            using var request = new HttpRequestMessage(HttpMethod.Post, punchUrl);
             request.Headers.TryAddWithoutValidation("X-Beautora-Agent-Key", options.ApiKey);
             request.Content = JsonContent.Create(new
             {
@@ -186,7 +217,9 @@ public static class ZktecoAdmsEndpoints
                 at = at.ToUniversalTime().ToString("O"),
                 externalKey
             });
-            using var response = await client.SendAsync(request, ct);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(8));
+            using var response = await client.SendAsync(request, timeout.Token);
             return response.IsSuccessStatusCode;
         }
         catch

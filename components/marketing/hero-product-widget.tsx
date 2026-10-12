@@ -73,6 +73,7 @@ export function HeroProductWidget() {
   useEffect(() => {
     if (paused) return;
     const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       setFade(false);
       window.setTimeout(() => {
         setIndex((i) => (i + 1) % SLIDES.length);

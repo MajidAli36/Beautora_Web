@@ -64,22 +64,36 @@ Configured device (example):
 - `tcp-probe` — verifies TCP reachability; data ops need vendor SDK
 - `vendor-sdk` — placeholder until Standalone SDK DLLs are linked inside the ZKTeco adapter
 
+## Beautora cloud (local SDK → https://www.beautora.app)
+
+Local agent owns hardware. **All DB / attendance uploads** go to Beautora SaaS:
+
+```text
+ZK / devices → Device Agent (this PC :17890) → https://www.beautora.app
+```
+
+Default `DeviceAgent:Beautora:AppUrl` is **`https://www.beautora.app`**.  
+Development (`appsettings.Development.json`) uses `http://localhost:3000`.  
+Override anytime with env `BEAUTORA_APP_URL`.
+
+See [docs/CLOUD-AND-SERVICE.md](docs/CLOUD-AND-SERVICE.md).
+
 ## Beautora attendance (thumb → `/attendance`)
 
-1. In Beautora **Devices**, create an **Attendance terminal** and copy its API key.
-2. On **Attendance**, enroll each stylist’s ZK user id as their **Thumb ID** (mock users: `1`, `2`).
-3. In `appsettings.json`:
+1. In Beautora **Devices**, create an **Attendance terminal** and copy its API key (optional for ADMS thumb-punch).
+2. On **Attendance**, enroll each stylist’s ZK user id as their **Thumb ID**.
+3. Production `appsettings.json`:
 
 ```json
 "Beautora": {
-  "AppUrl": "http://localhost:3000",
+  "AppUrl": "https://www.beautora.app",
   "AttendanceApiKey": "<attendance-terminal-api-key>",
   "AttendanceSyncEnabled": true
 }
 ```
 
-4. Run the agent (`dotnet run`), open `http://localhost:3000/attendance`, use **Discover terminal** / **Punch thumb** / **Sync punches to web**.
-5. Manual check-in on the same page still works if the agent or scanner is offline.
+4. Run the agent (or Windows service), open `https://www.beautora.app/attendance` on the salon PC.
+5. Manual check-in still works if the agent or scanner is offline.
 
 Hardware integration test:
 
@@ -95,11 +109,22 @@ cd D:\Projects\SaaS_Salon\device_agent
 dotnet test SyncOps.DevicePlatform.slnx
 ```
 
-## Windows Service
+## Customer installer (no .NET / no source for salons)
+
+**On your PC** (has .NET SDK), build the package:
 
 ```powershell
-.\installer\install-service.ps1
+cd device_agent\installer
+.\build-customer-package.ps1
 ```
+
+Give the salon **`dist\SyncOps-DeviceAgent.zip`**. They only see:
+
+- **Install.bat** — install background service (starts with Windows)
+- **Uninstall.bat** — remove everything
+
+No SDK, no Visual Studio, no project files on their machine.  
+Cloud: `https://www.beautora.app` · Guide: [installer/README-SETUP.md](installer/README-SETUP.md)
 
 ## Backward compatibility
 

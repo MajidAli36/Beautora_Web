@@ -25,7 +25,7 @@ export function AppPage({
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-[1600px] space-y-5 sm:space-y-6 lg:space-y-8",
+        "mx-auto w-full min-w-0 max-w-[1600px] space-y-4 sm:space-y-6 lg:space-y-8",
         className
       )}
     >
@@ -36,15 +36,15 @@ export function AppPage({
         )}
       >
         <div className="min-w-0 space-y-1">
-          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl">
             {title}
           </h1>
           {description ? (
-            <p className="text-sm text-muted-foreground">{description}</p>
+            <p className="text-sm text-muted-foreground text-pretty">{description}</p>
           ) : null}
         </div>
         {actions ? (
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
             {actions}
           </div>
         ) : null}

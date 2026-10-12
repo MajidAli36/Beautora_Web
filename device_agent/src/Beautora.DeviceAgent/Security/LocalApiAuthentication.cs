@@ -92,6 +92,8 @@ public sealed class AgentAuthMiddleware
 
         if (path.StartsWithSegments("/api/health") ||
             path.StartsWithSegments("/api/zkteco/watcher") ||
+            path.StartsWithSegments("/api/zkteco/wait") ||
+            path.StartsWithSegments("/api/zkteco/punches") ||
             path.StartsWithSegments("/iclock") ||
             path.StartsWithSegments("/swagger") ||
             path.StartsWithSegments("/favicon.ico") ||

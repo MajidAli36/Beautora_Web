@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/layout/page-header";
 import { Suspense } from "react";
 import { getAttendanceOverview, getAttendanceReport } from "@/lib/actions/attendance";
 import { getStaff } from "@/lib/actions/staff";
@@ -31,13 +30,8 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
   ]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Attendance"
-        description="Thumb: 1st press check-in, next press check-out. Manual In/Out is backup only."
-      />
-
-      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+    <div className="min-h-0 space-y-0">
+      <Suspense fallback={<Skeleton className="h-96 w-full rounded-2xl" />}>
         <AttendanceDashboard
           report={report}
           overview={overview}

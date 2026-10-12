@@ -153,8 +153,18 @@ export function SdkDevicesPanel({ canManage = false }: SdkDevicesPanelProps) {
     // Clears any old wrong key from localStorage and uses the shared SyncOps key.
     getSyncOpsAgentConfig();
     void refresh(true);
-    const timer = setInterval(() => void refresh(false), 12000);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void refresh(false);
+    }, 20000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refresh]);
 
   function runDiscover() {

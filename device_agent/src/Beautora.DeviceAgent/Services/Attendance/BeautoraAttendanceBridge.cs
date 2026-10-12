@@ -100,7 +100,7 @@ public sealed class BeautoraAttendanceBridge : IBeautoraAttendanceBridge
         {
             Configured = IsConfigured(),
             SyncEnabled = bridge.AttendanceSyncEnabled && IsConfigured(),
-            AppUrl = (bridge.AppUrl ?? "").TrimEnd('/'),
+            AppUrl = BeautoraCloudUrls.Resolve(bridge.AppUrl),
             ActiveDeviceId = _activeDeviceId,
             LastSyncUtc = _lastSyncUtc,
             WatermarkUtc = _watermarkUtc,
@@ -258,10 +258,10 @@ public sealed class BeautoraAttendanceBridge : IBeautoraAttendanceBridge
         }
 
         var resolvedAction = action is "check_in" or "check_out" ? action : "toggle";
-        var appUrl = _options.Beautora.AppUrl.TrimEnd('/');
+        var attendanceUrl = BeautoraCloudUrls.Api(_options.Beautora.AppUrl, "/api/devices/attendance");
         var client = _httpClientFactory.CreateClient("BeautoraAttendance");
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{appUrl}/api/devices/attendance");
+        using var request = new HttpRequestMessage(HttpMethod.Post, attendanceUrl);
         request.Headers.TryAddWithoutValidation("X-Device-Key", _options.Beautora.AttendanceApiKey);
         request.Content = JsonContent.Create(new
         {
@@ -311,7 +311,7 @@ public sealed class BeautoraAttendanceBridge : IBeautoraAttendanceBridge
     }
 
     private bool IsConfigured() =>
-        !string.IsNullOrWhiteSpace(_options.Beautora.AppUrl) &&
+        !string.IsNullOrWhiteSpace(BeautoraCloudUrls.Resolve(_options.Beautora.AppUrl)) &&
         !string.IsNullOrWhiteSpace(_options.Beautora.AttendanceApiKey);
 
     private static string ResolveAction(int? inOutMode) =>

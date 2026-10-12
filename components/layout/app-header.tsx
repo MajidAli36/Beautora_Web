@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { getPageTitle } from "@/lib/navigation";
@@ -10,8 +11,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
-import { GettingStartedGuide } from "@/components/guide/getting-started-guide";
-import { SalonCheatsheet } from "@/components/guide/salon-cheatsheet";
+
+/** Heavy sheet UIs — load after first paint so every app route stays lighter. */
+const GettingStartedGuide = dynamic(
+  () =>
+    import("@/components/guide/getting-started-guide").then((m) => ({
+      default: m.GettingStartedGuide,
+    })),
+  { ssr: false, loading: () => <div className="size-8 shrink-0" aria-hidden /> }
+);
+
+const SalonCheatsheet = dynamic(
+  () =>
+    import("@/components/guide/salon-cheatsheet").then((m) => ({
+      default: m.SalonCheatsheet,
+    })),
+  { ssr: false, loading: () => <div className="size-8 shrink-0" aria-hidden /> }
+);
 
 type AppHeaderProps = {
   userEmail?: string;
@@ -41,7 +57,7 @@ export function AppHeader({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1.5 border-b border-border bg-card/90 px-2 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md supports-[backdrop-filter]:bg-card/70 sm:h-16 sm:gap-3 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1.5 border-b border-border bg-card/95 px-2 pt-[env(safe-area-inset-top,0px)] sm:h-16 sm:gap-3 sm:bg-card/90 sm:px-6 sm:backdrop-blur-md sm:supports-[backdrop-filter]:bg-card/70">
       <SidebarTrigger className="touch-target -ml-0.5 size-10 shrink-0 sm:size-9" />
       <Separator orientation="vertical" className="hidden h-4 sm:block" />
 

@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const SEEN_KEY = "salon-notifications-seen-at";
-const POLL_MS = 45_000;
+const POLL_MS = 60_000;
 
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -53,12 +53,22 @@ export function NotificationBell() {
       setSeenAt(null);
     }
     load();
-    const id = window.setInterval(load, POLL_MS);
-    const onFocus = () => load();
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      load();
+    }, POLL_MS);
+    const onFocus = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(id);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
 

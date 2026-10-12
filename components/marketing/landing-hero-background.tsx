@@ -66,6 +66,7 @@ export function LandingHeroBackground() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       setActive((current) => (current + 1) % HERO_SLIDES.length);
     }, ROTATE_MS);
     return () => window.clearInterval(id);

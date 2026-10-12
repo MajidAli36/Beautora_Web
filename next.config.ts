@@ -21,12 +21,17 @@ const r2Host = hostnameFromUrl(process.env.R2_ENDPOINT);
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  compress: true,
   experimental: {
+    /** Tree-shake icon/chart barrels so pages don't pull the full packages. */
+    optimizePackageImports: ["lucide-react", "recharts", "date-fns"],
     serverActions: {
       bodySizeLimit: "6mb",
     },
   },
   images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: "https",

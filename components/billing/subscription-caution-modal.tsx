@@ -62,7 +62,10 @@ export function SubscriptionCautionModal({
     }
 
     maybeShow();
-    const id = window.setInterval(maybeShow, SUBSCRIPTION.cautionPopupIntervalMs);
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      maybeShow();
+    }, SUBSCRIPTION.cautionPopupIntervalMs);
     return () => window.clearInterval(id);
   }, [isLocked, isGrace, isLifetime]);
 

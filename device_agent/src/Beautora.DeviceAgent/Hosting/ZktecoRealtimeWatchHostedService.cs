@@ -36,6 +36,16 @@ public sealed class ZktecoRealtimeWatchHostedService : BackgroundService
         if (!_options.Zkteco.Enabled || string.IsNullOrWhiteSpace(_options.Zkteco.Host))
             return;
 
+        // ADMS Cloud push is the lightweight path. Node TCP watcher is optional and heavy.
+        if (!_options.Zkteco.EnableTcpWatcher)
+        {
+            _logger.LogInformation(
+                "ZK TCP watcher disabled (EnableTcpWatcher=false) — using ADMS → {Cloud}",
+                BeautoraCloudUrls.Resolve(_options.Beautora.AppUrl));
+            ZktecoWatcherDiagnostics.Set(false, "TCP watcher disabled — ADMS only");
+            return;
+        }
+
         var candidates = new[]
         {
             Path.Combine(_env.ContentRootPath, "tools", "zk-pull", "watch.mjs"),
@@ -88,7 +98,7 @@ public sealed class ZktecoRealtimeWatchHostedService : BackgroundService
         var psi = new ProcessStartInfo
         {
             FileName = "node",
-            Arguments = $"\"{script}\" {_options.Zkteco.Host} {_options.Zkteco.Port} \"{(_options.Beautora.AppUrl ?? "http://127.0.0.1:3000").TrimEnd('/')}\"",
+            Arguments = $"\"{script}\" {_options.Zkteco.Host} {_options.Zkteco.Port} \"{BeautoraCloudUrls.Resolve(_options.Beautora.AppUrl)}\"",
             WorkingDirectory = workDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -96,7 +106,7 @@ public sealed class ZktecoRealtimeWatchHostedService : BackgroundService
             CreateNoWindow = true,
         };
         psi.Environment["SYNCOPS_AGENT_API_KEY"] = _options.ApiKey;
-        psi.Environment["BEAUTORA_APP_URL"] = (_options.Beautora.AppUrl ?? "http://127.0.0.1:3000").TrimEnd('/');
+        psi.Environment["BEAUTORA_APP_URL"] = BeautoraCloudUrls.Resolve(_options.Beautora.AppUrl);
         psi.Environment["SYNCOPS_AGENT_URL"] = $"http://127.0.0.1:{_options.Port}";
 
         using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -179,17 +189,12 @@ public sealed class ZktecoRealtimeWatchHostedService : BackgroundService
 
     private async Task PushToBeautoraAsync(string userId, DateTimeOffset at, CancellationToken ct)
     {
-        var appUrl = (_options.Beautora.AppUrl ?? "").TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(appUrl))
-        {
-            _logger.LogWarning("Beautora AppUrl empty — punch stored locally only");
-            return;
-        }
+        var punchUrl = BeautoraCloudUrls.Api(_options.Beautora.AppUrl, "/api/agent/thumb-punch");
 
         try
         {
             var client = _httpClientFactory.CreateClient("BeautoraAttendance");
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{appUrl}/api/agent/thumb-punch");
+            using var request = new HttpRequestMessage(HttpMethod.Post, punchUrl);
             request.Headers.TryAddWithoutValidation("X-Beautora-Agent-Key", _options.ApiKey);
             request.Content = JsonContent.Create(new
             {

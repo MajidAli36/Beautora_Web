@@ -28,13 +28,45 @@ builder.Host.UseWindowsService(options =>
     options.ServiceName = "SyncOps Device Agent";
 });
 
+// Single-file Windows Service: EventLog provider can crash startup (missing AccessControl).
+// Keep console + debug; service lifetime still comes from UseWindowsService.
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(o =>
+{
+    o.SingleLine = true;
+    o.TimestampFormat = "HH:mm:ss ";
+});
+builder.Logging.AddDebug();
+
 builder.Services.Configure<DeviceAgentOptions>(builder.Configuration.GetSection(DeviceAgentOptions.SectionName));
 builder.Services.Configure<CloudDeviceOptions>(builder.Configuration.GetSection(CloudDeviceOptions.SectionName));
 
+// Always resolve cloud URL (production default https://www.beautora.app; env BEAUTORA_APP_URL wins).
+builder.Services.PostConfigure<DeviceAgentOptions>(opts =>
+{
+    opts.Beautora.AppUrl = BeautoraCloudUrls.Resolve(opts.Beautora.AppUrl);
+    if (opts.LeanMode)
+    {
+        opts.EnableTray = false;
+        if (opts.DiscoveryIntervalMinutes < 10)
+            opts.DiscoveryIntervalMinutes = 15;
+    }
+});
+builder.Services.PostConfigure<CloudDeviceOptions>(opts =>
+{
+    if (string.IsNullOrWhiteSpace(opts.BaseUrl))
+        opts.BaseUrl = BeautoraCloudUrls.Production;
+    else
+        opts.BaseUrl = BeautoraCloudUrls.Normalize(opts.BaseUrl);
+});
+
 var agentOptions = builder.Configuration.GetSection(DeviceAgentOptions.SectionName).Get<DeviceAgentOptions>()
                    ?? new DeviceAgentOptions();
+agentOptions.Beautora.AppUrl = BeautoraCloudUrls.Resolve(agentOptions.Beautora.AppUrl);
 var cloudOptions = builder.Configuration.GetSection(CloudDeviceOptions.SectionName).Get<CloudDeviceOptions>()
                    ?? new CloudDeviceOptions();
+if (string.IsNullOrWhiteSpace(cloudOptions.BaseUrl))
+    cloudOptions.BaseUrl = BeautoraCloudUrls.Production;
 
 builder.WebHost.UseUrls(agentOptions.ListenUrl);
 
@@ -51,7 +83,7 @@ builder.Services.AddCors(options =>
 
         policy.WithOrigins(agentOptions.AllowedOrigins.Length > 0
                 ? agentOptions.AllowedOrigins
-                : ["http://localhost:3000"])
+                : [BeautoraCloudUrls.Production, "https://beautora.app", "http://localhost:3000"])
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -167,15 +199,31 @@ app.MapBeautoraAttendanceEndpoints();
 app.MapZktecoAdmsEndpoints();
 
 var lanIp = Beautora.DeviceAgent.Security.LanAddressHelper.GetPreferredLanIPv4() ?? "192.168.1.100";
+var resolvedCloud = BeautoraCloudUrls.Resolve(agentOptions.Beautora.AppUrl);
 app.Logger.LogWarning(
-    "{Agent} listening on {Url} | DisableSecurity={Open} | ZK Cloud Server → {LanIp}:{Port} Proxy=OFF",
+    "{Agent} listening on {Url} | Cloud DB/API → {CloudUrl} | DisableSecurity={Open} | ZK Cloud Server → {LanIp}:{Port} Proxy=OFF",
     agentOptions.AgentName,
     agentOptions.ListenUrl,
+    resolvedCloud,
     agentOptions.DisableSecurity,
     lanIp,
     agentOptions.Port);
 if (agentOptions.DisableSecurity)
     app.Logger.LogWarning("SECURITY OFF — LAN can hit all routes (API key + localhost lock disabled). Set DisableSecurity=false later.");
+
+// Windows Service: slightly lower CPU priority so salon POS stays snappy.
+if (!Environment.UserInteractive)
+{
+    try
+    {
+        System.Diagnostics.Process.GetCurrentProcess().PriorityClass =
+            System.Diagnostics.ProcessPriorityClass.BelowNormal;
+    }
+    catch
+    {
+        /* ignore if not allowed */
+    }
+}
 
 app.Run();
 

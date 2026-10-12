@@ -69,11 +69,12 @@ public sealed class SyncOpsPlatformHostedService : BackgroundService
             }
         }
 
+        var intervalMinutes = Math.Clamp(_options.DiscoveryIntervalMinutes, 5, 120);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(intervalMinutes), stoppingToken);
                 await _manager.DiscoverAsync(new DiscoveryRequest { IncludeMocks = _options.MockMode }, stoppingToken);
                 if (_cloud.IsEnabled)
                 {

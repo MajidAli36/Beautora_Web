@@ -93,6 +93,55 @@ public static class AgentEndpoints
             });
         });
 
+        // Long-poll: browser waits here so Attendance UI updates the moment ADMS stores a punch.
+        api.MapGet("/zkteco/wait", async (long? since, CancellationToken ct) =>
+        {
+            var sinceVersion = since ?? SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoAttendancePunchStore.Version;
+            var version = await SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoAttendancePunchStore.WaitAsync(
+                sinceVersion,
+                TimeSpan.FromSeconds(25),
+                ct);
+            var latest = SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoAttendancePunchStore.Get()
+                .TakeLast(20)
+                .Select(l => new
+                {
+                    userId = l.UserId,
+                    timestamp = l.Timestamp,
+                    inOutMode = l.InOutMode,
+                    deviceId = l.DeviceId
+                })
+                .ToList();
+            return Results.Json(new
+            {
+                ok = true,
+                version,
+                changed = version > sinceVersion,
+                punches = latest
+            });
+        });
+
+        api.MapGet("/zkteco/punches", (long? sinceMs) =>
+        {
+            var from = sinceMs is > 0
+                ? DateTimeOffset.FromUnixTimeMilliseconds(sinceMs.Value)
+                : (DateTimeOffset?)null;
+            var punches = SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoAttendancePunchStore.Get(from)
+                .Select(l => new
+                {
+                    userId = l.UserId,
+                    timestamp = l.Timestamp,
+                    inOutMode = l.InOutMode,
+                    deviceId = l.DeviceId
+                })
+                .ToList();
+            return Results.Json(new
+            {
+                ok = true,
+                version = SyncOps.DeviceAdapters.ZKTeco.Protocol.ZktecoAttendancePunchStore.Version,
+                punches
+            });
+        });
+
         // Simulate device ATTLOG (proves C# → Beautora path without hardware cloud).
         api.MapPost("/zkteco/simulate-adms-punch", async (SimulateAdmsBody body, HttpRequest http, CancellationToken ct) =>
         {
@@ -106,30 +155,27 @@ public static class AgentEndpoints
 
             var services = http.HttpContext.RequestServices;
             var options = services.GetRequiredService<IOptions<DeviceAgentOptions>>().Value;
-            var appUrl = (options.Beautora.AppUrl ?? "").TrimEnd('/');
+            var punchUrl = BeautoraCloudUrls.Api(options.Beautora.AppUrl, "/api/agent/thumb-punch");
             var pushed = false;
-            if (!string.IsNullOrWhiteSpace(appUrl))
+            try
             {
-                try
+                var factory = services.GetRequiredService<IHttpClientFactory>();
+                var client = factory.CreateClient("BeautoraAttendance");
+                using var request = new HttpRequestMessage(HttpMethod.Post, punchUrl);
+                request.Headers.TryAddWithoutValidation("X-Beautora-Agent-Key", options.ApiKey);
+                request.Content = System.Net.Http.Json.JsonContent.Create(new
                 {
-                    var factory = services.GetRequiredService<IHttpClientFactory>();
-                    var client = factory.CreateClient("BeautoraAttendance");
-                    using var request = new HttpRequestMessage(HttpMethod.Post, $"{appUrl}/api/agent/thumb-punch");
-                    request.Headers.TryAddWithoutValidation("X-Beautora-Agent-Key", options.ApiKey);
-                    request.Content = System.Net.Http.Json.JsonContent.Create(new
-                    {
-                        thumbId = userId,
-                        action = "toggle",
-                        at = at.ToUniversalTime().ToString("O"),
-                        externalKey = $"{userId}@{at.ToUnixTimeMilliseconds()}"
-                    });
-                    using var response = await client.SendAsync(request, ct);
-                    pushed = response.IsSuccessStatusCode;
-                }
-                catch
-                {
-                    pushed = false;
-                }
+                    thumbId = userId,
+                    action = "toggle",
+                    at = at.ToUniversalTime().ToString("O"),
+                    externalKey = $"{userId}@{at.ToUnixTimeMilliseconds()}"
+                });
+                using var response = await client.SendAsync(request, ct);
+                pushed = response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                pushed = false;
             }
 
             return Results.Json(new

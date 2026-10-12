@@ -7,6 +7,7 @@ import {
   getAgentHealth,
   getDeviceAttendanceLogs,
   pickAttendanceTerminal,
+  waitForZktecoPunch,
 } from "@/lib/devices/syncops-agent";
 import { ingestThumbPunches } from "@/lib/actions/staff";
 import { formatAttendanceMinutes } from "@/lib/attendance/duration";
@@ -17,21 +18,62 @@ export const THUMB_ATTENDANCE_EVENT = "salon-thumb-attendance";
 export const THUMB_ATTENDANCE_WATERMARK_KEY = "salon-thumb-attendance-watermark-ms-v3";
 const WATERMARK_KEY = THUMB_ATTENDANCE_WATERMARK_KEY;
 const DEVICE_KEY = "salon-thumb-attendance-device-id-v3";
-/** Poll often so a machine punch lands in the DB within ~2s without any UI click. */
-const POLL_MS = 2000;
+const VERSION_KEY = "salon-thumb-attendance-agent-version-v1";
+
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const t = window.setTimeout(() => resolve(), ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(t);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true }
+    );
+  });
+}
+
+async function waitUntilVisible(signal: AbortSignal) {
+  if (document.visibilityState === "visible") return;
+  await new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        cleanup();
+        resolve();
+      }
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const cleanup = () => {
+      document.removeEventListener("visibilitychange", onVis);
+      signal.removeEventListener("abort", onAbort);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 /**
- * Probes the local SyncOps Device Agent (127.0.0.1). Mount only on Attendance
- * (and similar device screens) — Chrome will ask for “apps on this device”
- * permission if this runs site-wide during onboarding/dashboard.
- *
- * Staff press thumb on the ZK machine: 1st → check-in, next → check-out.
+ * Realtime thumb sync (Attendance page only):
+ * Long-poll agent while tab is visible; pause when hidden to save CPU/network.
  */
 export function ThumbAttendanceLiveSync() {
-  const busy = useRef(false);
+  const ingestBusy = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    const abort = new AbortController();
 
     async function resolveTerminalId(): Promise<string | null> {
       const cached = sessionStorage.getItem(DEVICE_KEY)?.trim();
@@ -44,59 +86,40 @@ export function ThumbAttendanceLiveSync() {
       return terminal.id;
     }
 
-    async function tick() {
-      if (busy.current || cancelled) return;
-      busy.current = true;
+    async function applyPunches(
+      punches: Array<{ thumbId: string; at: string; ms: number }>
+    ) {
+      if (!punches.length || ingestBusy.current || cancelled) return;
+      ingestBusy.current = true;
       try {
-        await getAgentHealth();
-        const deviceId = await resolveTerminalId();
-        if (!deviceId) return;
-
-        try {
-          await connectDevice(deviceId);
-        } catch {
-          // Push-buffer devices don't need a live TCP session; continue to read store.
-        }
-
-        let logs: Awaited<ReturnType<typeof getDeviceAttendanceLogs>> = [];
-        try {
-          logs = await getDeviceAttendanceLogs(deviceId);
-        } catch {
-          sessionStorage.removeItem(DEVICE_KEY);
-          return;
-        }
-
-        // First visit: only take punches from the last 2 minutes.
         if (localStorage.getItem(WATERMARK_KEY) == null) {
           localStorage.setItem(WATERMARK_KEY, String(Date.now() - 120_000));
         }
 
         let watermark = Number(localStorage.getItem(WATERMARK_KEY) || "0");
-        const fresh = logs
-          .map((l) => ({
-            ...l,
-            ms: new Date(l.timestamp).getTime(),
-            thumbId: String(l.userId ?? "").trim(),
-          }))
-          .filter((l) => l.thumbId && !Number.isNaN(l.ms) && l.ms > watermark)
+        const fresh = punches
+          .filter((p) => p.thumbId && !Number.isNaN(p.ms) && p.ms > watermark)
           .sort((a, b) => a.ms - b.ms);
+        if (!fresh.length) {
+          if (punches.length > 0 && typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent(THUMB_ATTENDANCE_EVENT));
+          }
+          return;
+        }
 
-        if (!fresh.length) return;
+        const result = await ingestThumbPunches(
+          fresh.map((l) => ({
+            thumbId: l.thumbId,
+            at: l.at,
+            action: "toggle" as const,
+            externalKey: `${l.thumbId}@${l.ms}`,
+          }))
+        );
 
-        const punches = fresh.map((l) => ({
-          thumbId: l.thumbId,
-          at: l.timestamp,
-          action: "toggle" as const,
-          externalKey: `${l.thumbId}@${l.ms}`,
-        }));
-
-        const result = await ingestThumbPunches(punches);
         let appliedAny = false;
-
         for (let i = 0; i < result.results.length; i++) {
           const row = result.results[i];
           const punchMs = fresh[i]?.ms;
-          // Always advance watermark past attempted punches so one failure cannot block later ones.
           if (punchMs && punchMs > watermark) {
             watermark = punchMs;
             localStorage.setItem(WATERMARK_KEY, String(watermark));
@@ -124,21 +147,92 @@ export function ThumbAttendanceLiveSync() {
           }
         }
 
-        if (appliedAny && typeof window !== "undefined") {
+        if ((appliedAny || fresh.length > 0) && typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent(THUMB_ATTENDANCE_EVENT));
         }
-      } catch {
-        // Agent offline or no permission — silent (user may not be on salon PC).
       } finally {
-        busy.current = false;
+        ingestBusy.current = false;
       }
     }
 
-    void tick();
-    const timer = setInterval(() => void tick(), POLL_MS);
+    async function fallbackTick() {
+      if (cancelled || document.visibilityState !== "visible") return;
+      try {
+        await getAgentHealth();
+        const deviceId = await resolveTerminalId();
+        if (!deviceId) return;
+        try {
+          await connectDevice(deviceId);
+        } catch {
+          /* push-buffer ok */
+        }
+        const logs = await getDeviceAttendanceLogs(deviceId);
+        await applyPunches(
+          logs.map((l) => {
+            const ms = new Date(l.timestamp).getTime();
+            return {
+              thumbId: String(l.userId ?? "").trim(),
+              at: l.timestamp,
+              ms,
+            };
+          })
+        );
+      } catch {
+        /* agent offline */
+      }
+    }
+
+    async function waitLoop() {
+      let since = Number(sessionStorage.getItem(VERSION_KEY) || "0");
+      while (!cancelled) {
+        try {
+          await waitUntilVisible(abort.signal);
+          if (cancelled) break;
+
+          const res = await waitForZktecoPunch(since, abort.signal);
+          since = res.version;
+          sessionStorage.setItem(VERSION_KEY, String(since));
+          if (!res.changed) continue;
+          if (document.visibilityState !== "visible") continue;
+
+          window.dispatchEvent(new CustomEvent(THUMB_ATTENDANCE_EVENT));
+
+          const punches = (res.punches ?? []).map((p) => {
+            const ms = new Date(p.timestamp).getTime();
+            return {
+              thumbId: String(p.userId ?? "").trim(),
+              at: p.timestamp,
+              ms,
+            };
+          });
+          await applyPunches(punches);
+          await sleep(150, abort.signal);
+          window.dispatchEvent(new CustomEvent(THUMB_ATTENDANCE_EVENT));
+        } catch {
+          if (cancelled) break;
+          try {
+            await sleep(1000, abort.signal);
+          } catch {
+            break;
+          }
+          if (document.visibilityState === "visible") {
+            await fallbackTick();
+          }
+        }
+      }
+    }
+
+    void fallbackTick();
+    void waitLoop();
+    const fallbackTimer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void fallbackTick();
+    }, 15000);
+
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      abort.abort();
+      clearInterval(fallbackTimer);
     };
   }, []);
 

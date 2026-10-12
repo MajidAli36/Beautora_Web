@@ -17,9 +17,10 @@ public sealed class DeviceAgentOptions
 
     public string[] AllowedOrigins { get; set; } =
     [
+        BeautoraCloudUrls.Production,
+        "https://beautora.app",
         "http://localhost:3000",
-        "https://www.beautora.app",
-        "https://beautora.app"
+        "https://localhost:3000"
     ];
 
     public string DefaultPrinterId { get; set; } = "";
@@ -27,7 +28,14 @@ public sealed class DeviceAgentOptions
     /// <summary>Windows printer used for ESC/POS drawer kick when drawer is printer-attached.</summary>
     public string DefaultDrawerPrinterId { get; set; } = "";
 
-    public bool EnableTray { get; set; } = true;
+    /// <summary>System tray UI. Keep false for Windows Service (saves RAM).</summary>
+    public bool EnableTray { get; set; }
+
+    /// <summary>
+    /// Low-resource mode for always-on Windows Service: quieter logs, slower rediscovery,
+    /// no tray, no Node TCP watcher unless explicitly enabled.
+    /// </summary>
+    public bool LeanMode { get; set; } = true;
 
     /// <summary>
     /// When true: no API-key auth, no localhost-only lock, LAN devices can hit all routes.
@@ -41,6 +49,9 @@ public sealed class DeviceAgentOptions
 
     /// <summary>Local SQLite path for device registry (relative to content root if not rooted).</summary>
     public string RegistryDatabasePath { get; set; } = "data/devices.db";
+
+    /// <summary>How often to rediscover printers/devices in the background (minutes).</summary>
+    public int DiscoveryIntervalMinutes { get; set; } = 15;
 
     public ZktecoOptions Zkteco { get; set; } = new();
 
@@ -58,24 +69,35 @@ public sealed class ZktecoOptions
     public string Host { get; set; } = "192.168.1.201";
     public int Port { get; set; } = 4370;
     public int TimeoutMs { get; set; } = 5000;
+
+    /// <summary>
+    /// Spawn Node.js TCP watcher (high RAM). Leave false for ADMS Cloud push (recommended).
+    /// </summary>
+    public bool EnableTcpWatcher { get; set; }
 }
 
 public sealed class DiscoveryOptions
 {
     /// <summary>Optional CIDR for TCP probing. Empty = no network scan.</summary>
     public string? IpRangeCidr { get; set; }
-    public int MaxConcurrency { get; set; } = 16;
+    public int MaxConcurrency { get; set; } = 8;
     public int TimeoutMs { get; set; } = 1000;
 }
 
 /// <summary>
-/// Salon web app bridge — Device Agent owns hardware; Beautora owns attendance records.
-/// Register an Attendance terminal under Devices and paste its API key here.
+/// Salon web app bridge — Device Agent owns hardware on the local PC;
+/// Beautora SaaS (<see cref="BeautoraCloudUrls.Production"/>) owns attendance DB / cloud APIs.
+/// Register an Attendance terminal under Devices and paste its API key here when using
+/// <c>/api/devices/attendance</c>; ADMS thumb-punch uses <c>DeviceAgent:ApiKey</c> →
+/// <c>/api/agent/thumb-punch</c>.
 /// </summary>
 public sealed class BeautoraBridgeOptions
 {
-    /// <summary>e.g. http://localhost:3000</summary>
-    public string AppUrl { get; set; } = "http://localhost:3000";
+    /// <summary>
+    /// Cloud web app base URL. Production default: https://www.beautora.app
+    /// Override with env BEAUTORA_APP_URL or appsettings.Development.json for local Next.js.
+    /// </summary>
+    public string AppUrl { get; set; } = BeautoraCloudUrls.Production;
 
     /// <summary>Devices → Attendance terminal → API key (X-Device-Key).</summary>
     public string AttendanceApiKey { get; set; } = "";
@@ -83,8 +105,8 @@ public sealed class BeautoraBridgeOptions
     /// <summary>Optional SyncOps device id (e.g. zkteco-mock). Empty = auto-pick attendance terminal.</summary>
     public string AttendanceDeviceId { get; set; } = "";
 
-    /// <summary>When true and AttendanceApiKey is set, poll ZK logs and POST to Beautora.</summary>
-    public bool AttendanceSyncEnabled { get; set; }
+    /// <summary>When true and AttendanceApiKey is set, poll ZK logs and POST to Beautora cloud.</summary>
+    public bool AttendanceSyncEnabled { get; set; } = true;
 
     public int AttendanceSyncIntervalSeconds { get; set; } = 15;
 

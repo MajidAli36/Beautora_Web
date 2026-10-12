@@ -127,11 +127,24 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
-  }
   html {
     @apply font-sans scroll-smooth;
+    /* Prevent accidental horizontal pan on mobile app chrome */
+    overflow-x: clip;
+    max-width: 100%;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    overflow-x: clip;
+    max-width: 100%;
+    min-width: 0;
+  }
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
   }
 }
 
@@ -380,10 +393,25 @@
     }
   }
 
-  /* App shell — mobile comfort */
+  /* App shell — mobile comfort + fit all device widths */
   .app-main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     /* Extra room so the FAB never covers bottom actions (Inventory / Finances) */
     padding-bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Cards / grids inside app never force page-wide horizontal scroll */
+  .app-main [data-slot="card"],
+  .app-main .dashboard-card {
+    min-width: 0;
+    max-width: 100%;
   }
 
   @keyframes app-nav-progress {

@@ -1,24 +1,42 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { usePageVisible } from "@/hooks/use-page-visible";
 import { AttendanceButtons } from "@/components/features/staff/staff-forms";
 import { AttendanceDesk } from "@/components/features/attendance/attendance-desk";
-import { ThumbAttendanceLiveSync } from "@/components/features/attendance/thumb-attendance-live-sync";
+import {
+  AttendanceCheatsheetButton,
+  AttendanceGuideButton,
+} from "@/components/features/attendance/attendance-help";
+import {
+  THUMB_ATTENDANCE_EVENT,
+  ThumbAttendanceLiveSync,
+} from "@/components/features/attendance/thumb-attendance-live-sync";
 import type { AttendanceOverview, AttendanceReport } from "@/lib/actions/attendance";
 import { attendanceMethodLabel } from "@/lib/attendance/labels";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
 import { formatAttendanceMinutes } from "@/lib/attendance/duration";
-import { addLocalDays, getLocalDateString, startOfLocalMonth } from "@/lib/dates/local";
-import { Fingerprint } from "lucide-react";
+import {
+  addLocalDays,
+  getLocalDateString,
+  isoToLocalDateString,
+  startOfLocalMonth,
+} from "@/lib/dates/local";
+import {
+  CalendarDays,
+  Clock3,
+  Fingerprint,
+  Users,
+  UserCheck,
+} from "lucide-react";
 
 type StaffMember = {
   id: string;
@@ -37,14 +55,51 @@ type AttendanceDashboardProps = {
   view: string;
 };
 
+type PeriodPreset = "today" | "daily" | "week" | "month" | "year" | "custom";
+
+const PERIODS: { id: PeriodPreset; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "daily", label: "Daily" },
+  { id: "week", label: "Weekly" },
+  { id: "month", label: "Monthly" },
+  { id: "year", label: "Yearly" },
+  { id: "custom", label: "Custom" },
+];
+
 function MethodBadge({ method }: { method: string }) {
   const isThumb = method === "BIOMETRIC";
   return (
-    <Badge variant={isThumb ? "default" : "outline"} className={cn(isThumb && "gap-1")}>
-      {isThumb && <Fingerprint className="size-3" />}
+    <Badge
+      variant={isThumb ? "default" : "outline"}
+      className={cn(
+        "gap-1 font-normal",
+        isThumb && "border-transparent bg-[#0FA99A] text-white [&_svg]:text-white"
+      )}
+    >
+      {isThumb ? <Fingerprint className="size-3" /> : null}
       {attendanceMethodLabel(method)}
     </Badge>
   );
+}
+
+function StatusBadge({ open }: { open: boolean }) {
+  return open ? (
+    <Badge className="border-transparent bg-teal-600 text-white font-normal">
+      Checked in
+    </Badge>
+  ) : (
+    <Badge variant="secondary" className="font-normal">
+      Checked out
+    </Badge>
+  );
+}
+
+function resolveActivePreset(from: string, to: string, view: string): PeriodPreset {
+  if (view === "today" || view === "daily" || view === "week" || view === "month" || view === "year" || view === "custom") {
+    return view;
+  }
+  if (from === to) return "daily";
+  return "custom";
 }
 
 export function AttendanceDashboard({
@@ -58,7 +113,32 @@ export function AttendanceDashboard({
 }: AttendanceDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pageVisible = usePageVisible();
   const [pending, startTransition] = useTransition();
+  const [methodFilter, setMethodFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const onPunch = () => {
+      if (document.visibilityState !== "visible") return;
+      // Coalesce rapid punches into one refresh.
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => router.refresh(), 80);
+    };
+    window.addEventListener(THUMB_ATTENDANCE_EVENT, onPunch);
+    return () => {
+      window.removeEventListener(THUMB_ATTENDANCE_EVENT, onPunch);
+      if (refreshTimer) clearTimeout(refreshTimer);
+    };
+  }, [router]);
+
+  // Backup refresh only while tab is visible (primary path is agent long-poll).
+  useEffect(() => {
+    if (!pageVisible) return;
+    const timer = setInterval(() => router.refresh(), 30000);
+    return () => clearInterval(timer);
+  }, [router, pageVisible]);
 
   function setParams(updates: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -71,24 +151,91 @@ export function AttendanceDashboard({
     });
   }
 
-  function setPreset(preset: "today" | "week" | "month") {
-    const toStr = getLocalDateString();
-    let fromStr = toStr;
-    if (preset === "week") fromStr = addLocalDays(toStr, -6);
-    else if (preset === "month") fromStr = startOfLocalMonth(toStr);
-    setParams({ from: fromStr, to: toStr, view: preset === "today" ? "daily" : "range" });
+  function setPreset(preset: PeriodPreset) {
+    const today = getLocalDateString();
+    if (preset === "today") {
+      setParams({ from: today, to: today, view: "today" });
+      return;
+    }
+    if (preset === "daily") {
+      const day = from === to ? from : today;
+      setParams({ from: day, to: day, view: "daily" });
+      return;
+    }
+    if (preset === "week") {
+      setParams({ from: addLocalDays(today, -6), to: today, view: "week" });
+      return;
+    }
+    if (preset === "month") {
+      setParams({ from: startOfLocalMonth(today), to: today, view: "month" });
+      return;
+    }
+    if (preset === "year") {
+      setParams({ from: `${today.slice(0, 4)}-01-01`, to: today, view: "year" });
+      return;
+    }
+    setParams({ view: "custom" });
   }
 
-  const thumbScans = report.records.filter((r) => r.method === "BIOMETRIC").length;
+  const activePreset = resolveActivePreset(from, to, view);
+
+  const filteredRecords = useMemo(() => {
+    return report.records.filter((r) => {
+      if (methodFilter && r.method !== methodFilter) return false;
+      if (statusFilter === "open" && r.check_out_at) return false;
+      if (statusFilter === "closed" && !r.check_out_at) return false;
+      return true;
+    });
+  }, [report.records, methodFilter, statusFilter]);
+
+  const kpi = useMemo(() => {
+    const thumbScans = filteredRecords.filter((r) => r.method === "BIOMETRIC").length;
+    const openInPeriod = filteredRecords.filter((r) => !r.check_out_at).length;
+    const staffDays = new Set(
+      filteredRecords.map(
+        (r) => `${r.staff?.id ?? "?"}:${isoToLocalDateString(r.check_in_at)}`
+      )
+    ).size;
+    return {
+      sessions: filteredRecords.length,
+      thumbScans,
+      onDuty: overview.onDuty.length,
+      openInPeriod,
+      staffDays,
+    };
+  }, [filteredRecords, overview.onDuty.length]);
+
   const onDutyIds = useMemo(
     () => new Set(overview.onDuty.map((s) => s.staffId)),
     [overview.onDuty]
   );
 
+  const showSummary =
+    activePreset !== "today" &&
+    activePreset !== "daily" &&
+    report.summaries.length > 0;
+
+  const rangeLabel = from === to ? from : `${from} → ${to}`;
+
   return (
-    <div className="space-y-6">
-      {/* Only probe local Device Agent on Attendance — not during onboarding/dashboard. */}
+    <div className="space-y-5">
       <ThumbAttendanceLiveSync />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-lg font-bold tracking-tight text-[#172033] sm:text-2xl">
+            Attendance
+          </h1>
+          <p className="text-sm text-muted-foreground text-pretty">
+            Track staff attendance, working hours, and daily sessions.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <AttendanceGuideButton />
+          <AttendanceCheatsheetButton />
+        </div>
+      </div>
+
       {canManage && (
         <AttendanceDesk
           staff={staffList}
@@ -98,10 +245,14 @@ export function AttendanceDashboard({
       )}
 
       {!canManage && (
-        <Card>
+        <Card className="rounded-2xl border-[#E5E7EB] shadow-none">
           <CardHeader className="pb-2">
-            <CardDescription>On duty now</CardDescription>
-            <CardTitle className="text-2xl">{overview.onDuty.length}</CardTitle>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              On duty now
+            </p>
+            <CardTitle className="text-2xl tabular-nums text-[#172033]">
+              {overview.onDuty.length}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {overview.onDuty.length === 0 ? (
@@ -109,7 +260,7 @@ export function AttendanceDashboard({
             ) : (
               overview.onDuty.map((s) => (
                 <div key={s.staffId} className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{s.staffName}</span>
+                  <span className="font-medium text-[#172033]">{s.staffName}</span>
                   <MethodBadge method={s.method} />
                 </div>
               ))
@@ -118,91 +269,176 @@ export function AttendanceDashboard({
         </Card>
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {(["today", "week", "month"] as const).map((p) => (
-            <Button
-              key={p}
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={pending}
-              className={cn(
-                p === "today" && from === to && "border-primary bg-accent text-accent-foreground"
-              )}
-              onClick={() => setPreset(p)}
-            >
-              {p === "today" ? "Today" : p === "week" ? "This week" : "This month"}
-            </Button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="from" className="text-xs">
-              From
-            </Label>
-            <Input
-              id="from"
-              type="date"
-              value={from}
-              className="h-8 w-36"
-              onChange={(e) => setParams({ from: e.target.value, view: "range" })}
-            />
+      {/* Filters */}
+      <Card className="rounded-2xl border-[#E5E7EB] shadow-none">
+        <CardContent className="flex flex-col gap-4 p-3 sm:p-4">
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-0.5 [-webkit-overflow-scrolling:touch]">
+            {PERIODS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={pending}
+                onClick={() => setPreset(p.id)}
+                className={cn(
+                  "h-8 shrink-0 rounded-lg px-3 text-sm font-medium transition-colors",
+                  activePreset === p.id
+                    ? "bg-[#0FA99A] text-white shadow-sm"
+                    : "bg-[#F8FAFC] text-[#172033] hover:bg-teal-50 border border-[#E5E7EB]"
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="to" className="text-xs">
-              To
-            </Label>
-            <Input
-              id="to"
-              type="date"
-              value={to}
-              className="h-8 w-36"
-              onChange={(e) => setParams({ to: e.target.value, view: "range" })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="staff" className="text-xs">
-              Staff
-            </Label>
-            <select
-              id="staff"
-              className="flex h-8 rounded-lg border border-input bg-background px-2 text-sm"
-              value={searchParams.get("staff") ?? ""}
-              onChange={(e) => setParams({ staff: e.target.value })}
-            >
-              <option value="">All staff</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
 
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="att-from" className="text-xs text-muted-foreground">
+                From
+              </Label>
+              <Input
+                id="att-from"
+                type="date"
+                value={from}
+                className="h-9 w-full rounded-xl border-[#E5E7EB] sm:h-8 sm:w-[9.5rem]"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  const nextTo = next > to ? next : to;
+                  setParams({
+                    from: next,
+                    to: nextTo,
+                    view: next === nextTo ? "daily" : "custom",
+                  });
+                }}
+              />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="att-to" className="text-xs text-muted-foreground">
+                To
+              </Label>
+              <Input
+                id="att-to"
+                type="date"
+                value={to}
+                className="h-9 w-full rounded-xl border-[#E5E7EB] sm:h-8 sm:w-[9.5rem]"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  const nextFrom = next < from ? next : from;
+                  setParams({
+                    from: nextFrom,
+                    to: next,
+                    view: nextFrom === next ? "daily" : "custom",
+                  });
+                }}
+              />
+            </div>
+            <div className="min-w-0 space-y-1 col-span-2 sm:col-span-1">
+              <Label htmlFor="att-staff" className="text-xs text-muted-foreground">
+                Staff
+              </Label>
+              <select
+                id="att-staff"
+                className="flex h-9 w-full min-w-0 rounded-xl border border-[#E5E7EB] bg-white px-2 text-sm sm:h-8 sm:min-w-[10rem] sm:w-auto"
+                value={searchParams.get("staff") ?? ""}
+                onChange={(e) => setParams({ staff: e.target.value })}
+              >
+                <option value="">All staff</option>
+                {staffList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="att-method" className="text-xs text-muted-foreground">
+                Method
+              </Label>
+              <select
+                id="att-method"
+                className="flex h-9 w-full rounded-xl border border-[#E5E7EB] bg-white px-2 text-sm sm:h-8 sm:min-w-[9rem] sm:w-auto"
+                value={methodFilter}
+                onChange={(e) => setMethodFilter(e.target.value)}
+              >
+                <option value="">All methods</option>
+                <option value="BIOMETRIC">Thumb scan</option>
+                <option value="MANUAL">Manual</option>
+                <option value="DEVICE">Device PIN</option>
+                <option value="APP">App</option>
+              </select>
+            </div>
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="att-status" className="text-xs text-muted-foreground">
+                Status
+              </Label>
+              <select
+                id="att-status"
+                className="flex h-9 w-full rounded-xl border border-[#E5E7EB] bg-white px-2 text-sm sm:h-8 sm:min-w-[9rem] sm:w-auto"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All statuses</option>
+                <option value="open">Checked in</option>
+                <option value="closed">Checked out</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPI cards */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Sessions", value: report.stats.totalSessions },
-          { label: "Thumb", value: thumbScans },
-          { label: "On duty", value: report.stats.openSessions },
-          { label: "Staff-days", value: report.stats.uniqueStaffDays },
+          {
+            label: "Sessions",
+            value: kpi.sessions,
+            hint: rangeLabel,
+            icon: CalendarDays,
+          },
+          {
+            label: "Thumb Scans",
+            value: kpi.thumbScans,
+            hint: "Biometric sessions",
+            icon: Fingerprint,
+          },
+          {
+            label: "On Duty",
+            value: kpi.onDuty,
+            hint: "Currently checked in",
+            icon: UserCheck,
+          },
+          {
+            label: "Staff-Days",
+            value: kpi.staffDays,
+            hint: "Unique attendance days",
+            icon: Users,
+          },
         ].map((s) => (
-          <Card key={s.label}>
-            <CardHeader className="py-3 pb-2">
-              <CardDescription>{s.label}</CardDescription>
-              <CardTitle className="text-xl">{s.value}</CardTitle>
-            </CardHeader>
+          <Card
+            key={s.label}
+            className="rounded-2xl border-[#E5E7EB] bg-white shadow-none transition-colors hover:border-teal-200"
+          >
+            <CardContent className="flex items-start justify-between gap-3 p-4">
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
+                <p className="text-2xl font-semibold tabular-nums tracking-tight text-[#172033]">
+                  {s.value}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground">{s.hint}</p>
+              </div>
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-[#0FA99A]">
+                <s.icon className="size-4" />
+              </span>
+            </CardContent>
           </Card>
         ))}
       </div>
 
-      {view !== "daily" && report.summaries.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Staff summary</CardTitle>
-            <CardDescription>Hours for selected period</CardDescription>
+      {showSummary && (
+        <Card className="rounded-2xl border-[#E5E7EB] shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-[#172033]">Staff summary</CardTitle>
+            <p className="text-sm text-muted-foreground">Hours for {rangeLabel}</p>
           </CardHeader>
           <CardContent>
             <PaginatedList
@@ -216,53 +452,70 @@ export function AttendanceDashboard({
               }}
             >
               {(slice) => (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Staff</TableHead>
-                      <TableHead>Sessions</TableHead>
-                      <TableHead>Days</TableHead>
-                      <TableHead>Hours</TableHead>
-                      <TableHead>Avg / day</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {slice.map((s) => (
-                      <TableRow key={s.staffId}>
-                        <TableCell className="font-medium">{s.staffName}</TableCell>
-                        <TableCell>{s.sessions}</TableCell>
-                        <TableCell>{s.workingDays}</TableCell>
-                        <TableCell>{s.totalHours}h</TableCell>
-                        <TableCell>{s.avgHoursPerDay}h</TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Staff</TableHead>
+                        <TableHead>Sessions</TableHead>
+                        <TableHead>Days</TableHead>
+                        <TableHead>Hours</TableHead>
+                        <TableHead>Avg / day</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {slice.map((s) => (
+                        <TableRow key={s.staffId}>
+                          <TableCell className="font-medium text-[#172033]">
+                            {s.staffName}
+                          </TableCell>
+                          <TableCell className="tabular-nums">{s.sessions}</TableCell>
+                          <TableCell className="tabular-nums">{s.workingDays}</TableCell>
+                          <TableCell className="tabular-nums">{s.totalHours}h</TableCell>
+                          <TableCell className="tabular-nums">{s.avgHoursPerDay}h</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </PaginatedList>
           </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Log</CardTitle>
-          <CardDescription>{from === to ? from : `${from} → ${to}`}</CardDescription>
+      <Card className="rounded-2xl border-[#E5E7EB] shadow-none">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
+          <div>
+            <CardTitle className="text-base text-[#172033]">Attendance log</CardTitle>
+            <p className="text-sm text-muted-foreground">{rangeLabel}</p>
+          </div>
+          {pending ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock3 className="size-3.5 animate-pulse" />
+              Updating…
+            </span>
+          ) : null}
         </CardHeader>
         <CardContent>
           <PaginatedList
-            items={report.records}
+            items={filteredRecords}
             empty={
-              <p className="text-sm text-muted-foreground">No attendance records for this period.</p>
+              <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#F8FAFC] px-4 py-10 text-center">
+                <p className="text-sm font-medium text-[#172033]">No attendance records</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Try another date range, staff filter, or sync the scanner.
+                </p>
+              </div>
             }
             search={{
-              placeholder: "Search staff, method…",
+              placeholder: "Search by staff name…",
               getText: (a) =>
                 [
                   a.staff?.full_name ?? "",
                   a.method,
                   attendanceMethodLabel(a.method),
-                  a.check_out_at ? "checked out" : "on duty",
+                  a.check_out_at ? "checked out" : "checked in",
                 ].join(" "),
               emptyFiltered: (
                 <p className="text-sm text-muted-foreground">No records match your search.</p>
@@ -270,45 +523,58 @@ export function AttendanceDashboard({
             }}
           >
             {(slice) => (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Staff</TableHead>
-                    <TableHead>In</TableHead>
-                    <TableHead>Out</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Method</TableHead>
-                    {canManage && <TableHead></TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {slice.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="font-medium">{a.staff?.full_name ?? "—"}</TableCell>
-                      <TableCell>{formatDateTime(a.check_in_at)}</TableCell>
-                      <TableCell>
-                        {a.check_out_at ? (
-                          formatDateTime(a.check_out_at)
-                        ) : (
-                          <Badge variant="secondary">On duty</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatAttendanceMinutes(a.durationMinutes)}</TableCell>
-                      <TableCell>
-                        <MethodBadge method={a.method} />
-                      </TableCell>
-                      {canManage && a.staff && (
-                        <TableCell>
-                          <AttendanceButtons
-                            staffId={a.staff.id}
-                            onDuty={!a.check_out_at || onDutyIds.has(a.staff.id)}
-                          />
-                        </TableCell>
-                      )}
+              <div className="overflow-x-auto rounded-xl border border-[#E5E7EB]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#F8FAFC] hover:bg-[#F8FAFC]">
+                      <TableHead>Staff</TableHead>
+                      <TableHead>Check-in</TableHead>
+                      <TableHead>Check-out</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Status</TableHead>
+                      {canManage && <TableHead className="w-[1%]">Actions</TableHead>}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {slice.map((a) => {
+                      const open = !a.check_out_at;
+                      return (
+                        <TableRow key={a.id} className="h-12">
+                          <TableCell className="font-medium text-[#172033]">
+                            {a.staff?.full_name ?? "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm">
+                            {formatDateTime(a.check_in_at)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm">
+                            {a.check_out_at ? formatDateTime(a.check_out_at) : "—"}
+                          </TableCell>
+                          <TableCell className="tabular-nums">
+                            {formatAttendanceMinutes(a.durationMinutes)}
+                          </TableCell>
+                          <TableCell>
+                            <MethodBadge method={a.method} />
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge open={open} />
+                          </TableCell>
+                          {canManage && (
+                            <TableCell>
+                              {a.staff ? (
+                                <AttendanceButtons
+                                  staffId={a.staff.id}
+                                  onDuty={open || onDutyIds.has(a.staff.id)}
+                                />
+                              ) : null}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </PaginatedList>
         </CardContent>

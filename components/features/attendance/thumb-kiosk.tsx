@@ -168,10 +168,18 @@ export function ThumbAttendanceKiosk() {
     }
 
     poll();
-    const timer = setInterval(poll, 3000);
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void poll();
+    }, 5000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [savedKey, loadFeed]);
 
@@ -184,9 +192,12 @@ export function ThumbAttendanceKiosk() {
   // Keep an invisible field focused so USB “keyboard wedge” scanners can type the thumb ID.
   useEffect(() => {
     if (!savedKey || setupOpen) return;
-    const focus = () => scanInputRef.current?.focus();
+    const focus = () => {
+      if (document.visibilityState !== "visible") return;
+      scanInputRef.current?.focus();
+    };
     focus();
-    const timer = setInterval(focus, 2000);
+    const timer = setInterval(focus, 3000);
     const onVisibility = () => {
       if (document.visibilityState === "visible") focus();
     };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Printer, RefreshCw, Download, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
@@ -59,18 +60,76 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ReportError, ReportLoading } from "@/components/features/reports/ui/report-states";
-import { OverallTab } from "@/components/features/reports/tabs/overall-tab";
-import { SalesTab } from "@/components/features/reports/tabs/sales-tab";
-import { ServicesTab } from "@/components/features/reports/tabs/services-tab";
-import { CustomersTab } from "@/components/features/reports/tabs/customers-tab";
-import { AppointmentsTab } from "@/components/features/reports/tabs/appointments-tab";
-import { StaffTab } from "@/components/features/reports/tabs/staff-tab";
-import { InventoryTab } from "@/components/features/reports/tabs/inventory-tab";
-import { InHouseUsageTab } from "@/components/features/reports/tabs/in-house-usage-tab";
-import { ProductsTab } from "@/components/features/reports/tabs/products-tab";
-import { FinanceTab } from "@/components/features/reports/tabs/finance-tab";
-import { PaymentsTab } from "@/components/features/reports/tabs/payments-tab";
-import { DuesTab } from "@/components/features/reports/tabs/dues-tab";
+
+const tabLoading = () => <ReportLoading className="min-h-[240px]" />;
+
+/** One tab chunk at a time — avoids shipping every recharts tab on first open. */
+const OverallTab = dynamic(
+  () => import("@/components/features/reports/tabs/overall-tab").then((m) => ({ default: m.OverallTab })),
+  { loading: tabLoading }
+);
+const SalesTab = dynamic(
+  () => import("@/components/features/reports/tabs/sales-tab").then((m) => ({ default: m.SalesTab })),
+  { loading: tabLoading }
+);
+const ServicesTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/services-tab").then((m) => ({ default: m.ServicesTab })),
+  { loading: tabLoading }
+);
+const CustomersTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/customers-tab").then((m) => ({
+      default: m.CustomersTab,
+    })),
+  { loading: tabLoading }
+);
+const AppointmentsTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/appointments-tab").then((m) => ({
+      default: m.AppointmentsTab,
+    })),
+  { loading: tabLoading }
+);
+const StaffTab = dynamic(
+  () => import("@/components/features/reports/tabs/staff-tab").then((m) => ({ default: m.StaffTab })),
+  { loading: tabLoading }
+);
+const InventoryTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/inventory-tab").then((m) => ({
+      default: m.InventoryTab,
+    })),
+  { loading: tabLoading }
+);
+const InHouseUsageTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/in-house-usage-tab").then((m) => ({
+      default: m.InHouseUsageTab,
+    })),
+  { loading: tabLoading }
+);
+const ProductsTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/products-tab").then((m) => ({ default: m.ProductsTab })),
+  { loading: tabLoading }
+);
+const FinanceTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/finance-tab").then((m) => ({ default: m.FinanceTab })),
+  { loading: tabLoading }
+);
+const PaymentsTab = dynamic(
+  () =>
+    import("@/components/features/reports/tabs/payments-tab").then((m) => ({
+      default: m.PaymentsTab,
+    })),
+  { loading: tabLoading }
+);
+const DuesTab = dynamic(
+  () => import("@/components/features/reports/tabs/dues-tab").then((m) => ({ default: m.DuesTab })),
+  { loading: tabLoading }
+);
 
 const PRESETS: { id: ReportPeriodPreset; label: string }[] = [
   { id: "today", label: "Today" },

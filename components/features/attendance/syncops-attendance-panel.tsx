@@ -18,6 +18,7 @@ import {
   type SyncOpsDeviceInfo,
 } from "@/lib/devices/syncops-agent";
 import { recordThumbAttendance } from "@/lib/actions/staff";
+import { THUMB_ATTENDANCE_EVENT } from "@/components/features/attendance/thumb-attendance-live-sync";
 import { notify } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,8 +81,18 @@ export function SyncOpsAttendancePanel({ enrolledStaff }: SyncOpsAttendancePanel
   useEffect(() => {
     getSyncOpsAgentConfig();
     void refresh();
-    const timer = setInterval(() => void refresh(), 10000);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void refresh();
+    }, 20000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [refresh]);
 
   function runDiscover() {
@@ -184,13 +195,22 @@ export function SyncOpsAttendancePanel({ enrolledStaff }: SyncOpsAttendancePanel
           }
         }
 
-        const result = await recordThumbAttendance(value, "toggle");
+        const at = new Date().toISOString();
+        const result = await recordThumbAttendance(
+          value,
+          "toggle",
+          at,
+          `${value}@${Date.now()}`
+        );
         if (result.error) throw new Error(result.error);
 
         notify.success(result.action === "check_out" ? "Checked out" : "Checked in", {
           description: result.staffName ?? value,
         });
         setLastMessage(`${result.action} → ${result.staffName ?? value}`);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent(THUMB_ATTENDANCE_EVENT));
+        }
         router.refresh();
         await refresh();
       } catch (e) {

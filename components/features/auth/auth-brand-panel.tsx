@@ -151,10 +151,11 @@ export function AuthBrandPanel(_props: AuthBrandPanelProps = {}) {
   useEffect(() => {
     if (paused) return;
     const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       setActive((current) => (current + 1) % SLIDES.length);
     }, ROTATE_MS);
     return () => window.clearInterval(id);
-  }, [paused, active]);
+  }, [paused]);
 
   const message = SLIDES[active] ?? SLIDES[0];
   const isCeo = message.kind === "ceo";

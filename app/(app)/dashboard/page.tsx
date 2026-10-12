@@ -12,7 +12,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AppointmentList } from "@/components/dashboard/appointment-list";
 import { QuickActions } from "@/components/dashboard/quick-actions";
-import { RevenueChart } from "@/components/dashboard/revenue-chart";
+import { RevenueChartLazy } from "@/components/dashboard/revenue-chart-lazy";
 import { CustomerInsights } from "@/components/dashboard/customer-insights";
 import { ServicePerformance } from "@/components/dashboard/service-performance";
 import { DashboardStockPanel } from "@/components/dashboard/dashboard-stock-panel";
@@ -113,7 +113,7 @@ export default async function DashboardPage() {
       </div>
 
       {data && (
-        <RevenueChart
+        <RevenueChartLazy
           revenueByDay={data.revenueByDay}
           appointmentsByDay={data.appointmentsByDay}
         />

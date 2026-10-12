@@ -26,19 +26,20 @@ public sealed class BeautoraAttendanceSyncHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var bridge = _options.Beautora;
+        var cloudUrl = BeautoraCloudUrls.Resolve(bridge.AppUrl);
         if (!bridge.AttendanceSyncEnabled ||
-            string.IsNullOrWhiteSpace(bridge.AttendanceApiKey) ||
-            string.IsNullOrWhiteSpace(bridge.AppUrl))
+            string.IsNullOrWhiteSpace(bridge.AttendanceApiKey))
         {
             _logger.LogInformation(
-                "Beautora attendance auto-sync disabled (set DeviceAgent:Beautora:AttendanceSyncEnabled=true + AttendanceApiKey)");
+                "Beautora attendance auto-sync disabled (set DeviceAgent:Beautora:AttendanceSyncEnabled=true + AttendanceApiKey). Cloud URL would be {CloudUrl}",
+                cloudUrl);
             return;
         }
 
         var interval = TimeSpan.FromSeconds(Math.Clamp(bridge.AttendanceSyncIntervalSeconds, 5, 300));
         _logger.LogInformation(
             "Beautora attendance auto-sync enabled → {AppUrl} every {Seconds}s",
-            bridge.AppUrl.TrimEnd('/'),
+            cloudUrl,
             interval.TotalSeconds);
 
         // Brief delay so discovery can finish first.
