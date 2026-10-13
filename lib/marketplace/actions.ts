@@ -199,12 +199,15 @@ export async function upsertSellerProduct(
       updated_at: new Date().toISOString(),
     };
     if (submitForReview) patch.status = "published";
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("marketplace_products")
       .update(patch)
       .eq("id", id)
-      .eq("seller_id", seller.id);
+      .eq("seller_id", seller.id)
+      .select("id")
+      .maybeSingle();
     if (error) return { error: error.message };
+    if (!updated) return { error: "Product not found for this seller" };
   } else {
     const { error } = await supabase.from("marketplace_products").insert({
       seller_id: seller.id,
@@ -235,16 +238,26 @@ export async function upsertSellerProduct(
 export async function adjustSellerStock(formData: FormData): Promise<ActionResult> {
   const seller = await getMyMarketplaceSeller();
   if (!seller) return { error: "Not a seller." };
-  const productId = String(formData.get("product_id") ?? "");
-  const stock = Math.max(0, Math.floor(Number(formData.get("stock") ?? 0)));
+  const productId = String(formData.get("product_id") ?? "").trim();
+  const stockRaw = Number(formData.get("stock") ?? 0);
+  if (!productId) return { error: "Choose a product" };
+  if (!Number.isFinite(stockRaw) || stockRaw < 0) {
+    return { error: "Stock must be zero or greater" };
+  }
+  const stock = Math.floor(stockRaw);
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("marketplace_products")
     .update({ stock, updated_at: new Date().toISOString() })
     .eq("id", productId)
-    .eq("seller_id", seller.id);
+    .eq("seller_id", seller.id)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "Product not found for this seller" };
   revalidatePath("/marketplace/inventory");
+  revalidatePath("/marketplace/products");
+  revalidatePath("/shop");
   return { success: true };
 }
 
@@ -274,10 +287,14 @@ export async function listPublicMarketplaceProducts(opts?: {
     .eq("marketplace_sellers.status", "approved")
     .gt("stock", 0)
     .order("updated_at", { ascending: false })
-    .limit(100);
+    .limit(500);
 
   const { data, error } = await query;
-  if (error || !data) return [];
+  if (error) {
+    console.error("[marketplace] listPublicMarketplaceProducts failed", error.message);
+    return [];
+  }
+  if (!data) return [];
 
   const q = (opts?.q ?? "").trim().toLowerCase();
   let rows = data as unknown as Array<
@@ -472,8 +489,9 @@ export async function placeMarketplaceCodOrder(input: {
     return { error: "Email is required for card payments (invoice delivery)." };
   }
 
-  const admin = tryCreateAdminClient();
-  if (!admin) return { error: "Checkout unavailable right now." };
+  const adminClient = tryCreateAdminClient();
+  if (!adminClient) return { error: "Checkout unavailable right now." };
+  const admin = adminClient;
 
   const { isMarketplaceEnabled } = await import("@/lib/marketplace/settings");
   if (!(await isMarketplaceEnabled())) {
@@ -621,6 +639,22 @@ export async function placeMarketplaceCodOrder(input: {
 
   if (orderErr || !order) return { error: orderErr?.message ?? "Could not create order." };
 
+  async function cancelOrphanOrder(reason: string) {
+    await admin
+      .from("marketplace_orders")
+      .update({
+        status: "cancelled",
+        payment_status: "unpaid",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order!.id);
+    await admin
+      .from("marketplace_seller_orders")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("order_id", order!.id);
+    return { error: reason } as const;
+  }
+
   // Per-seller sub-orders
   const bySeller = new Map<string, typeof lines>();
   for (const l of lines) {
@@ -644,7 +678,9 @@ export async function placeMarketplaceCodOrder(input: {
       })
       .select("id")
       .single();
-    if (soErr || !sellerOrder) return { error: soErr?.message ?? "Could not create seller order." };
+    if (soErr || !sellerOrder) {
+      return cancelOrphanOrder(soErr?.message ?? "Could not create seller order.");
+    }
     sellerOrderIdBySeller.set(sellerId, sellerOrder.id);
   }
 
@@ -655,7 +691,9 @@ export async function placeMarketplaceCodOrder(input: {
       seller_order_id: sellerOrderIdBySeller.get(l.seller_id) ?? null,
     }))
   );
-  if (itemsErr) return { error: itemsErr.message };
+  if (itemsErr) {
+    return cancelOrphanOrder(itemsErr.message);
+  }
 
   // Persist COD payment intent (architecture hook; no capture)
   const intent = await payment.createPayment({
@@ -678,20 +716,110 @@ export async function placeMarketplaceCodOrder(input: {
     // Phase 2 table may be pending apply — order still succeeds
   }
 
+  type AppliedStock = {
+    kind: "variant" | "product";
+    id: string;
+    quantity: number;
+    title: string;
+  };
+  const appliedStock: AppliedStock[] = [];
+  let stockFailedTitle: string | null = null;
+
   for (const l of lines) {
     if (l.variant_id) {
       const v = variantById.get(l.variant_id)!;
-      await admin
+      const next = Math.max(0, Number(v.stock) - l.quantity);
+      const { data: updated, error: stockErr } = await admin
         .from("marketplace_product_variants")
-        .update({ stock: v.stock - l.quantity, updated_at: new Date().toISOString() })
-        .eq("id", l.variant_id);
+        .update({ stock: next, updated_at: new Date().toISOString() })
+        .eq("id", l.variant_id)
+        .gte("stock", l.quantity)
+        .select("id")
+        .maybeSingle();
+      if (stockErr || !updated) {
+        stockFailedTitle = l.product_title;
+        break;
+      }
+      v.stock = next;
+      appliedStock.push({
+        kind: "variant",
+        id: l.variant_id,
+        quantity: l.quantity,
+        title: l.product_title,
+      });
     } else {
       const p = byId.get(l.product_id)!;
-      await admin
+      const next = Math.max(0, Number(p.stock) - l.quantity);
+      const { data: updated, error: stockErr } = await admin
         .from("marketplace_products")
-        .update({ stock: p.stock - l.quantity, updated_at: new Date().toISOString() })
-        .eq("id", l.product_id);
+        .update({ stock: next, updated_at: new Date().toISOString() })
+        .eq("id", l.product_id)
+        .gte("stock", l.quantity)
+        .select("id")
+        .maybeSingle();
+      if (stockErr || !updated) {
+        stockFailedTitle = l.product_title;
+        break;
+      }
+      p.stock = next;
+      appliedStock.push({
+        kind: "product",
+        id: l.product_id,
+        quantity: l.quantity,
+        title: l.product_title,
+      });
     }
+  }
+
+  if (stockFailedTitle) {
+    // Reverse successful decrements so cancel does not leave stock wrong.
+    for (const applied of appliedStock.reverse()) {
+      if (applied.kind === "variant") {
+        const { data: row } = await admin
+          .from("marketplace_product_variants")
+          .select("stock")
+          .eq("id", applied.id)
+          .maybeSingle();
+        const current = Number(row?.stock ?? 0);
+        await admin
+          .from("marketplace_product_variants")
+          .update({
+            stock: current + applied.quantity,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", applied.id);
+      } else {
+        const { data: row } = await admin
+          .from("marketplace_products")
+          .select("stock")
+          .eq("id", applied.id)
+          .maybeSingle();
+        const current = Number(row?.stock ?? 0);
+        await admin
+          .from("marketplace_products")
+          .update({
+            stock: current + applied.quantity,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", applied.id);
+      }
+    }
+
+    await admin
+      .from("marketplace_orders")
+      .update({
+        status: "cancelled",
+        payment_status: "unpaid",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.id);
+    await admin
+      .from("marketplace_seller_orders")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("order_id", order.id);
+    return {
+      error: `Insufficient stock for: ${stockFailedTitle}. Please refresh cart and try again.`,
+    };
   }
 
   try {

@@ -69,12 +69,45 @@ export async function createProductCategory(
   if (!name?.trim()) return { error: "Name is required" };
 
   const supabase = await createClient();
+  const trimmed = name.trim();
+  const sortOrder = Number(formData.get("sort_order") ?? 0);
+  const { restoreSoftDeletedByName } = await import("@/lib/db/restore-soft-deleted");
+  const restored = await restoreSoftDeletedByName({
+    client: supabase,
+    table: "product_categories",
+    organizationId: org.organizationId,
+    name: trimmed,
+    extraUpdate: { sort_order: sortOrder },
+  });
+  if (restored) {
+    revalidatePath("/products");
+    revalidatePath("/in-house");
+    return { success: true };
+  }
+
   const { error } = await supabase.from("product_categories").insert({
     organization_id: org.organizationId,
-    name: name.trim(),
-    sort_order: Number(formData.get("sort_order") ?? 0),
+    name: trimmed,
+    sort_order: sortOrder,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") {
+      const again = await restoreSoftDeletedByName({
+        client: supabase,
+        table: "product_categories",
+        organizationId: org.organizationId,
+        name: trimmed,
+        extraUpdate: { sort_order: sortOrder },
+      });
+      if (again) {
+        revalidatePath("/products");
+        revalidatePath("/in-house");
+        return { success: true };
+      }
+      return { error: "A category with this name already exists" };
+    }
+    return { error: error.message };
+  }
   revalidatePath("/products");
   revalidatePath("/in-house");
   return { success: true };
@@ -143,28 +176,103 @@ export async function createProduct(
   }
 
   const costPrice = resolveStoredCostPrice(formData, parsed.data);
+  const openingStock = Number(parsed.data.stock_quantity) || 0;
+  const productName = parsed.data.name.trim();
 
   const supabase = await createClient();
-  const { error } = await supabase.from("products").insert({
-    organization_id: org.organizationId,
-    category_id: parsed.data.category_id ?? null,
-    sku: parsed.data.sku ?? null,
-    name: parsed.data.name,
-    description: parsed.data.description ?? null,
-    product_kind: parsed.data.product_kind,
-    cost_price: costPrice,
-    retail_price: parsed.data.retail_price,
-    stock_quantity: parsed.data.stock_quantity,
-    low_stock_threshold: parsed.data.low_stock_threshold,
-    is_active: parsed.data.is_active,
-    unit_label: parsed.data.unit_label?.trim() || null,
-    pack_size: parsed.data.pack_size ?? null,
-    default_usage_qty: parsed.data.default_usage_qty ?? null,
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // products has no unique(name) — never restore beside an active same-name row.
+  const { data: activeSame } = await supabase
+    .from("products")
+    .select("id")
+    .eq("organization_id", org.organizationId)
+    .eq("name", productName)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (activeSame) {
+    return { error: "A product with this name already exists" };
+  }
+
+  const { restoreSoftDeletedByName } = await import("@/lib/db/restore-soft-deleted");
+  // Only wipe on-hand when the form supplies a new opening qty (>0).
+  // Opening 0 on restore keeps prior stock so recreate does not silently zero inventory.
+  const restored = await restoreSoftDeletedByName({
+    client: supabase,
+    table: "products",
+    organizationId: org.organizationId,
+    name: productName,
+    extraUpdate: {
+      category_id: parsed.data.category_id ?? null,
+      sku: parsed.data.sku?.trim() || null,
+      description: parsed.data.description ?? null,
+      product_kind: parsed.data.product_kind,
+      cost_price: costPrice,
+      retail_price: parsed.data.retail_price,
+      ...(openingStock > 0 ? { stock_quantity: 0 } : {}),
+      low_stock_threshold: parsed.data.low_stock_threshold,
+      is_active: parsed.data.is_active,
+      unit_label: parsed.data.unit_label?.trim() || null,
+      pack_size: parsed.data.pack_size ?? null,
+      default_usage_qty: parsed.data.default_usage_qty ?? null,
+    },
   });
-  if (error) return { error: error.message };
+
+  let created: { id: string } | null = restored;
+  if (!created) {
+    // Insert at 0, then record opening stock as IN so inventory history is correct.
+    const { data, error } = await supabase
+      .from("products")
+      .insert({
+        organization_id: org.organizationId,
+        category_id: parsed.data.category_id ?? null,
+        sku: parsed.data.sku?.trim() || null,
+        name: productName,
+        description: parsed.data.description ?? null,
+        product_kind: parsed.data.product_kind,
+        cost_price: costPrice,
+        retail_price: parsed.data.retail_price,
+        stock_quantity: 0,
+        low_stock_threshold: parsed.data.low_stock_threshold,
+        is_active: parsed.data.is_active,
+        unit_label: parsed.data.unit_label?.trim() || null,
+        pack_size: parsed.data.pack_size ?? null,
+        default_usage_qty: parsed.data.default_usage_qty ?? null,
+      })
+      .select("id")
+      .single();
+    if (error || !data) {
+      return { error: error?.message ?? "Could not create product" };
+    }
+    created = data;
+  }
+
+  if (openingStock > 0) {
+    const { error: invErr } = await supabase.from("inventory_transactions").insert({
+      organization_id: org.organizationId,
+      product_id: created.id,
+      type: "IN",
+      quantity: openingStock,
+      notes: "Opening stock",
+      created_by: user?.id ?? null,
+      reference_type: "opening",
+    });
+    if (invErr) {
+      // Product exists — surface stock failure clearly so staff can adjust.
+      revalidatePath("/products");
+      revalidatePath("/in-house");
+      return {
+        error: `Product saved but opening stock failed: ${invErr.message}. Use Adjust inventory to add stock.`,
+      };
+    }
+  }
+
   revalidatePath("/products");
   revalidatePath("/in-house");
   revalidatePath("/services");
+  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -197,12 +305,12 @@ export async function updateProduct(
   const costPrice = resolveStoredCostPrice(formData, parsed.data);
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("products")
     .update({
       category_id: parsed.data.category_id ?? null,
-      sku: parsed.data.sku ?? null,
-      name: parsed.data.name,
+      sku: parsed.data.sku?.trim() || null,
+      name: parsed.data.name.trim(),
       description: parsed.data.description ?? null,
       product_kind: parsed.data.product_kind,
       cost_price: costPrice,
@@ -215,12 +323,16 @@ export async function updateProduct(
     })
     .eq("id", id)
     .eq("organization_id", org.organizationId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!updated) return { error: "Product not found or already deleted" };
   revalidatePath("/products");
   revalidatePath("/in-house");
   revalidatePath("/services");
+  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -251,6 +363,9 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   });
   if (result.error) return { error: result.error };
   revalidatePath("/products");
+  revalidatePath("/in-house");
+  revalidatePath("/pos");
+  revalidatePath("/services");
   return { success: true };
 }
 
@@ -259,32 +374,81 @@ export async function adjustInventory(
   formData: FormData
 ): Promise<ActionResult> {
   const org = await requireAction("products.edit");
-  const productId = formData.get("product_id") as string;
+  const productId = String(formData.get("product_id") ?? "").trim();
   const type = formData.get("type") as "IN" | "OUT" | "ADJUSTMENT";
   const quantity = Number(formData.get("quantity"));
-  const notes = (formData.get("notes") as string) || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
 
-  if (!productId || !type || !quantity || quantity <= 0) {
-    return { error: "Invalid inventory adjustment" };
+  if (!productId || !["IN", "OUT", "ADJUSTMENT"].includes(type)) {
+    return { error: "Choose a product and adjustment type" };
+  }
+  if (!Number.isFinite(quantity)) {
+    return { error: "Enter a valid quantity" };
+  }
+  // IN/OUT require > 0. ADJUSTMENT is absolute on-hand and may be 0.
+  if (type !== "ADJUSTMENT" && quantity <= 0) {
+    return { error: "Quantity must be greater than zero" };
+  }
+  if (type === "ADJUSTMENT" && quantity < 0) {
+    return { error: "On-hand quantity cannot be negative" };
   }
 
   const supabase = await createClient();
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, name, stock_quantity")
+    .eq("id", productId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!product) return { error: "Product not found in this salon" };
+
+  if (type === "OUT" && Number(product.stock_quantity) < quantity) {
+    return {
+      error: `Insufficient stock for ${product.name} (have ${product.stock_quantity}, need ${quantity})`,
+    };
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // DB CHECK quantity > 0 — zeroing stock must OUT the current on-hand amount.
+  let txnType: "IN" | "OUT" | "ADJUSTMENT" = type;
+  let txnQty = quantity;
+  let txnNotes = notes;
+  if (type === "ADJUSTMENT" && quantity === 0) {
+    const current = Number(product.stock_quantity) || 0;
+    if (current <= 0) {
+      revalidatePath("/products");
+      revalidatePath("/in-house");
+      revalidatePath("/pos");
+      return { success: true };
+    }
+    txnType = "OUT";
+    txnQty = current;
+    txnNotes = notes ? `${notes} (set on-hand to 0)` : "Set on-hand to 0";
+  }
+
   const { error } = await supabase.from("inventory_transactions").insert({
     organization_id: org.organizationId,
     product_id: productId,
-    type,
-    quantity,
-    notes,
+    type: txnType,
+    quantity: txnQty,
+    notes: txnNotes,
     created_by: user?.id ?? null,
     reference_type: "manual",
   });
-  if (error) return { error: error.message };
+  if (error) {
+    const msg = error.message || "Inventory update failed";
+    if (/insufficient stock/i.test(msg)) {
+      return { error: msg };
+    }
+    return { error: msg };
+  }
   revalidatePath("/products");
   revalidatePath("/in-house");
+  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -376,8 +540,11 @@ export async function getLowStockProducts() {
     .eq("is_active", true)
     .is("deleted_at", null)
     .order("stock_quantity");
-  if (error) return [];
-  return data
+  if (error) {
+    console.error("[inventory] low-stock query failed", error.message);
+    return [];
+  }
+  return (data ?? [])
     .filter((p) => p.stock_quantity <= p.low_stock_threshold)
     .map((p) => ({
       id: p.id,
@@ -419,8 +586,8 @@ export async function getPosCatalog() {
       .select("id, first_name, last_name, phone")
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null)
-      .order("first_name")
-      .limit(100),
+      .order("created_at", { ascending: false })
+      .limit(2000),
     supabase
       .from("staff")
       .select("id, full_name")

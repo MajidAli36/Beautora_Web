@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { resolveSubscription } from "@/lib/billing/subscription";
 import { getStoreVisual, type StoreVisual } from "@/lib/marketing/store-visuals";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
@@ -57,7 +58,7 @@ async function resolveAssetUrl(path: string | null): Promise<string | null> {
   return signed.url ?? null;
 }
 
-export async function listPublicStores(): Promise<PublicStore[]> {
+async function listPublicStoresUncached(): Promise<PublicStore[]> {
   const admin = tryCreateAdminClient();
   if (!admin) return [];
 
@@ -75,57 +76,71 @@ export async function listPublicStores(): Promise<PublicStore[]> {
   const operationalOrgs = orgs.filter((org) => resolveSubscription(org).isOperational);
   if (!operationalOrgs.length) return [];
 
-  const stores = await Promise.all(
-    operationalOrgs.map(async (org) => {
-      const [
-        { count: serviceCount },
-        { count: staffCount },
-        { data: serviceRows },
-        logoUrl,
-        coverUrl,
-      ] = await Promise.all([
-        admin
-          .from("services")
-          .select("*", { count: "exact", head: true })
-          .eq("organization_id", org.id)
-          .eq("is_active", true),
-        admin
-          .from("staff")
-          .select("*", { count: "exact", head: true })
-          .eq("organization_id", org.id)
-          .eq("is_active", true)
-          .eq("online_booking_enabled", true),
-        admin
-          .from("services")
-          .select("name")
-          .eq("organization_id", org.id)
-          .eq("is_active", true)
-          .order("name")
-          .limit(3),
-        resolveAssetUrl(org.logo_path),
-        resolveAssetUrl(org.cover_path),
-      ]);
+  const orgIds = operationalOrgs.map((o) => o.id);
 
-      return {
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        city: org.city,
-        country: org.country ?? null,
-        address: org.address,
-        tagline: org.tagline,
-        whatsappPhone: org.whatsapp_phone,
-        serviceCount: serviceCount ?? 0,
-        staffCount: staffCount ?? 0,
-        highlightServices: (serviceRows ?? []).map((s) => s.name),
-        logoUrl,
-        coverUrl,
-        visual: getStoreVisual(org.slug, org.name),
-      };
-    })
+  // Batch catalog counts instead of 3 queries × N stores.
+  const [{ data: serviceRows }, { data: staffRows }] = await Promise.all([
+    admin
+      .from("services")
+      .select("organization_id, name")
+      .in("organization_id", orgIds)
+      .eq("is_active", true)
+      .order("name"),
+    admin
+      .from("staff")
+      .select("organization_id")
+      .in("organization_id", orgIds)
+      .eq("is_active", true)
+      .eq("online_booking_enabled", true)
+      .is("deleted_at", null),
+  ]);
+
+  const serviceCountByOrg = new Map<string, number>();
+  const highlightByOrg = new Map<string, string[]>();
+  for (const row of serviceRows ?? []) {
+    const id = row.organization_id as string;
+    serviceCountByOrg.set(id, (serviceCountByOrg.get(id) ?? 0) + 1);
+    const highlights = highlightByOrg.get(id) ?? [];
+    if (highlights.length < 3) {
+      highlights.push(row.name);
+      highlightByOrg.set(id, highlights);
+    }
+  }
+
+  const staffCountByOrg = new Map<string, number>();
+  for (const row of staffRows ?? []) {
+    const id = row.organization_id as string;
+    staffCountByOrg.set(id, (staffCountByOrg.get(id) ?? 0) + 1);
+  }
+
+  // Sign only logos for the listing strip (covers use visual fallback) — half the R2 work.
+  const logoUrls = await Promise.all(
+    operationalOrgs.map((org) => resolveAssetUrl(org.logo_path))
   );
 
-  return stores;
+  return operationalOrgs.map((org, i) => ({
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    city: org.city,
+    country: org.country ?? null,
+    address: org.address,
+    tagline: org.tagline,
+    whatsappPhone: org.whatsapp_phone,
+    serviceCount: serviceCountByOrg.get(org.id) ?? 0,
+    staffCount: staffCountByOrg.get(org.id) ?? 0,
+    highlightServices: highlightByOrg.get(org.id) ?? [],
+    logoUrl: logoUrls[i] ?? null,
+    coverUrl: null,
+    visual: getStoreVisual(org.slug, org.name),
+  }));
+}
+
+export async function listPublicStores(): Promise<PublicStore[]> {
+  return unstable_cache(listPublicStoresUncached, ["public-stores-list"], {
+    revalidate: 300,
+    tags: ["public-stores"],
+  })();
 }
 
 /** Unique cities that have at least one store (for filters). */

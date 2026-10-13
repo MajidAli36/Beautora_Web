@@ -43,13 +43,47 @@ export async function createCategory(
   }
 
   const supabase = await createClient();
+  const name = parsed.data.name.trim();
+  const { restoreSoftDeletedByName } = await import("@/lib/db/restore-soft-deleted");
+  const restored = await restoreSoftDeletedByName({
+    client: supabase,
+    table: "service_categories",
+    organizationId: org.organizationId,
+    name,
+    extraUpdate: { sort_order: parsed.data.sort_order },
+  });
+  if (restored) {
+    revalidatePath("/services");
+    revalidatePath("/");
+    revalidatePath("/book");
+    return { success: true };
+  }
+
   const { error } = await supabase.from("service_categories").insert({
     organization_id: org.organizationId,
-    name: parsed.data.name,
+    name,
     sort_order: parsed.data.sort_order,
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") {
+      const again = await restoreSoftDeletedByName({
+        client: supabase,
+        table: "service_categories",
+        organizationId: org.organizationId,
+        name,
+        extraUpdate: { sort_order: parsed.data.sort_order },
+      });
+      if (again) {
+        revalidatePath("/services");
+        revalidatePath("/");
+        revalidatePath("/book");
+        return { success: true };
+      }
+      return { error: "A category with this name already exists" };
+    }
+    return { error: error.message };
+  }
   revalidatePath("/services");
   revalidatePath("/");
   revalidatePath("/book");
@@ -108,12 +142,35 @@ export async function createService(
   }
 
   const supabase = await createClient();
+  const name = parsed.data.name.trim();
+  const { restoreSoftDeletedByName } = await import("@/lib/db/restore-soft-deleted");
+  const restored = await restoreSoftDeletedByName({
+    client: supabase,
+    table: "services",
+    organizationId: org.organizationId,
+    name,
+    extraUpdate: {
+      category_id: parsed.data.category_id ?? null,
+      description: parsed.data.description ?? null,
+      price: parsed.data.price,
+      duration_minutes: parsed.data.duration_minutes,
+      is_active: parsed.data.is_active,
+    },
+  });
+  if (restored) {
+    revalidatePath("/services");
+    revalidatePath("/");
+    revalidatePath("/book");
+    revalidatePath("/pos");
+    return { success: true };
+  }
+
   const { data: created, error } = await supabase
     .from("services")
     .insert({
       organization_id: org.organizationId,
       category_id: parsed.data.category_id ?? null,
-      name: parsed.data.name,
+      name,
       description: parsed.data.description ?? null,
       price: parsed.data.price,
       duration_minutes: parsed.data.duration_minutes,
@@ -122,11 +179,37 @@ export async function createService(
     .select("id")
     .single();
 
-  if (error || !created) return { error: error?.message ?? "Failed to create service" };
+  if (error || !created) {
+    if (error?.code === "23505") {
+      const again = await restoreSoftDeletedByName({
+        client: supabase,
+        table: "services",
+        organizationId: org.organizationId,
+        name,
+        extraUpdate: {
+          category_id: parsed.data.category_id ?? null,
+          description: parsed.data.description ?? null,
+          price: parsed.data.price,
+          duration_minutes: parsed.data.duration_minutes,
+          is_active: parsed.data.is_active,
+        },
+      });
+      if (again) {
+        revalidatePath("/services");
+        revalidatePath("/");
+        revalidatePath("/book");
+        revalidatePath("/pos");
+        return { success: true };
+      }
+      return { error: "A service with this name already exists" };
+    }
+    return { error: error?.message ?? "Failed to create service" };
+  }
 
   revalidatePath("/services");
   revalidatePath("/");
   revalidatePath("/book");
+  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -152,11 +235,11 @@ export async function updateService(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("services")
     .update({
       category_id: parsed.data.category_id ?? null,
-      name: parsed.data.name,
+      name: parsed.data.name.trim(),
       description: parsed.data.description ?? null,
       price: parsed.data.price,
       duration_minutes: parsed.data.duration_minutes,
@@ -164,13 +247,17 @@ export async function updateService(
     })
     .eq("id", id)
     .eq("organization_id", org.organizationId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!updated) return { error: "Service not found or already deleted" };
 
   revalidatePath("/services");
   revalidatePath("/");
   revalidatePath("/book");
+  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -575,19 +662,58 @@ export async function createPackage(
   const quantities = formData.getAll("quantities") as string[];
 
   const supabase = await createClient();
-  const { data: pkg, error: pkgError } = await supabase
+  const pkgName = parsed.data.name.trim();
+
+  const { data: activePkg } = await supabase
     .from("packages")
-    .insert({
-      organization_id: org.organizationId,
-      name: parsed.data.name,
+    .select("id")
+    .eq("organization_id", org.organizationId)
+    .eq("name", pkgName)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (activePkg) {
+    return { error: "A package with this name already exists" };
+  }
+
+  const { restoreSoftDeletedByName } = await import("@/lib/db/restore-soft-deleted");
+  const restoredPkg = await restoreSoftDeletedByName({
+    client: supabase,
+    table: "packages",
+    organizationId: org.organizationId,
+    name: pkgName,
+    extraUpdate: {
       description: parsed.data.description ?? null,
       price: parsed.data.price,
       is_active: parsed.data.is_active,
-    })
-    .select("id")
-    .single();
+    },
+  });
 
-  if (pkgError || !pkg) return { error: pkgError?.message ?? "Failed to create package" };
+  let pkg: { id: string } | null = restoredPkg;
+  if (!pkg) {
+    const { data: created, error: pkgError } = await supabase
+      .from("packages")
+      .insert({
+        organization_id: org.organizationId,
+        name: pkgName,
+        description: parsed.data.description ?? null,
+        price: parsed.data.price,
+        is_active: parsed.data.is_active,
+      })
+      .select("id")
+      .single();
+    if (pkgError || !created) {
+      return { error: pkgError?.message ?? "Failed to create package" };
+    }
+    pkg = created;
+  } else {
+    // Clear old package items before re-attaching services
+    const { error: clearErr } = await supabase
+      .from("package_items")
+      .delete()
+      .eq("package_id", pkg.id)
+      .eq("organization_id", org.organizationId);
+    if (clearErr) return { error: clearErr.message };
+  }
 
   const items = serviceIds
     .map((serviceId, i) => ({

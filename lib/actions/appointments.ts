@@ -43,11 +43,18 @@ export async function createAppointment(
   if (!scheduledAt) return { error: "Time slot required" };
 
   const supabase = await createClient();
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const {
+    ensureCustomerFromBooking,
+    normalizeBookingEmail,
+    normalizeBookingPhone,
+  } = await import("@/lib/customers/ensure-from-booking");
 
   // Always attach a customer: use selected id, or find/create from booking details.
+  // Admin client after app permission so RLS cannot block reception/staff.
   if (!customerId) {
-    const { ensureCustomerFromBooking } = await import("@/lib/customers/ensure-from-booking");
-    const ensured = await ensureCustomerFromBooking(supabase, org.organizationId, {
+    const admin = createAdminClient();
+    const ensured = await ensureCustomerFromBooking(admin, org.organizationId, {
       firstName,
       lastName,
       phone,
@@ -56,10 +63,9 @@ export async function createAppointment(
     });
     if ("error" in ensured) return { error: ensured.error };
     customerId = ensured.customerId;
-    if (ensured.created) {
-      revalidatePath("/customers");
-      revalidatePath(`/customers/${customerId}`);
-    }
+    revalidatePath("/customers");
+    revalidatePath(`/customers/${customerId}`);
+    revalidatePath("/pos");
   } else {
     const { data: selected } = await supabase
       .from("customers")
@@ -70,18 +76,28 @@ export async function createAppointment(
       .maybeSingle();
     if (!selected) return { error: "Selected customer not found" };
 
+    const normalizedPhone = normalizeBookingPhone(phone);
+    const normalizedEmail = normalizeBookingEmail(email);
     const patch: Record<string, string | null> = {};
     if (!selected.last_name && lastName) patch.last_name = lastName;
-    if (!selected.phone && phone) patch.phone = phone;
-    if (!selected.email && email) patch.email = email;
+    if (normalizedPhone && selected.phone !== normalizedPhone) {
+      patch.phone = normalizedPhone;
+    }
+    if (normalizedEmail && selected.email?.toLowerCase() !== normalizedEmail) {
+      patch.email = normalizedEmail;
+    }
     if (!selected.notes && bookingNotes) patch.notes = bookingNotes;
     if (Object.keys(patch).length > 0) {
-      await supabase
+      const { error: patchErr } = await supabase
         .from("customers")
         .update({ ...patch, updated_at: new Date().toISOString() })
         .eq("id", customerId)
         .eq("organization_id", org.organizationId);
+      if (patchErr) {
+        console.error("[appointments] customer patch failed", patchErr.message);
+      }
       revalidatePath(`/customers/${customerId}`);
+      revalidatePath("/customers");
     }
   }
 
@@ -996,6 +1012,9 @@ export async function createOnlineBooking(input: {
 
   revalidatePath("/appointments");
   revalidatePath("/online-booking");
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/pos");
   return {
     success: true,
     pendingApproval,
@@ -1122,6 +1141,7 @@ export async function getOrgBySlug(slug: string) {
       .select("id, name, price, duration_minutes")
       .eq("organization_id", org.id)
       .eq("is_active", true)
+      .is("deleted_at", null)
       .order("name"),
     admin
       .from("staff")
@@ -1129,6 +1149,7 @@ export async function getOrgBySlug(slug: string) {
       .eq("organization_id", org.id)
       .eq("is_active", true)
       .eq("online_booking_enabled", true)
+      .is("deleted_at", null)
       .order("full_name"),
   ]);
   return {

@@ -12,6 +12,7 @@ import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PaginatedList } from "@/components/ui/table-pagination";
+import { formatDate } from "@/lib/format";
 
 export function PlatformPartnersPanel({
   partners,
@@ -74,10 +75,11 @@ export function PlatformPartnersPanel({
           <p className="mt-1 text-xs text-muted-foreground">
             {p.email}
             {p.phone ? ` · ${p.phone}` : ""} · applied{" "}
-            {new Date(p.created_at).toLocaleDateString("en-PK")} ·{" "}
+            {formatDate(p.created_at)} ·{" "}
             {p.referredStoreCount} store
             {p.referredStoreCount === 1 ? "" : "s"} · earned{" "}
-            {SUBSCRIPTION.currencyLabel} {p.earnedTotalPkr.toLocaleString("en-PK")}
+            {SUBSCRIPTION.currencyLabel}{" "}
+            {p.earnedTotalPkr.toLocaleString("en-US")}
           </p>
           {p.review_notes && p.status !== "pending" ? (
             <p className="mt-1 text-xs text-muted-foreground">{p.review_notes}</p>

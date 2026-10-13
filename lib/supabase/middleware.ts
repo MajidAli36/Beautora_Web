@@ -38,6 +38,13 @@ export async function updateSession(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", pathname);
+  const edgeCountry =
+    request.headers.get("x-vercel-ip-country")?.trim() ||
+    request.headers.get("cf-ipcountry")?.trim() ||
+    null;
+  if (edgeCountry) {
+    requestHeaders.set("x-country-code", edgeCountry);
+  }
 
   const next = () =>
     NextResponse.next({
@@ -45,31 +52,6 @@ export async function updateSession(request: NextRequest) {
     });
 
   let supabaseResponse = next();
-
-  const supabase = createServerClient<Database>(
-    getSupabaseUrl(),
-    getSupabaseAnonKey(),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = next();
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const isServerAction = request.headers.has("next-action");
   const isResetPasswordRoute = pathname.startsWith("/reset-password");
@@ -106,6 +88,49 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/marketplace") ||
     isPartnerDashboard;
 
+  // Skip Supabase getUser() on anonymous marketing traffic (no auth cookie).
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.includes("-auth-token") || c.name.startsWith("sb-"));
+
+  if (!hasAuthCookie) {
+    if (isServerAction) return supabaseResponse;
+    if (isProtectedRoute || isOnboardingRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
+    }
+    // Public marketing / shop / book — no session work.
+    return supabaseResponse;
+  }
+
+  const supabase = createServerClient<Database>(
+    getSupabaseUrl(),
+    getSupabaseAnonKey(),
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = next();
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Refresh session cookies for server actions, then skip route redirects.
   if (isServerAction) {
     return supabaseResponse;
   }

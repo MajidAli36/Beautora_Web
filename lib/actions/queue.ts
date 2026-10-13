@@ -82,6 +82,7 @@ export async function issueWalkInToken(
       .eq("id", resolvedStaffId)
       .eq("organization_id", org.organizationId)
       .eq("is_active", true)
+      .is("deleted_at", null)
       .maybeSingle();
     if (!staff) return { error: "Selected staff not found" };
     staffName = staff.full_name;
@@ -97,6 +98,7 @@ export async function issueWalkInToken(
       .eq("id", resolvedChairId)
       .eq("organization_id", org.organizationId)
       .eq("is_active", true)
+      .is("deleted_at", null)
       .maybeSingle();
     if (!chair) return { error: "Selected chair not found" };
     chairName = chair.name;

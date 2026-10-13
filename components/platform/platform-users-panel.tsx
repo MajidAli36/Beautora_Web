@@ -31,10 +31,29 @@ import { cn } from "@/lib/utils";
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Date(value).toLocaleString("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  // Fixed locale + UTC parts avoid SSR/client hydration mismatches from toLocaleString.
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const month = months[d.getUTCMonth()] ?? "???";
+  const year = d.getUTCFullYear();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${day}-${month}-${year}, ${hh}:${mm} UTC`;
 }
 
 function statusBadge(status: PlatformUserStatus) {

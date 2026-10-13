@@ -64,7 +64,11 @@ export async function updateSellerStoreProfile(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { normalizeContactEmail } = await import("@/lib/phone/contact");
+  const normalizedAccountEmail = normalizeContactEmail(accountEmail) ?? accountEmail;
+  const normalizedInvoiceEmail = normalizeContactEmail(invoiceEmail) ?? invoiceEmail;
+
+  const { data: updatedSeller, error } = await supabase
     .from("marketplace_sellers")
     .update({
       shop_name: shopName,
@@ -78,8 +82,8 @@ export async function updateSellerStoreProfile(
       supports_cod: supportsCod,
       accepts_cod: acceptsCod,
       accepts_card: acceptsCard,
-      account_email: accountEmail,
-      invoice_email: invoiceEmail,
+      account_email: normalizedAccountEmail,
+      invoice_email: normalizedInvoiceEmail,
       cod_terms: codTerms,
       cod_prep_note: codPrepNote,
       card_instructions: cardInstructions,
@@ -92,7 +96,12 @@ export async function updateSellerStoreProfile(
         : seller.store_published_at,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", seller.id);
+    .eq("id", seller.id)
+    .select("id")
+    .maybeSingle();
+  if (!error && !updatedSeller) {
+    return { error: "Seller profile not found" };
+  }
   if (error) {
     // Migration may not be applied yet — retry without payment-term columns
     if (
@@ -100,7 +109,7 @@ export async function updateSellerStoreProfile(
       error.message.includes("card_account") ||
       error.message.includes("card_instructions")
     ) {
-      const { error: fbErr } = await supabase
+      const { data: fbUpdated, error: fbErr } = await supabase
         .from("marketplace_sellers")
         .update({
           shop_name: shopName,
@@ -114,15 +123,18 @@ export async function updateSellerStoreProfile(
           supports_cod: supportsCod,
           accepts_cod: acceptsCod,
           accepts_card: acceptsCard,
-          account_email: accountEmail,
-          invoice_email: invoiceEmail,
+          account_email: normalizedAccountEmail,
+          invoice_email: normalizedInvoiceEmail,
           store_published_at: publish
             ? seller.store_published_at ?? new Date().toISOString()
             : seller.store_published_at,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", seller.id);
+        .eq("id", seller.id)
+        .select("id")
+        .maybeSingle();
       if (fbErr) return { error: fbErr.message };
+      if (!fbUpdated) return { error: "Seller profile not found" };
     } else {
       return { error: error.message };
     }
@@ -292,7 +304,7 @@ export async function upsertProductVariant(
   if (!owned) return { error: "Product not found." };
 
   if (id) {
-    const { error } = await supabase
+    const { data: updatedVariant, error } = await supabase
       .from("marketplace_product_variants")
       .update({
         name,
@@ -307,8 +319,11 @@ export async function upsertProductVariant(
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("product_id", productId);
+      .eq("product_id", productId)
+      .select("id")
+      .maybeSingle();
     if (error) return { error: error.message };
+    if (!updatedVariant) return { error: "Variant not found" };
   } else {
     const { error } = await supabase.from("marketplace_product_variants").insert({
       product_id: productId,

@@ -82,12 +82,15 @@ export async function setDeviceActive(
 ): Promise<ActionResult> {
   const org = await requireAction("devices.edit");
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("devices")
     .update({ is_active: isActive })
     .eq("id", deviceId)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "Device not found" };
   revalidatePath("/devices");
   return { success: true };
 }
@@ -102,13 +105,16 @@ export async function deleteDevice(deviceId: string): Promise<ActionResult> {
     .eq("device_id", deviceId)
     .eq("organization_id", org.organizationId);
 
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from("devices")
     .delete()
     .eq("id", deviceId)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!deleted) return { error: "Device not found" };
   revalidatePath("/devices");
   return { success: true };
 }

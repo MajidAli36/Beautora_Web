@@ -21,20 +21,117 @@ export async function createStaff(
 ): Promise<ActionResult> {
   const org = await requireAction("staff.create");
   const parsed = staffSchema.safeParse({
-    full_name: formData.get("full_name"),
-    phone: formData.get("phone") || undefined,
-    email: formData.get("email") || undefined,
-    job_title: formData.get("job_title") || undefined,
-    pin_code: formData.get("pin_code") || undefined,
+    full_name: String(formData.get("full_name") ?? "").trim(),
+    phone: String(formData.get("phone") ?? "").trim() || undefined,
+    email: String(formData.get("email") ?? "").trim() || undefined,
+    job_title: String(formData.get("job_title") ?? "").trim() || undefined,
+    pin_code: String(formData.get("pin_code") ?? "").trim() || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
+  const { normalizeContactEmail, normalizeContactPhone } = await import(
+    "@/lib/phone/contact"
+  );
+  const phone = normalizeContactPhone(parsed.data.phone ?? null);
+  const email = normalizeContactEmail(parsed.data.email || null);
+  const fullName = parsed.data.full_name.trim();
+
   const supabase = await createClient();
+
+  // Restore soft-deleted staff with same phone/email instead of creating a twin.
+  // Separate queries — PostgREST `.or()` breaks on unquoted emails with @ / .
+  if (phone || email) {
+    const { phoneLookupVariants } = await import(
+      "@/lib/customers/ensure-from-booking"
+    );
+    // Block restore/insert when an active staff already owns this contact.
+    if (phone) {
+      const { data: activePhone } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("organization_id", org.organizationId)
+        .in("phone", phoneLookupVariants(phone))
+        .is("deleted_at", null)
+        .limit(1)
+        .maybeSingle();
+      if (activePhone) {
+        return { error: "A staff member with this phone already exists" };
+      }
+    }
+    if (email) {
+      const { data: activeEmail } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("organization_id", org.organizationId)
+        .eq("email", email)
+        .is("deleted_at", null)
+        .limit(1)
+        .maybeSingle();
+      if (activeEmail) {
+        return { error: "A staff member with this email already exists" };
+      }
+    }
+
+    let deletedId: string | null = null;
+    if (phone) {
+      const { data: byPhone } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("organization_id", org.organizationId)
+        .in("phone", phoneLookupVariants(phone))
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      deletedId = byPhone?.id ?? null;
+    }
+    if (!deletedId && email) {
+      const { data: byEmail } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("organization_id", org.organizationId)
+        .eq("email", email)
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      deletedId = byEmail?.id ?? null;
+    }
+    if (deletedId) {
+      const { data: restored, error: restoreErr } = await supabase
+        .from("staff")
+        .update({
+          deleted_at: null,
+          full_name: fullName,
+          phone,
+          email,
+          job_title: parsed.data.job_title ?? null,
+          pin_code: parsed.data.pin_code ?? null,
+          is_active: true,
+          online_booking_enabled: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", deletedId)
+        .eq("organization_id", org.organizationId)
+        .select("id")
+        .maybeSingle();
+      if (restoreErr) return { error: restoreErr.message };
+      if (restored) {
+        revalidatePath("/staff");
+        revalidatePath("/attendance");
+        revalidatePath("/online-booking");
+        revalidatePath("/appointments");
+        revalidatePath("/pos");
+        return { success: true };
+      }
+    }
+  }
+
   const { error } = await supabase.from("staff").insert({
     organization_id: org.organizationId,
-    full_name: parsed.data.full_name,
-    phone: parsed.data.phone ?? null,
-    email: parsed.data.email || null,
+    full_name: fullName,
+    phone,
+    email,
     job_title: parsed.data.job_title ?? null,
     pin_code: parsed.data.pin_code ?? null,
     online_booking_enabled: true,
@@ -44,6 +141,7 @@ export async function createStaff(
   revalidatePath("/attendance");
   revalidatePath("/online-booking");
   revalidatePath("/appointments");
+  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -54,7 +152,7 @@ export async function setStaffActive(
   const org = await requireAction("staff.edit");
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("staff")
     .update(
       isActive
@@ -62,9 +160,13 @@ export async function setStaffActive(
         : { is_active: false, online_booking_enabled: false }
     )
     .eq("id", staffId)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!updated) return { error: "Staff not found or already deleted" };
   revalidatePath("/staff");
   revalidatePath("/attendance");
   revalidatePath("/pos");
@@ -158,6 +260,7 @@ export async function recordManualAttendance(
     .select("id, full_name, is_active")
     .eq("organization_id", org.organizationId)
     .eq("id", staffId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!staff) return { error: "Staff not found" };
@@ -315,22 +418,27 @@ export async function enrollStaffThumb(
     .select("id, full_name")
     .eq("organization_id", org.organizationId)
     .eq("thumb_id", thumbId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (existing && existing.id !== parsed.data.staff_id) {
     return { error: `This thumb is already enrolled for ${existing.full_name}` };
   }
 
-  const { error } = await supabase
+  const { data: enrolled, error } = await supabase
     .from("staff")
     .update({
       thumb_id: thumbId,
       thumb_enrolled_at: new Date().toISOString(),
     })
     .eq("organization_id", org.organizationId)
-    .eq("id", parsed.data.staff_id);
+    .eq("id", parsed.data.staff_id)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!enrolled) return { error: "Staff not found or already deleted" };
   revalidatePath("/staff");
   revalidatePath("/attendance");
   return { success: true };
@@ -339,12 +447,16 @@ export async function enrollStaffThumb(
 export async function removeStaffThumb(staffId: string): Promise<ActionResult> {
   const org = await requireAction("staff.edit");
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("staff")
     .update({ thumb_id: null, thumb_enrolled_at: null })
     .eq("organization_id", org.organizationId)
-    .eq("id", staffId);
+    .eq("id", staffId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "Staff not found or already deleted" };
   revalidatePath("/staff");
   revalidatePath("/attendance");
   return { success: true };

@@ -68,14 +68,44 @@ export async function createChair(
     .limit(1)
     .maybeSingle();
 
+  const chairName = parsed.data.name.trim();
+  const sortOrder = (existing?.sort_order ?? 0) + 1;
+  const { restoreSoftDeletedByName } = await import("@/lib/db/restore-soft-deleted");
+  const restored = await restoreSoftDeletedByName({
+    client: supabase,
+    table: "chairs",
+    organizationId: org.organizationId,
+    name: chairName,
+    extraUpdate: { is_active: true, sort_order: sortOrder },
+  });
+  if (restored) {
+    revalidatePath("/chairs");
+    revalidatePath("/queue");
+    return { success: true };
+  }
+
   const { error } = await supabase.from("chairs").insert({
     organization_id: org.organizationId,
-    name: parsed.data.name,
-    sort_order: (existing?.sort_order ?? 0) + 1,
+    name: chairName,
+    sort_order: sortOrder,
   });
 
   if (error) {
-    if (error.code === "23505") return { error: "A chair with this name already exists" };
+    if (error.code === "23505") {
+      const again = await restoreSoftDeletedByName({
+        client: supabase,
+        table: "chairs",
+        organizationId: org.organizationId,
+        name: chairName,
+        extraUpdate: { is_active: true, sort_order: sortOrder },
+      });
+      if (again) {
+        revalidatePath("/chairs");
+        revalidatePath("/queue");
+        return { success: true };
+      }
+      return { error: "A chair with this name already exists" };
+    }
     return { error: error.message };
   }
 
@@ -98,16 +128,20 @@ export async function renameChair(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("chairs")
-    .update({ name: parsed.data.name })
+    .update({ name: parsed.data.name.trim() })
     .eq("id", id)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     if (error.code === "23505") return { error: "A chair with this name already exists" };
     return { error: error.message };
   }
+  if (!updated) return { error: "Chair not found or already deleted" };
 
   revalidatePath("/chairs");
   revalidatePath("/queue");
@@ -117,12 +151,16 @@ export async function renameChair(
 export async function setChairActive(id: string, isActive: boolean): Promise<ActionResult> {
   const org = await requireAction("chairs.edit");
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("chairs")
     .update({ is_active: isActive })
     .eq("id", id)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "Chair not found or already deleted" };
   revalidatePath("/chairs");
   revalidatePath("/queue");
   return { success: true };

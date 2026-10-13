@@ -9,7 +9,7 @@ import {
   getActiveServicesForLinking,
   getServiceLinksByProduct,
 } from "@/lib/actions/services";
-import { canManageRecords } from "@/lib/auth/permissions";
+import { getCapabilities } from "@/lib/auth/permissions";
 import { InventoryAdjustForm } from "@/components/features/products/product-actions";
 import { InHouseProductForm } from "@/components/features/products/in-house-product-form";
 import { InHouseProductsTable } from "@/components/features/products/in-house-products-table";
@@ -22,14 +22,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function InHousePage() {
-  const [categories, products, transactions, canManage, services, linksMap] = await Promise.all([
+  const [categories, products, transactions, caps, services, linksMap] = await Promise.all([
     getProductCategories(),
     getInHouseProducts(),
     getInventoryTransactions(50),
-    canManageRecords(),
+    getCapabilities("products"),
     getActiveServicesForLinking(),
     getServiceLinksByProduct(),
   ]);
+  const canManage = caps.canManage;
+  const canCreate = caps.canCreate;
+  const canEdit = caps.canEdit;
 
   const usageTxns = (transactions ?? []).filter((t) =>
     String((t as { reference_type?: string | null }).reference_type ?? "").startsWith(
@@ -98,7 +101,7 @@ export default async function InHousePage() {
         </CardContent>
       </Card>
 
-      {canManage && (
+      {canCreate && (
         <Card>
           <CardHeader>
             <CardTitle>Add in-house product</CardTitle>
@@ -130,7 +133,7 @@ export default async function InHousePage() {
         </CardContent>
       </Card>
 
-      {canManage && (
+      {canEdit && (
         <Card>
           <CardHeader>
             <CardTitle>Restock / adjust</CardTitle>

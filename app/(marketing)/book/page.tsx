@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { getPublicStoreBookingProfile } from "@/lib/actions/store-profile";
 import { getPublicStoreBySlug } from "@/lib/actions/stores";
 import { MarketingBookingPage } from "@/components/marketing/marketing-booking-page";
@@ -10,11 +11,16 @@ import { SYNCOPS } from "@/lib/print/syncops";
 
 export const revalidate = 120;
 
-export async function generateMetadata(): Promise<Metadata> {
+const loadBookPageData = cache(async () => {
   const [org, store] = await Promise.all([
     getPublicStoreBookingProfile(BOOKING_SLUG),
     getPublicStoreBySlug(BOOKING_SLUG),
   ]);
+  return { org, store };
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { org, store } = await loadBookPageData();
   if (!org) {
     return buildPageMetadata({
       title: "Book Appointment",
@@ -32,10 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BookAppointmentPage() {
-  const [org, store] = await Promise.all([
-    getPublicStoreBookingProfile(BOOKING_SLUG),
-    getPublicStoreBySlug(BOOKING_SLUG),
-  ]);
+  const { org, store } = await loadBookPageData();
 
   const schema =
     org != null

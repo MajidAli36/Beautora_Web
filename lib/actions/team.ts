@@ -83,7 +83,11 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
     .eq("organization_id", org.organizationId)
     .order("created_at", { ascending: true });
 
-  if (error || !data) return [];
+  if (error) {
+    console.error("[team] getTeamMembers failed", error.message);
+    return [];
+  }
+  if (!data) return [];
 
   return Promise.all(
     data.map(async (row) => {
@@ -111,7 +115,11 @@ export async function getPendingTeamInvitations(): Promise<TeamInvitation[]> {
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
-  if (error || !data) return [];
+  if (error) {
+    console.error("[team] getPendingTeamInvitations failed", error.message);
+    return [];
+  }
+  if (!data) return [];
 
   const now = Date.now();
   return data.map((row) => {

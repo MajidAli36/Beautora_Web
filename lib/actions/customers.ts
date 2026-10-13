@@ -12,13 +12,125 @@ import type { ActionResult } from "@/types/commerce";
 export type { ActionResult };
 
 const customerSchema = z.object({
-  first_name: z.string().min(1, "First name is required"),
-  last_name: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  first_name: z.string().trim().min(1, "First name is required"),
+  last_name: z.string().trim().optional(),
+  phone: z.string().trim().optional(),
+  email: z
+    .string()
+    .trim()
+    .email("Invalid email")
+    .optional()
+    .or(z.literal("")),
   notes: z.string().optional(),
   tags: z.string().optional(),
 });
+
+function parseCustomerForm(formData: FormData) {
+  const rawEmail = String(formData.get("email") ?? "").trim();
+  return customerSchema.safeParse({
+    first_name: String(formData.get("first_name") ?? "").trim(),
+    last_name: String(formData.get("last_name") ?? "").trim() || undefined,
+    phone: String(formData.get("phone") ?? "").trim() || undefined,
+    email: rawEmail || "",
+    notes: String(formData.get("notes") ?? "").trim() || undefined,
+    tags: String(formData.get("tags") ?? "").trim() || undefined,
+  });
+}
+
+async function upsertNormalizedCustomer(input: {
+  organizationId: string;
+  first_name: string;
+  last_name?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  tags: string[];
+  /** When set, update this row instead of insert/find. */
+  existingId?: string;
+}): Promise<ActionResult & { customerId?: string }> {
+  const {
+    normalizeBookingEmail,
+    normalizeBookingPhone,
+    ensureCustomerFromBooking,
+  } = await import("@/lib/customers/ensure-from-booking");
+
+  const phone = normalizeBookingPhone(input.phone ?? null);
+  const email = normalizeBookingEmail(input.email || null);
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return {
+      error:
+        "Server is missing SUPABASE_SERVICE_ROLE_KEY — cannot save customers right now.",
+    };
+  }
+
+  if (input.existingId) {
+    const { data: updated, error } = await admin
+      .from("customers")
+      .update({
+        first_name: input.first_name,
+        last_name: input.last_name ?? null,
+        phone,
+        email,
+        notes: input.notes ?? null,
+        tags: input.tags,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.existingId)
+      .eq("organization_id", input.organizationId)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) return { error: error.message };
+    if (!updated) return { error: "Customer not found or already deleted" };
+    return { success: true, customerId: updated.id };
+  }
+
+  // Prefer find/restore so re-adding the same phone/email never “vanishes”.
+  const ensured = await ensureCustomerFromBooking(admin, input.organizationId, {
+    firstName: input.first_name,
+    lastName: input.last_name ?? null,
+    phone,
+    email,
+    notes: input.notes ?? null,
+  });
+  if ("error" in ensured) return { error: ensured.error };
+
+  // Active match (not newly created / restored) — do not overwrite CRM profile.
+  if (!ensured.created) {
+    return {
+      error:
+        "A customer with this phone or email already exists. Open their profile instead of creating a duplicate.",
+      customerId: ensured.customerId,
+    };
+  }
+
+  // New or restored — apply full submitted profile (tags included).
+  const { data: updated, error: updateErr } = await admin
+    .from("customers")
+    .update({
+      first_name: input.first_name,
+      last_name: input.last_name ?? null,
+      phone,
+      email,
+      notes: input.notes ?? null,
+      tags: input.tags,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", ensured.customerId)
+    .eq("organization_id", input.organizationId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (updateErr) return { error: updateErr.message };
+  if (!updated) {
+    return { error: "Customer could not be saved after create/restore" };
+  }
+
+  return { success: true, customerId: updated.id };
+}
 
 async function requireCustomerAction(action: "customers.create" | "customers.edit" | "customers.delete") {
   try {
@@ -44,15 +156,7 @@ export async function createCustomer(
   if ("error" in orgOrErr) return { error: orgOrErr.error };
   const org = orgOrErr;
 
-  const parsed = customerSchema.safeParse({
-    first_name: formData.get("first_name"),
-    last_name: formData.get("last_name") || undefined,
-    phone: formData.get("phone") || undefined,
-    email: formData.get("email") || undefined,
-    notes: formData.get("notes") || undefined,
-    tags: formData.get("tags") || undefined,
-  });
-
+  const parsed = parseCustomerForm(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
@@ -61,26 +165,22 @@ export async function createCustomer(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  // App permission already checked — use admin client so RLS role lists cannot block reception.
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("customers")
-    .insert({
-      organization_id: org.organizationId,
-      first_name: parsed.data.first_name,
-      last_name: parsed.data.last_name ?? null,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email || null,
-      notes: parsed.data.notes ?? null,
-      tags,
-    })
-    .select("id")
-    .single();
-
-  if (error) return { error: error.message };
+  const result = await upsertNormalizedCustomer({
+    organizationId: org.organizationId,
+    first_name: parsed.data.first_name,
+    last_name: parsed.data.last_name,
+    phone: parsed.data.phone,
+    email: parsed.data.email,
+    notes: parsed.data.notes,
+    tags,
+  });
+  if (result.error || !result.customerId) {
+    return { error: result.error ?? "Could not create customer" };
+  }
 
   revalidatePath("/customers");
-  redirect(`/customers/${data.id}`);
+  revalidatePath("/pos");
+  redirect(`/customers/${result.customerId}`);
 }
 
 /** Create customer without redirect — for slide-over / modal forms. */
@@ -92,15 +192,7 @@ export async function createCustomerInline(
   if ("error" in orgOrErr) return { error: orgOrErr.error };
   const org = orgOrErr;
 
-  const parsed = customerSchema.safeParse({
-    first_name: formData.get("first_name"),
-    last_name: formData.get("last_name") || undefined,
-    phone: formData.get("phone") || undefined,
-    email: formData.get("email") || undefined,
-    notes: formData.get("notes") || undefined,
-    tags: formData.get("tags") || undefined,
-  });
-
+  const parsed = parseCustomerForm(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
@@ -109,26 +201,22 @@ export async function createCustomerInline(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("customers")
-    .insert({
-      organization_id: org.organizationId,
-      first_name: parsed.data.first_name,
-      last_name: parsed.data.last_name ?? null,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email || null,
-      notes: parsed.data.notes ?? null,
-      tags,
-    })
-    .select("id")
-    .single();
-
-  if (error) return { error: error.message };
-  if (!data?.id) return { error: "Could not create customer" };
+  const result = await upsertNormalizedCustomer({
+    organizationId: org.organizationId,
+    first_name: parsed.data.first_name,
+    last_name: parsed.data.last_name,
+    phone: parsed.data.phone,
+    email: parsed.data.email,
+    notes: parsed.data.notes,
+    tags,
+  });
+  if (result.error || !result.customerId) {
+    return { error: result.error ?? "Could not create customer" };
+  }
 
   revalidatePath("/customers");
-  return { success: true, customerId: data.id };
+  revalidatePath("/pos");
+  return { success: true, customerId: result.customerId };
 }
 
 export type CustomerDirectoryRow = {
@@ -234,15 +322,7 @@ export async function updateCustomer(
   if ("error" in orgOrErr) return { error: orgOrErr.error };
   const org = orgOrErr;
 
-  const parsed = customerSchema.safeParse({
-    first_name: formData.get("first_name"),
-    last_name: formData.get("last_name") || undefined,
-    phone: formData.get("phone") || undefined,
-    email: formData.get("email") || undefined,
-    notes: formData.get("notes") || undefined,
-    tags: formData.get("tags") || undefined,
-  });
-
+  const parsed = parseCustomerForm(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
@@ -251,24 +331,21 @@ export async function updateCustomer(
     ? parsed.data.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("customers")
-    .update({
-      first_name: parsed.data.first_name,
-      last_name: parsed.data.last_name ?? null,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email || null,
-      notes: parsed.data.notes ?? null,
-      tags,
-    })
-    .eq("id", id)
-    .eq("organization_id", org.organizationId);
-
-  if (error) return { error: error.message };
+  const result = await upsertNormalizedCustomer({
+    organizationId: org.organizationId,
+    existingId: id,
+    first_name: parsed.data.first_name,
+    last_name: parsed.data.last_name,
+    phone: parsed.data.phone,
+    email: parsed.data.email,
+    notes: parsed.data.notes,
+    tags,
+  });
+  if (result.error) return { error: result.error };
 
   revalidatePath("/customers");
   revalidatePath(`/customers/${id}`);
+  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -341,26 +418,45 @@ export async function deleteCustomerInline(id: string): Promise<ActionResult> {
 
   revalidatePath("/customers");
   revalidatePath(`/customers/${id}`);
+  revalidatePath("/pos");
   return { success: true };
 }
 
 export async function getCustomers(search?: string) {
   const org = await requireOrganization();
   const supabase = await createClient();
+  const {
+    normalizeBookingPhone,
+    phoneLookupVariants,
+  } = await import("@/lib/customers/ensure-from-booking");
 
   let query = supabase
     .from("customers")
     .select("id, first_name, last_name, phone, email, created_at, notes, tags")
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
-    .order("first_name")
-    .limit(500);
+    .order("created_at", { ascending: false })
+    .limit(2000);
 
-  if (search?.trim()) {
-    const term = `%${search.trim()}%`;
-    query = query.or(
-      `first_name.ilike.${term},last_name.ilike.${term},phone.ilike.${term},email.ilike.${term}`
-    );
+  const raw = search?.trim() ?? "";
+  if (raw) {
+    // Escape commas/% for PostgREST `or` filter values.
+    const safe = raw.replace(/[%_,]/g, " ").trim();
+    const term = `%${safe}%`;
+    const parts = [
+      `first_name.ilike.${term}`,
+      `last_name.ilike.${term}`,
+      `phone.ilike.${term}`,
+      `email.ilike.${term}`,
+    ];
+    const normalized = normalizeBookingPhone(raw);
+    if (normalized) {
+      for (const variant of phoneLookupVariants(normalized)) {
+        parts.push(`phone.eq.${variant}`);
+        parts.push(`phone.ilike.%${variant}%`);
+      }
+    }
+    query = query.or(parts.join(","));
   }
 
   const { data, error } = await query;
@@ -417,7 +513,7 @@ export async function getCustomerHistory(customerId: string): Promise<CustomerHi
   const customer = await getCustomer(customerId);
   if (!customer) return null;
 
-  const [appointments, sales] = await Promise.all([
+  const [appointmentsRes, salesRes, apptCountRes, salesAggRes] = await Promise.all([
     supabase
       .from("appointments")
       .select(`
@@ -428,8 +524,7 @@ export async function getCustomerHistory(customerId: string): Promise<CustomerHi
       .eq("organization_id", org.organizationId)
       .eq("customer_id", customerId)
       .order("scheduled_at", { ascending: false })
-      .limit(50)
-      .then(({ data }) => data ?? []),
+      .limit(50),
     supabase
       .from("sales")
       .select(`
@@ -440,11 +535,24 @@ export async function getCustomerHistory(customerId: string): Promise<CustomerHi
       .eq("organization_id", org.organizationId)
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false })
-      .limit(50)
-      .then(({ data }) => data ?? []),
+      .limit(50),
+    supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", org.organizationId)
+      .eq("customer_id", customerId),
+    supabase
+      .from("sales")
+      .select("total, status")
+      .eq("organization_id", org.organizationId)
+      .eq("customer_id", customerId)
+      .in("status", ["COMPLETED", "AMENDED"])
+      .is("deleted_at", null),
   ]);
 
-  const completedSales = sales.filter(
+  const appointments = appointmentsRes.data ?? [];
+  const sales = salesRes.data ?? [];
+  const completedSales = (salesAggRes.data ?? []).filter(
     (s) => s.status === "COMPLETED" || s.status === "AMENDED"
   );
   const totalSpent = completedSales.reduce((sum, s) => sum + Number(s.total), 0);
@@ -455,7 +563,7 @@ export async function getCustomerHistory(customerId: string): Promise<CustomerHi
     stats: {
       totalSpent,
       visitCount: completedSales.length,
-      appointmentCount: appointments.length,
+      appointmentCount: apptCountRes.count ?? appointments.length,
     },
   };
 }

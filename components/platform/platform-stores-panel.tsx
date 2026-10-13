@@ -17,18 +17,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
+import { formatDate as formatDatePk, formatDateTime } from "@/lib/format";
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Date(value).toLocaleString("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return formatDateTime(value);
 }
 
 function formatShortDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-PK");
+  return formatDatePk(value);
 }
 
 function dash(value: string | null | undefined) {
@@ -87,7 +85,7 @@ function storeStatusLine(store: PlatformStoreRow): string {
     return `Trial · ${store.daysLeftInTrial} day${store.daysLeftInTrial === 1 ? "" : "s"} left`;
   }
   if (store.phase === "active" && store.subscriptionEndsAt) {
-    return `Paid through ${new Date(store.subscriptionEndsAt).toLocaleDateString("en-PK")}`;
+    return `Paid through ${formatShortDate(store.subscriptionEndsAt)}`;
   }
   if (store.phase === "grace" && store.hoursLeftInGrace != null) {
     return `Grace · ~${store.hoursLeftInGrace}h left`;

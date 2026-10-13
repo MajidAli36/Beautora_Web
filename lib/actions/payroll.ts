@@ -34,8 +34,20 @@ const paymentSchema = z.object({
   notes: z.string().optional(),
 });
 
+async function requireFinancesReadAccess() {
+  try {
+    return await requireAction("reports.view");
+  } catch {
+    try {
+      return await requireAction("finances.create");
+    } catch {
+      return await requireAction("finances.edit");
+    }
+  }
+}
+
 export async function getStaffPayments(from?: string, to?: string): Promise<StaffPaymentRow[]> {
-  const org = await requireAction("reports.view");
+  const org = await requireFinancesReadAccess();
   const supabase = await createClient();
 
   let query = supabase
@@ -154,13 +166,16 @@ export async function deleteStaffPayment(paymentId: string): Promise<ActionResul
   const org = await requireAction("finances.edit");
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from("staff_payments")
     .delete()
     .eq("id", paymentId)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!deleted) return { error: "Payment not found" };
 
   revalidatePath("/finances");
   revalidatePath("/dashboard");

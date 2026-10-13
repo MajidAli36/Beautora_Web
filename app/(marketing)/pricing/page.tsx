@@ -6,10 +6,10 @@ import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { FaqSection } from "@/components/seo/faq-section";
 import { buildPageMetadata, PRICING_FAQ, SITE_SEO } from "@/lib/seo/site";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
-import { resolveVisitorBillingPlan } from "@/lib/billing/visitor-plan";
+import { defaultVisitorBillingPlan } from "@/lib/billing/visitor-plan";
 import { SYNCOPS } from "@/lib/print/syncops";
 
-export const revalidate = 0;
+export const revalidate = 300;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Pricing",
@@ -25,7 +25,8 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 export default async function PricingPage() {
-  const visitor = await resolveVisitorBillingPlan();
+  // Static-friendly default — both plans are always listed; highlight Asia by default.
+  const visitor = defaultVisitorBillingPlan();
 
   return (
     <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">

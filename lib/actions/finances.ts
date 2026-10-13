@@ -80,8 +80,21 @@ function isLegacySaleRefundExpense(description: string | null | undefined) {
   );
 }
 
+async function requireFinancesReadAccess() {
+  // Finances screen needs these loaders even when Reports nav is off.
+  try {
+    return await requireAction("reports.view");
+  } catch {
+    try {
+      return await requireAction("finances.create");
+    } catch {
+      return await requireAction("finances.edit");
+    }
+  }
+}
+
 export async function getFinancialSummary(from?: string, to?: string): Promise<FinancialSummary> {
-  const org = await requireAction("reports.view");
+  const org = await requireFinancesReadAccess();
   const supabase = await createClient();
   const { start, end, fromLabel, toLabel } = parseDateRange(from, to);
 
@@ -304,7 +317,7 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
 }
 
 export async function getExpenses(from?: string, to?: string): Promise<ExpenseRow[]> {
-  const org = await requireAction("reports.view");
+  const org = await requireFinancesReadAccess();
   const supabase = await createClient();
   const { fromLabel, toLabel } = parseDateRange(from, to);
 
@@ -379,13 +392,16 @@ export async function deleteExpense(expenseId: string): Promise<ActionResult> {
   const org = await requireAction("finances.delete");
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from("expenses")
     .delete()
     .eq("id", expenseId)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!deleted) return { error: "Expense not found" };
 
   revalidatePath("/finances");
   revalidatePath("/reports");

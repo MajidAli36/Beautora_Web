@@ -44,7 +44,14 @@ export default async function CustomerDetailPage({
       canDeleteCustomers(),
       canManageRecords(),
       canUsePos(),
-      getCustomerFinancialSummary(id),
+      getCustomerFinancialSummary(id).catch(() => ({
+        totalPurchases: 0,
+        totalPaid: 0,
+        outstandingDue: 0,
+        totalRefunds: 0,
+        totalDiscounts: 0,
+        dueInvoiceCount: 0,
+      })),
     ]);
 
   if (!customer || !history) notFound();

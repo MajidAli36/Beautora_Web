@@ -1,18 +1,36 @@
-import { headers } from "next/headers";
 import {
   resolveBillingPlanFromCountryCode,
   type BillingPlan,
 } from "@/lib/billing/plans";
 
 /**
+ * Default plan when geo is unknown — keeps marketing RSC static/ISR-friendly
+ * (no `headers()` opt-out of caching).
+ */
+export function defaultVisitorBillingPlan(): {
+  plan: BillingPlan;
+  countryCode: string | null;
+  detected: boolean;
+} {
+  return {
+    plan: resolveBillingPlanFromCountryCode(null),
+    countryCode: null,
+    detected: false,
+  };
+}
+
+/**
  * Best-effort visitor region for marketing pricing.
- * Uses Vercel / Cloudflare edge country headers when present.
+ * Prefer middleware-injected `x-country-code` when present; never call `headers()`
+ * from the homepage hot path — that forced full dynamic rendering.
  */
 export async function resolveVisitorBillingPlan(): Promise<{
   plan: BillingPlan;
   countryCode: string | null;
   detected: boolean;
 }> {
+  // Lazy import so callers that only need `defaultVisitorBillingPlan` stay static.
+  const { headers } = await import("next/headers");
   const h = await headers();
   const code =
     h.get("x-vercel-ip-country")?.trim() ||

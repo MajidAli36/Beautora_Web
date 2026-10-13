@@ -23,10 +23,15 @@ import {
 } from "@/lib/onboarding/slug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireStoreLocation } from "@/lib/location/store-location";
+import { normalizeContactPhone } from "@/lib/phone/contact";
 import type { ActionResult } from "@/types/commerce";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function normalizeOrgPhone(raw: string | null | undefined): string | null {
+  return normalizeContactPhone(raw);
+}
 const ACCOUNT_TYPES = new Set<PaymentAccountType>([
   "JAZZCASH",
   "EASYPAISA",
@@ -232,9 +237,9 @@ export async function updateStoreProfile(input: {
             address: input.address?.trim() || null,
             city: location.city,
             country: location.country,
-            phone: input.phone?.trim() || null,
-            email: input.email?.trim() || null,
-            whatsapp_phone: input.whatsappPhone?.trim() || null,
+            phone: normalizeOrgPhone(input.phone),
+            email: input.email?.trim().toLowerCase() || null,
+            whatsapp_phone: normalizeOrgPhone(input.whatsappPhone),
             arrival_notes: input.arrivalNotes?.trim() || null,
           }
         : {
@@ -243,9 +248,9 @@ export async function updateStoreProfile(input: {
             address: input.address?.trim() || null,
             city: location.city,
             country: location.country,
-            phone: input.phone?.trim() || null,
-            email: input.email?.trim() || null,
-            whatsapp_phone: input.whatsappPhone?.trim() || null,
+            phone: normalizeOrgPhone(input.phone),
+            email: input.email?.trim().toLowerCase() || null,
+            whatsapp_phone: normalizeOrgPhone(input.whatsappPhone),
             arrival_notes: input.arrivalNotes?.trim() || null,
           }
     )

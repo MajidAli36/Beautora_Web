@@ -33,7 +33,12 @@ export const getUserMemberships = cache(async (): Promise<OrganizationMembership
     )
     .eq("user_id", user.id);
 
-  if (error || !data) return [];
+  if (error) {
+    // Soft-fail: layout depends on this — never 500 the whole app shell.
+    console.error("[org] getUserMemberships failed", error.message);
+    return [];
+  }
+  if (!data) return [];
 
   return data
     .filter((row) => row.organization)

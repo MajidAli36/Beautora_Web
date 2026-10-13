@@ -1,7 +1,19 @@
 /**
  * Ensure a customer row exists for booking flows (in-house + online).
- * Match by phone first, then email; create or fill missing profile fields.
+ * Match by phone first, then email; create, restore soft-deleted, or fill blanks.
  */
+
+import {
+  normalizeBookingEmail,
+  normalizeBookingPhone,
+  phoneLookupVariants,
+} from "@/lib/phone/normalize";
+
+export {
+  normalizeBookingEmail,
+  normalizeBookingPhone,
+  phoneLookupVariants,
+} from "@/lib/phone/normalize";
 
 export type BookingPersonInput = {
   firstName: string;
@@ -23,6 +35,7 @@ type CustomerRow = {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  deleted_at?: string | null;
 };
 
 /** Minimal Supabase-like client used by server + admin. */
@@ -30,50 +43,114 @@ type DbClient = {
   from: (table: string) => any;
 };
 
-/** Digits-only PK-friendly phone for storage and comparison. */
-export function normalizeBookingPhone(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) return null;
-  // Pakistan mobile: 03XXXXXXXXX → 92XXXXXXXXXX
-  if (digits.startsWith("0") && digits.length === 11) {
-    return `92${digits.slice(1)}`;
+async function findByPhone(
+  client: DbClient,
+  organizationId: string,
+  phone: string,
+  includeDeleted: boolean
+): Promise<CustomerRow | null> {
+  const variants = phoneLookupVariants(phone);
+  let query = client
+    .from("customers")
+    .select("id, first_name, last_name, phone, email, notes, deleted_at")
+    .eq("organization_id", organizationId)
+    .in("phone", variants)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (!includeDeleted) {
+    query = query.is("deleted_at", null);
+  } else {
+    query = query.not("deleted_at", "is", null);
   }
-  // Pakistan without leading 0: 3XXXXXXXXX
-  if (digits.length === 10 && digits.startsWith("3")) {
-    return `92${digits}`;
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Customer phone lookup failed: ${error.message}`);
   }
-  // Already international 92…
-  if (digits.startsWith("92") && digits.length >= 12) {
-    return digits;
-  }
-  return digits;
+  const rows = (data as CustomerRow[] | null) ?? [];
+  return rows[0] ?? null;
 }
 
-/** Lookup forms so 0301… / 92301… / 301… match the same customer. */
-function phoneLookupVariants(normalized: string): string[] {
-  const variants = new Set<string>([normalized]);
-  if (normalized.startsWith("92") && normalized.length >= 12) {
-    const national = normalized.slice(2);
-    variants.add(`0${national}`);
-    variants.add(national);
-  } else if (normalized.startsWith("0") && normalized.length >= 11) {
-    variants.add(`92${normalized.slice(1)}`);
-    variants.add(normalized.slice(1));
+async function findByEmail(
+  client: DbClient,
+  organizationId: string,
+  email: string,
+  includeDeleted: boolean
+): Promise<CustomerRow | null> {
+  let query = client
+    .from("customers")
+    .select("id, first_name, last_name, phone, email, notes, deleted_at")
+    .eq("organization_id", organizationId)
+    .eq("email", email)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (!includeDeleted) {
+    query = query.is("deleted_at", null);
+  } else {
+    query = query.not("deleted_at", "is", null);
   }
-  return [...variants];
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Customer email lookup failed: ${error.message}`);
+  }
+  const rows = (data as CustomerRow[] | null) ?? [];
+  return rows[0] ?? null;
 }
 
-export function normalizeBookingEmail(email: string | null | undefined): string | null {
-  if (!email) return null;
-  const trimmed = email.trim().toLowerCase();
-  if (!trimmed || !trimmed.includes("@")) return null;
-  return trimmed;
+async function applyProfilePatch(
+  client: DbClient,
+  organizationId: string,
+  existing: CustomerRow,
+  patch: {
+    firstName: string;
+    lastName: string | null;
+    phone: string | null;
+    email: string | null;
+    notes: string | null;
+    restore?: boolean;
+  }
+) {
+  const next: Record<string, string | null> = {};
+  if (patch.restore) {
+    next.deleted_at = null;
+  }
+  if (!existing.last_name && patch.lastName) next.last_name = patch.lastName;
+  if ((!existing.phone || patch.restore) && patch.phone) next.phone = patch.phone;
+  else if (patch.phone && existing.phone && existing.phone !== patch.phone) {
+    // Normalize stored phone when we know the canonical form
+    next.phone = patch.phone;
+  }
+  if ((!existing.email || patch.restore) && patch.email) next.email = patch.email;
+  if (!existing.notes && patch.notes) next.notes = patch.notes;
+  if (
+    patch.firstName.length > 1 &&
+    (patch.restore || existing.first_name.trim().length <= 1)
+  ) {
+    next.first_name = patch.firstName;
+  } else if (patch.restore && patch.firstName) {
+    next.first_name = patch.firstName;
+  }
+
+  if (Object.keys(next).length === 0) return;
+
+  const { data: patched, error } = await client
+    .from("customers")
+    .update({ ...next, updated_at: new Date().toISOString() })
+    .eq("id", existing.id)
+    .eq("organization_id", organizationId)
+    .select("id, deleted_at")
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Customer profile update failed: ${error.message}`);
+  }
+  if (patch.restore && patched?.deleted_at) {
+    throw new Error("Could not restore soft-deleted customer");
+  }
 }
 
 /**
  * Find-or-create customer for an appointment booking.
  * Always returns a customer id when firstName is present.
+ * Soft-deleted matches are restored instead of creating a twin.
  */
 export async function ensureCustomerFromBooking(
   client: DbClient,
@@ -90,74 +167,67 @@ export async function ensureCustomerFromBooking(
   const email = normalizeBookingEmail(person.email);
   const notes = person.notes?.trim() || null;
 
-  let existing: CustomerRow | null = null;
+  try {
+    let existing: CustomerRow | null = null;
+    let restored = false;
 
-  if (phone) {
-    const variants = phoneLookupVariants(phone);
-    const { data } = await client
-      .from("customers")
-      .select("id, first_name, last_name, phone, email, notes")
-      .eq("organization_id", organizationId)
-      .in("phone", variants)
-      .is("deleted_at", null)
-      .limit(1);
-    const rows = (data as CustomerRow[] | null) ?? [];
-    existing = rows[0] ?? null;
-  }
-
-  if (!existing && email) {
-    const { data } = await client
-      .from("customers")
-      .select("id, first_name, last_name, phone, email, notes")
-      .eq("organization_id", organizationId)
-      .ilike("email", email)
-      .is("deleted_at", null)
-      .maybeSingle();
-    existing = (data as CustomerRow | null) ?? null;
-  }
-
-  if (existing) {
-    const patch: Record<string, string | null> = {};
-    if (!existing.last_name && lastName) patch.last_name = lastName;
-    if (!existing.phone && phone) patch.phone = phone;
-    if (!existing.email && email) patch.email = email;
-    if (!existing.notes && notes) patch.notes = notes;
-    // Keep a stronger name if they only had a placeholder / single letter
-    if (
-      firstName.length > 1 &&
-      existing.first_name.trim().length <= 1
-    ) {
-      patch.first_name = firstName;
+    if (phone) {
+      existing = await findByPhone(client, organizationId, phone, false);
+    }
+    if (!existing && email) {
+      existing = await findByEmail(client, organizationId, email, false);
     }
 
-    if (Object.keys(patch).length > 0) {
-      await client
-        .from("customers")
-        .update({ ...patch, updated_at: new Date().toISOString() })
-        .eq("id", existing.id)
-        .eq("organization_id", organizationId);
+    // Soft-deleted match → restore instead of inventing a duplicate.
+    if (!existing && phone) {
+      const deleted = await findByPhone(client, organizationId, phone, true);
+      if (deleted) {
+        existing = deleted;
+        restored = true;
+      }
+    }
+    if (!existing && email) {
+      const deleted = await findByEmail(client, organizationId, email, true);
+      if (deleted) {
+        existing = deleted;
+        restored = true;
+      }
     }
 
-    return { customerId: existing.id, created: false };
+    if (existing) {
+      await applyProfilePatch(client, organizationId, existing, {
+        firstName,
+        lastName,
+        phone,
+        email,
+        notes,
+        restore: restored,
+      });
+      return { customerId: existing.id, created: restored };
+    }
+
+    const { data: created, error } = await client
+      .from("customers")
+      .insert({
+        organization_id: organizationId,
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        email,
+        notes,
+        tags: [],
+      })
+      .select("id")
+      .single();
+
+    if (error || !created) {
+      return { error: error?.message ?? "Failed to create customer" };
+    }
+
+    return { customerId: created.id as string, created: true };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to ensure customer",
+    };
   }
-
-  const { data: created, error } = await client
-    .from("customers")
-    .insert({
-      organization_id: organizationId,
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      email,
-      notes,
-      tags: [],
-    })
-    .select("id")
-    .single();
-
-  if (error || !created) {
-    return { error: error?.message ?? "Failed to create customer" };
-  }
-
-  return { customerId: created.id as string, created: true };
 }

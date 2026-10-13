@@ -770,6 +770,7 @@ export async function voidSale(
   const soft = softDeletePatch(actor);
 
   // 1) Restore retail stock while sale is still live — abort void if this fails.
+  const voidRestoredQty = new Map<string, number>();
   {
     const [{ data: outs }, { data: ins }] = await Promise.all([
       supabase
@@ -817,6 +818,22 @@ export async function voidSale(
           error: `Void aborted — inventory restore failed: ${invErr.message}`,
         };
       }
+      voidRestoredQty.set(productId, quantity);
+    }
+  }
+
+  async function rollbackVoidInventory() {
+    for (const [productId, quantity] of voidRestoredQty) {
+      await supabase.from("inventory_transactions").insert({
+        organization_id: org.organizationId,
+        product_id: productId,
+        type: "OUT",
+        quantity,
+        reference_type: "sale_void_rollback",
+        reference_id: id,
+        notes: "Void aborted — reverse premature stock restore",
+        created_by: user?.id ?? null,
+      });
     }
   }
 
@@ -840,7 +857,9 @@ export async function voidSale(
   const refunded = (refs ?? []).reduce((s, p) => s + Number(p.amount), 0);
   const netCashToRefund = roundMoney(Math.max(0, cashCollected - refunded));
   let voidRefundId: string | null = null;
-  if (netCashToRefund > 0) {
+  // Always insert SALE_VOID (even amount 0) so Finances can reverse VOID tickets
+  // that had no cash collected — otherwise unpaid voids inflate sales revenue.
+  {
     const { data: refundRow, error: refundErr } = await supabase
       .from("sale_refunds")
       .insert({
@@ -855,6 +874,7 @@ export async function voidSale(
       .select("id")
       .single();
     if (refundErr || !refundRow) {
+      await rollbackVoidInventory();
       return {
         error: `Void aborted — refund record failed: ${refundErr?.message ?? "unknown"}`,
       };
@@ -883,12 +903,14 @@ export async function voidSale(
     if (voidRefundId) {
       await supabase.from("sale_refunds").delete().eq("id", voidRefundId);
     }
+    await rollbackVoidInventory();
     return { error: error.message };
   }
   if (!voided) {
     if (voidRefundId) {
       await supabase.from("sale_refunds").delete().eq("id", voidRefundId);
     }
+    await rollbackVoidInventory();
     return { error: "Sale was already voided or changed by someone else" };
   }
 
@@ -988,15 +1010,31 @@ export async function getSales(
     if (!safe) return [];
     const like = `%${safe}%`;
 
+    const {
+      normalizeBookingPhone,
+      phoneLookupVariants,
+    } = await import("@/lib/customers/ensure-from-booking");
+    const phoneParts = [
+      `first_name.ilike.${like}`,
+      `last_name.ilike.${like}`,
+      `phone.ilike.${like}`,
+      `email.ilike.${like}`,
+    ];
+    const normalizedPhone = normalizeBookingPhone(term);
+    if (normalizedPhone) {
+      for (const variant of phoneLookupVariants(normalizedPhone)) {
+        phoneParts.push(`phone.eq.${variant}`);
+        phoneParts.push(`phone.ilike.%${variant}%`);
+      }
+    }
+
     const [{ data: customers }, { data: invoices }] = await Promise.all([
       supabase
         .from("customers")
         .select("id")
         .eq("organization_id", org.organizationId)
         .is("deleted_at", null)
-        .or(
-          `first_name.ilike.${like},last_name.ilike.${like},phone.ilike.${like},email.ilike.${like}`
-        ),
+        .or(phoneParts.join(",")),
       supabase
         .from("invoices")
         .select("sale_id")
@@ -1056,7 +1094,7 @@ export async function getSales(
     query = query.in("id", saleIds.slice(0, 500));
   }
 
-  const { data, error } = await query.limit(100);
+  const { data, error } = await query.limit(500);
   if (error) throw new Error(error.message);
   return data as unknown as (Sale & {
     customer: {

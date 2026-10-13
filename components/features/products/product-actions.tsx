@@ -75,9 +75,9 @@ export function InventoryAdjustForm({ products }: { products: { id: string; name
       <div className="space-y-2">
         <Label htmlFor="type">Type</Label>
         <select id="type" name="type" className="flex h-8 rounded-lg border border-input bg-background px-2.5 text-sm">
-          <option value="IN">Stock in</option>
-          <option value="OUT">Stock out</option>
-          <option value="ADJUSTMENT">Set quantity</option>
+          <option value="IN">Stock in (add)</option>
+          <option value="OUT">Stock out (remove)</option>
+          <option value="ADJUSTMENT">Set on-hand quantity</option>
         </select>
       </div>
       <div className="space-y-2">
@@ -86,12 +86,15 @@ export function InventoryAdjustForm({ products }: { products: { id: string; name
           id="qty"
           name="quantity"
           type="number"
-          min={0.001}
+          min={0}
           step="0.001"
           required
           defaultValue={1}
           className="w-28"
         />
+        <p className="text-[11px] text-muted-foreground">
+          “Set on-hand” replaces stock with this number (not add). Use 0 to clear stock.
+        </p>
       </div>
       <div className="space-y-2 min-w-[160px] flex-1">
         <Label htmlFor="inv_notes">Notes</Label>

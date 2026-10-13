@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { notify } from "@/lib/toast";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate as formatDatePk, formatDateTime } from "@/lib/format";
 
 type Seller = PlatformMarketplaceSeller;
 type Product = Awaited<ReturnType<typeof listPlatformPendingProducts>>[number];
@@ -30,10 +30,7 @@ function dash(value: string | null | undefined) {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Date(value).toLocaleString("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return formatDateTime(value);
 }
 
 function sellerStatusBadge(status: Seller["status"]) {
@@ -184,7 +181,7 @@ export function PlatformMarketplacePanel({
                         {s.ownerEmail ? ` · ${s.ownerEmail}` : ""}
                         {contactPhone ? ` · ${contactPhone}` : " · no phone on file"}
                         {" · applied "}
-                        {new Date(s.created_at).toLocaleDateString("en-PK")}
+                        {formatDatePk(s.created_at)}
                         {" · "}
                         {s.productCount} product{s.productCount === 1 ? "" : "s"}
                       </p>

@@ -19,8 +19,8 @@ export async function getWhatsAppCustomers(): Promise<WhatsAppCustomer[]> {
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
     .not("phone", "is", null)
-    .order("first_name")
-    .limit(500);
+    .order("created_at", { ascending: false })
+    .limit(2000);
 
   if (error) throw new Error(error.message);
   return (data ?? []).filter(

@@ -14,7 +14,7 @@ import { TeamBehindSection } from "@/components/marketing/team-behind-section";
 import { LandingFinalCta } from "@/components/marketing/landing-final-cta";
 import { FaqSection } from "@/components/seo/faq-section";
 import { buildPageMetadata, SITE_FAQ, SITE_SEO } from "@/lib/seo/site";
-import { resolveVisitorBillingPlan } from "@/lib/billing/visitor-plan";
+import { defaultVisitorBillingPlan } from "@/lib/billing/visitor-plan";
 import Link from "next/link";
 
 export const revalidate = 300;
@@ -35,9 +35,10 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 export default async function HomePage() {
+  // Default plan (no headers()) so ISR/`revalidate` can cache the homepage.
   const [stores, visitor] = await Promise.all([
     listPublicStores(),
-    resolveVisitorBillingPlan(),
+    Promise.resolve(defaultVisitorBillingPlan()),
   ]);
 
   return (

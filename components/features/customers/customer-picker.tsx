@@ -46,7 +46,7 @@ export function CustomerPicker({
   onValueChange,
   allowEmpty = false,
   emptyLabel = "Walk-in",
-  limit = 12,
+  limit = 25,
 }: CustomerPickerProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -77,11 +77,20 @@ export function CustomerPicker({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return customers.slice(0, limit);
+    const qDigits = q.replace(/\D/g, "");
     return customers
       .filter((c) => {
         const full = formatCustomerName(c.first_name, c.last_name).toLowerCase();
         const phone = (c.phone ?? "").toLowerCase();
-        return full.includes(q) || phone.includes(q);
+        const phoneDigits = phone.replace(/\D/g, "");
+        if (full.includes(q) || phone.includes(q)) return true;
+        if (qDigits.length >= 3 && phoneDigits.includes(qDigits)) return true;
+        // 0301… vs 92301… / last-10 match
+        if (qDigits.length >= 10) {
+          const tail = qDigits.slice(-10);
+          if (phoneDigits.endsWith(tail)) return true;
+        }
+        return false;
       })
       .slice(0, limit);
   }, [customers, query, limit]);

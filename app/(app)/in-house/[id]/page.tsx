@@ -6,7 +6,7 @@ import {
   getProductCategories,
 } from "@/lib/actions/products";
 import { getActiveServicesForLinking } from "@/lib/actions/services";
-import { canManageRecords } from "@/lib/auth/permissions";
+import { getCapabilities } from "@/lib/auth/permissions";
 import { EditProductButton } from "@/components/features/products/edit-product-dialog";
 import { LinkProductToServiceButton } from "@/components/features/products/link-product-to-service-dialog";
 import { InventoryAdjustForm } from "@/components/features/products/product-actions";
@@ -45,12 +45,13 @@ export default async function InHouseProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [detail, canManage, services, categories] = await Promise.all([
+  const [detail, caps, services, categories] = await Promise.all([
     getInHouseProductDetail(id),
-    canManageRecords(),
+    getCapabilities("products"),
     getActiveServicesForLinking(),
     getProductCategories(),
   ]);
+  const canManage = caps.canManage;
 
   if (!detail) notFound();
 

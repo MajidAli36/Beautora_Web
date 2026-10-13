@@ -178,7 +178,8 @@ export async function applyAsPartner(input: {
 
   const username = validated.username;
   const fullName = input.fullName?.trim() || null;
-  const phone = input.phone?.trim() || null;
+  const { normalizeContactPhone } = await import("@/lib/phone/contact");
+  const phone = normalizeContactPhone(input.phone) ?? null;
 
   const { data: usernameClash } = await admin
     .from("partners")

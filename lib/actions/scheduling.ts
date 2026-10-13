@@ -313,12 +313,17 @@ export async function saveWeeklyStaffSchedule(
 export async function getOnlineBookingStaff() {
   const org = await requireOrganization();
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("staff")
     .select("id, full_name, job_title, online_booking_enabled")
     .eq("organization_id", org.organizationId)
     .eq("is_active", true)
+    .is("deleted_at", null)
     .order("full_name");
+  if (error) {
+    console.error("[scheduling] online booking staff failed", error.message);
+    return [];
+  }
   return data ?? [];
 }
 
@@ -328,12 +333,16 @@ export async function setStaffOnlineBooking(
 ): Promise<ActionResult> {
   const org = await requireAction("online_booking.configure");
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("staff")
     .update({ online_booking_enabled: enabled })
     .eq("id", staffId)
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "Staff not found or already deleted" };
   revalidatePath("/staff");
   revalidatePath("/online-booking");
   revalidatePath("/book");

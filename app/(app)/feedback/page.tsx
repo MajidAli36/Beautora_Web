@@ -44,9 +44,18 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
   const from = params.from ?? startOfLocalMonth(to);
 
   const [customers, staffList, dashboard] = await Promise.all([
-    getCustomers().catch(() => []),
-    getStaff().catch(() => []),
-    getFeedbackDashboard(from, to).catch(() => emptyDashboard(from, to)),
+    getCustomers().catch((err) => {
+      console.error("[feedback] customers load failed", err);
+      return [];
+    }),
+    getStaff().catch((err) => {
+      console.error("[feedback] staff load failed", err);
+      return [];
+    }),
+    getFeedbackDashboard(from, to).catch((err) => {
+      console.error("[feedback] dashboard load failed", err);
+      return emptyDashboard(from, to);
+    }),
   ]);
 
   return (

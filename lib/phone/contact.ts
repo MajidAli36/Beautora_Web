@@ -1,11 +1,22 @@
-/** Normalize and validate a contact phone (salon / marketplace / partner). */
+import {
+  normalizeBookingEmail,
+  normalizeBookingPhone,
+} from "@/lib/phone/normalize";
+
+/**
+ * Canonical contact phone for salon / marketplace / partner / staff.
+ * Same PK-friendly digits as customer booking (`92…` / national forms).
+ */
 export function normalizeContactPhone(raw: string | null | undefined): string | null {
-  const trimmed = raw?.trim() ?? "";
-  if (!trimmed) return null;
-  return trimmed.replace(/\s+/g, " ");
+  return normalizeBookingPhone(raw);
 }
 
-/** Require a usable phone: at least 7 digits after stripping formatting. */
+/** Lowercase trimmed email — empty / invalid → null. */
+export function normalizeContactEmail(raw: string | null | undefined): string | null {
+  return normalizeBookingEmail(raw);
+}
+
+/** Require a usable phone: at least 7 digits after normalization. */
 export function requireContactPhone(
   raw: string | null | undefined
 ): { ok: true; phone: string } | { ok: false; error: string } {
@@ -13,8 +24,7 @@ export function requireContactPhone(
   if (!phone) {
     return { ok: false, error: "Phone number is required" };
   }
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 7 || digits.length > 15) {
+  if (phone.length < 7 || phone.length > 15) {
     return {
       ok: false,
       error: "Enter a valid phone number (7–15 digits)",

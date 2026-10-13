@@ -16,6 +16,7 @@ import { PlatformStoresPanel } from "@/components/platform/platform-stores-panel
 import type { PartnerRow } from "@/lib/actions/partners";
 import { PLATFORM_DASHBOARD_PREVIEW } from "@/lib/platform/dashboard-preview";
 import { SUBSCRIPTION } from "@/lib/billing/subscription";
+import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -218,7 +219,7 @@ export function PlatformAdminPanel({
                       {p.organization_city ? `${p.organization_city} · ` : ""}
                       {p.organization_slug ? `/${p.organization_slug}` : ""}
                       {" · submitted "}
-                      {new Date(p.created_at).toLocaleString("en-PK")}
+                      {formatDateTime(p.created_at)}
                     </p>
                   </div>
                   {p.status === "pending" && (
@@ -257,7 +258,7 @@ export function PlatformAdminPanel({
                     value={
                       p.currency === "USD" || p.payment_method === "usdt_bep20"
                         ? `$${Number(p.amount).toLocaleString("en-US")} USDT`
-                        : `${SUBSCRIPTION.currencyLabel} ${Number(p.amount).toLocaleString("en-PK")}`
+                        : `${SUBSCRIPTION.currencyLabel} ${Number(p.amount).toLocaleString("en-US")}`
                     }
                   />
                   <Detail
@@ -292,7 +293,7 @@ export function PlatformAdminPanel({
                   {p.reviewed_at && (
                     <Detail
                       label="Reviewed"
-                      value={`${new Date(p.reviewed_at).toLocaleString("en-PK")}${
+                      value={`${formatDateTime(p.reviewed_at)}${
                         p.review_notes ? ` · ${p.review_notes}` : ""
                       }`}
                     />
