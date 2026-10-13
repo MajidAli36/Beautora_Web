@@ -39,7 +39,8 @@ function AppConnectionBadge({ status }: { status: AppDeviceConnection }) {
     <Badge
       variant={status === "live" ? "default" : "outline"}
       className={cn(
-        status === "live" && "bg-teal-600 hover:bg-teal-600",
+        status === "live" &&
+          "border-transparent bg-teal-600 text-white hover:bg-teal-600 hover:text-white",
         status === "idle" && "border-amber-500/40 text-amber-800 dark:text-amber-200"
       )}
     >

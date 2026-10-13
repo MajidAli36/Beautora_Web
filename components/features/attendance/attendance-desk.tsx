@@ -366,7 +366,7 @@ export function AttendanceDesk({ staff, onDuty, enrolledCount }: AttendanceDeskP
             <Button
               type="button"
               size="sm"
-              className="h-8 bg-[#0FA99A] hover:bg-[#0d9689]"
+              className="h-8 bg-[#0FA99A] text-white hover:bg-[#0d9689] hover:text-white"
               disabled={pending || !agentOnline}
               onClick={syncScanner}
             >
@@ -416,7 +416,7 @@ export function AttendanceDesk({ staff, onDuty, enrolledCount }: AttendanceDeskP
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate font-medium text-[#172033]">{s.full_name}</p>
                         {checkedIn ? (
-                          <Badge className="bg-teal-600 hover:bg-teal-600 font-normal">
+                          <Badge className="border-transparent bg-teal-600 text-white hover:bg-teal-600 hover:text-white font-normal">
                             Checked in
                           </Badge>
                         ) : (
@@ -455,7 +455,7 @@ export function AttendanceDesk({ staff, onDuty, enrolledCount }: AttendanceDeskP
                         <Button
                           type="button"
                           size="sm"
-                          className="h-8 bg-[#0FA99A] hover:bg-[#0d9689]"
+                          className="h-8 bg-[#0FA99A] text-white hover:bg-[#0d9689] hover:text-white"
                           disabled={pending || punchBusy}
                           onClick={() => machinePunch(s)}
                           title="Instant check-in / check-out via web API"

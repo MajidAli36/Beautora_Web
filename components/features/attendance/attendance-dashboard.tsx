@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { usePageVisible } from "@/hooks/use-page-visible";
 import { AttendanceButtons } from "@/components/features/staff/staff-forms";
 import { AttendanceDesk } from "@/components/features/attendance/attendance-desk";
@@ -16,6 +17,7 @@ import {
 import type { AttendanceOverview, AttendanceReport } from "@/lib/actions/attendance";
 import { attendanceMethodLabel } from "@/lib/attendance/labels";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +27,10 @@ import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
 import { formatAttendanceMinutes } from "@/lib/attendance/duration";
 import {
+  downloadExportDocument,
+  type ExportDocument,
+} from "@/lib/reports/export-formats";
+import {
   addLocalDays,
   getLocalDateString,
   isoToLocalDateString,
@@ -33,8 +39,9 @@ import {
 import {
   CalendarDays,
   Clock3,
+  Download,
   Fingerprint,
-  Users,
+  Timer,
   UserCheck,
 } from "lucide-react";
 
@@ -188,6 +195,12 @@ export function AttendanceDashboard({
     });
   }, [report.records, methodFilter, statusFilter]);
 
+  const selectedStaffId = searchParams.get("staff") ?? "";
+  const selectedStaffName = useMemo(() => {
+    if (!selectedStaffId) return null;
+    return staffList.find((s) => s.id === selectedStaffId)?.full_name ?? null;
+  }, [selectedStaffId, staffList]);
+
   const kpi = useMemo(() => {
     const thumbScans = filteredRecords.filter((r) => r.method === "BIOMETRIC").length;
     const openInPeriod = filteredRecords.filter((r) => !r.check_out_at).length;
@@ -196,12 +209,19 @@ export function AttendanceDashboard({
         (r) => `${r.staff?.id ?? "?"}:${isoToLocalDateString(r.check_in_at)}`
       )
     ).size;
+    const totalMinutes = filteredRecords.reduce(
+      (sum, r) => sum + (r.durationMinutes ?? 0),
+      0
+    );
     return {
       sessions: filteredRecords.length,
       thumbScans,
       onDuty: overview.onDuty.length,
       openInPeriod,
       staffDays,
+      totalMinutes,
+      totalHoursLabel: formatAttendanceMinutes(totalMinutes),
+      totalHoursDecimal: Math.round((totalMinutes / 60) * 10) / 10,
     };
   }, [filteredRecords, overview.onDuty.length]);
 
@@ -211,11 +231,84 @@ export function AttendanceDashboard({
   );
 
   const showSummary =
-    activePreset !== "today" &&
-    activePreset !== "daily" &&
-    report.summaries.length > 0;
+    (!selectedStaffId && activePreset !== "today" && activePreset !== "daily") ||
+    (Boolean(selectedStaffId) && report.summaries.length > 0);
 
   const rangeLabel = from === to ? from : `${from} → ${to}`;
+
+  async function downloadExcel() {
+    if (filteredRecords.length === 0) {
+      toast.error("No attendance rows to export for this filter");
+      return;
+    }
+    const staffLabel = selectedStaffName ?? "All staff";
+    const doc: ExportDocument = {
+      filenameBase: `attendance-${from}_to_${to}${selectedStaffId ? `-${staffLabel.replace(/\s+/g, "_")}` : ""}`,
+      title: "Attendance report",
+      subtitle: `${staffLabel} · ${rangeLabel} · Total ${kpi.totalHoursLabel}`,
+      sheets: [
+        {
+          name: "Summary",
+          headers: ["Staff", "Date range", "Sessions", "Thumb scans", "Total hours", "Total minutes", "Staff-days"],
+          rows: [
+            [
+              staffLabel,
+              rangeLabel,
+              kpi.sessions,
+              kpi.thumbScans,
+              kpi.totalHoursDecimal,
+              kpi.totalMinutes,
+              kpi.staffDays,
+            ],
+          ],
+        },
+        {
+          name: "Sessions",
+          headers: [
+            "Staff",
+            "Check-in",
+            "Check-out",
+            "Duration",
+            "Duration (minutes)",
+            "Method",
+            "Status",
+          ],
+          rows: filteredRecords.map((r) => [
+            r.staff?.full_name ?? "",
+            formatDateTime(r.check_in_at),
+            r.check_out_at ? formatDateTime(r.check_out_at) : "",
+            formatAttendanceMinutes(r.durationMinutes),
+            r.durationMinutes ?? "",
+            attendanceMethodLabel(r.method),
+            r.check_out_at ? "Checked out" : "Checked in",
+          ]),
+        },
+        ...(report.summaries.length > 0
+          ? [
+              {
+                name: "Staff hours",
+                headers: ["Staff", "Sessions", "Days", "Hours", "Avg hours / day"],
+                rows: report.summaries.map((s) => [
+                  s.staffName,
+                  s.sessions,
+                  s.workingDays,
+                  s.totalHours,
+                  s.avgHoursPerDay,
+                ]),
+              },
+            ]
+          : []),
+      ],
+    };
+    try {
+      await downloadExportDocument(doc, "xlsx");
+      toast.success("Excel downloaded", {
+        description: `${staffLabel} · ${kpi.totalHoursLabel}`,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create Excel file");
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -391,32 +484,38 @@ export function AttendanceDashboard({
         {[
           {
             label: "Sessions",
-            value: kpi.sessions,
+            value: String(kpi.sessions),
             hint: rangeLabel,
             icon: CalendarDays,
           },
           {
             label: "Thumb Scans",
-            value: kpi.thumbScans,
+            value: String(kpi.thumbScans),
             hint: "Biometric sessions",
             icon: Fingerprint,
           },
           {
-            label: "On Duty",
-            value: kpi.onDuty,
-            hint: "Currently checked in",
-            icon: UserCheck,
+            label: "Total Hours",
+            value: kpi.totalHoursLabel === "—" ? "0m" : kpi.totalHoursLabel,
+            hint: selectedStaffName
+              ? `${selectedStaffName} · closed sessions`
+              : "Sum of closed sessions",
+            icon: Timer,
+            emphasize: true,
           },
           {
-            label: "Staff-Days",
-            value: kpi.staffDays,
-            hint: "Unique attendance days",
-            icon: Users,
+            label: "On Duty",
+            value: String(kpi.onDuty),
+            hint: "Currently checked in",
+            icon: UserCheck,
           },
         ].map((s) => (
           <Card
             key={s.label}
-            className="rounded-2xl border-[#E5E7EB] bg-white shadow-none transition-colors hover:border-teal-200"
+            className={cn(
+              "rounded-2xl border-[#E5E7EB] bg-white shadow-none transition-colors hover:border-teal-200",
+              s.emphasize && "border-teal-200 bg-teal-50/40"
+            )}
           >
             <CardContent className="flex items-start justify-between gap-3 p-4">
               <div className="min-w-0 space-y-1">
@@ -433,6 +532,21 @@ export function AttendanceDashboard({
           </Card>
         ))}
       </div>
+
+      {selectedStaffName ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-200 bg-teal-50/50 px-4 py-3">
+          <p className="text-sm text-[#172033]">
+            <span className="font-semibold">{selectedStaffName}</span>
+            <span className="text-muted-foreground"> · {rangeLabel}</span>
+          </p>
+          <p className="text-sm font-semibold tabular-nums text-[#0FA99A]">
+            Total hours: {kpi.totalHoursLabel === "—" ? "0m" : kpi.totalHoursLabel}
+            <span className="ml-2 font-normal text-muted-foreground">
+              ({kpi.totalHoursDecimal}h)
+            </span>
+          </p>
+        </div>
+      ) : null}
 
       {showSummary && (
         <Card className="rounded-2xl border-[#E5E7EB] shadow-none">
@@ -488,14 +602,33 @@ export function AttendanceDashboard({
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
           <div>
             <CardTitle className="text-base text-[#172033]">Attendance log</CardTitle>
-            <p className="text-sm text-muted-foreground">{rangeLabel}</p>
+            <p className="text-sm text-muted-foreground">
+              {selectedStaffName ? `${selectedStaffName} · ` : null}
+              {rangeLabel}
+              {kpi.sessions > 0
+                ? ` · ${kpi.totalHoursLabel === "—" ? "0m" : kpi.totalHoursLabel} total`
+                : null}
+            </p>
           </div>
-          {pending ? (
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock3 className="size-3.5 animate-pulse" />
-              Updating…
-            </span>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {pending ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock3 className="size-3.5 animate-pulse" />
+                Updating…
+              </span>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="rounded-xl"
+              disabled={filteredRecords.length === 0}
+              onClick={() => void downloadExcel()}
+            >
+              <Download className="size-3.5" />
+              Excel
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <PaginatedList

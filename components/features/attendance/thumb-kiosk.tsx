@@ -352,7 +352,9 @@ export function ThumbAttendanceKiosk() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {r.onDuty ? (
-                        <Badge className="bg-teal-600">On duty</Badge>
+                        <Badge className="border-transparent bg-teal-600 text-white hover:bg-teal-600 hover:text-white">
+                          On duty
+                        </Badge>
                       ) : (
                         <Badge variant="outline" className="border-white/20 text-white/70">
                           Done

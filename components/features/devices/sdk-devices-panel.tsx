@@ -63,7 +63,11 @@ function TypeIcon({ type }: { type: string | number | undefined }) {
 
 function ConnectionBadge({ state }: { state: ConnectionState }) {
   if (state === "connected") {
-    return <Badge className="bg-teal-600 hover:bg-teal-600">Connected</Badge>;
+    return (
+      <Badge className="border-transparent bg-teal-600 text-white hover:bg-teal-600 hover:text-white">
+        Connected
+      </Badge>
+    );
   }
   if (state === "mock") {
     return <Badge variant="secondary">Connected (mock)</Badge>;
