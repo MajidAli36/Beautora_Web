@@ -75,7 +75,7 @@ export function EditProductButton({
             <DialogTitle>Edit {catalog === "inhouse" ? "in-house product" : "product"}</DialogTitle>
             <DialogDescription>
               {catalog === "inhouse"
-                ? "Same setup as Add: bottles / open stock / pieces. Change quantity from Restock / adjust."
+                ? "Same setup as Add: bottles / open stock / pieces. On-hand quantity can be set here or via Restock."
                 : "Update catalog details and pricing. Use Inventory to change stock quantity."}
             </DialogDescription>
           </DialogHeader>
@@ -336,7 +336,7 @@ function EditInHouseFields({
         <p className="font-medium text-foreground">Same as Add</p>
         <p className="text-muted-foreground">
           Bottles: set size in each bottle + cost of one bottle. Open stock: cost per {measure || "ml"}{" "}
-          only. Stock qty stays on Restock / adjust.
+          only. Set on-hand quantity below to update remaining stock.
         </p>
       </div>
 
@@ -545,9 +545,28 @@ function EditInHouseFields({
         </p>
       </div>
 
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor={`edit_p_stock_${product.id}`}>
+          On-hand quantity ({measure || "units"}) *
+        </Label>
+        <Input
+          id={`edit_p_stock_${product.id}`}
+          name="stock_quantity"
+          type="number"
+          min={0}
+          step="0.001"
+          required
+          defaultValue={String(stock)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Saves as the new on-hand amount (same as Restock → Set on-hand). Use Restock to add
+          without replacing.
+        </p>
+      </div>
+
       <div className="sm:col-span-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm space-y-1">
         <p>
-          Current stock:{" "}
+          Current stock before save:{" "}
           <strong>
             {stock} {measure || "units"}
           </strong>
@@ -561,7 +580,7 @@ function EditInHouseFields({
         <p>
           Cost per {measure || "unit"}: <strong>{formatCurrency(unitCost)}</strong>
           {" · "}
-          Stock value: <strong>{formatCurrency(stockValue)}</strong>
+          Stock value (at current qty): <strong>{formatCurrency(stockValue)}</strong>
         </p>
         {perBottle != null && perBottle > 0 ? (
           <p>
@@ -610,9 +629,6 @@ function EditInHouseFields({
         />
         <Label htmlFor={`edit_p_active_${product.id}`}>Active</Label>
       </div>
-      <p className="text-xs text-muted-foreground sm:col-span-2">
-        Change stock quantity from Restock / adjust (same unit).
-      </p>
       <DialogFooter className="sm:col-span-2">
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel

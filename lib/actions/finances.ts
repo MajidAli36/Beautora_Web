@@ -106,13 +106,13 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     { data: staffPay },
     { data: salePayments },
     { data: periodRefunds },
-    inventory,
   ] = await Promise.all([
     supabase
       .from("sales")
       .select("id, total, status")
       .eq("organization_id", org.organizationId)
       .in("status", ["COMPLETED", "AMENDED", "REFUNDED", "VOID"])
+      .is("deleted_at", null)
       .gte("completed_at", start.toISOString())
       .lte("completed_at", end.toISOString()),
     // Include REFUNDED so historical inflow is not erased when an advance is later refunded
@@ -141,20 +141,25 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
       .eq("organization_id", org.organizationId)
       .gte("payment_date", fromLabel)
       .lte("payment_date", toLabel),
-      supabase
-        .from("payments")
-        .select("amount, reference, sale_id")
-        .eq("organization_id", org.organizationId)
-        .gte("paid_at", start.toISOString())
-        .lte("paid_at", end.toISOString()),
-      supabase
-        .from("sale_refunds")
-        .select("amount, sale_id, reference")
-        .eq("organization_id", org.organizationId)
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-    getInventoryMoneySnapshot(org.organizationId, fromLabel, toLabel),
-    ]);
+    supabase
+      .from("payments")
+      .select("amount, reference, sale_id")
+      .eq("organization_id", org.organizationId)
+      .gte("paid_at", start.toISOString())
+      .lte("paid_at", end.toISOString()),
+    supabase
+      .from("sale_refunds")
+      .select("amount, sale_id, reference")
+      .eq("organization_id", org.organizationId)
+      .gte("created_at", start.toISOString())
+      .lte("created_at", end.toISOString()),
+  ]);
+
+  // One sales ID list shared by inventory / product / revenue helpers (no re-scan).
+  const postedSaleIds = (sales ?? [])
+    .filter((s) => s.status === "COMPLETED" || s.status === "AMENDED")
+    .map((s) => s.id);
+  const usageSaleIds = (sales ?? []).map((s) => s.id);
 
   const salesRevenue = roundMoney((sales ?? []).reduce((sum, s) => sum + Number(s.total), 0));
   const advancesCollected = roundMoney(
@@ -191,13 +196,17 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     { status: string; total: number; deleted_at: string | null }
   >();
   if (refundSaleIds.length) {
-    for (let i = 0; i < refundSaleIds.length; i += 200) {
-      const chunk = refundSaleIds.slice(i, i + 200);
-      const { data: refSales } = await supabase
-        .from("sales")
-        .select("id, status, deleted_at, total")
-        .eq("organization_id", org.organizationId)
-        .in("id", chunk);
+    const chunks = await Promise.all(
+      Array.from({ length: Math.ceil(refundSaleIds.length / 200) }, (_, i) => {
+        const chunk = refundSaleIds.slice(i * 200, i * 200 + 200);
+        return supabase
+          .from("sales")
+          .select("id, status, deleted_at, total")
+          .eq("organization_id", org.organizationId)
+          .in("id", chunk);
+      })
+    );
+    for (const { data: refSales } of chunks) {
       for (const s of refSales ?? []) {
         refundSaleMeta.set(s.id, {
           status: s.status,
@@ -245,11 +254,28 @@ export async function getFinancialSummary(from?: string, to?: string): Promise<F
     (periodRefunds ?? []).reduce((sum, r) => sum + Number(r.amount), 0)
   );
 
-  const [productSaleRows, revenueSplit, serviceUsageCogs] = await Promise.all([
-    getProductSalesBreakdown(org.organizationId, fromLabel, toLabel),
-    getRevenueSplit(org.organizationId, fromLabel, toLabel),
-    getServiceUsageCogs(org.organizationId, fromLabel, toLabel),
-  ]);
+  const [inventory, productSaleRows, revenueSplit, serviceUsageCogs] =
+    await Promise.all([
+      getInventoryMoneySnapshot(
+        org.organizationId,
+        fromLabel,
+        toLabel,
+        postedSaleIds
+      ),
+      getProductSalesBreakdown(
+        org.organizationId,
+        fromLabel,
+        toLabel,
+        postedSaleIds
+      ),
+      getRevenueSplit(org.organizationId, fromLabel, toLabel, postedSaleIds),
+      getServiceUsageCogs(
+        org.organizationId,
+        fromLabel,
+        toLabel,
+        usageSaleIds
+      ),
+    ]);
 
   const productCogs = inventory.productSales.costOfGoodsSold;
   const productRetailRevenue = inventory.productSales.retailRevenue;

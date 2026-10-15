@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
+import { revalidateProducts } from "@/lib/cache/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
 import type { Product, ProductCategory, ProductKind } from "@/types";
@@ -80,8 +81,7 @@ export async function createProductCategory(
     extraUpdate: { sort_order: sortOrder },
   });
   if (restored) {
-    revalidatePath("/products");
-    revalidatePath("/in-house");
+    revalidateProducts();
     return { success: true };
   }
 
@@ -100,16 +100,14 @@ export async function createProductCategory(
         extraUpdate: { sort_order: sortOrder },
       });
       if (again) {
-        revalidatePath("/products");
-        revalidatePath("/in-house");
+        revalidateProducts();
         return { success: true };
       }
       return { error: "A category with this name already exists" };
     }
     return { error: error.message };
   }
-  revalidatePath("/products");
-  revalidatePath("/in-house");
+  revalidateProducts();
   return { success: true };
 }
 
@@ -138,8 +136,7 @@ export async function deleteProductCategory(id: string): Promise<ActionResult> {
     before: row as unknown as Record<string, unknown>,
   });
   if (result.error) return { error: result.error };
-  revalidatePath("/products");
-  revalidatePath("/in-house");
+  revalidateProducts();
   return { success: true };
 }
 
@@ -250,7 +247,18 @@ export async function createProduct(
   }
 
   if (openingStock > 0) {
-    const { error: invErr } = await supabase.from("inventory_transactions").insert({
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    let admin;
+    try {
+      admin = createAdminClient();
+    } catch {
+      revalidateProducts();
+      return {
+        error:
+          "Product saved but opening stock failed (missing SUPABASE_SERVICE_ROLE_KEY). Use Restock / adjust.",
+      };
+    }
+    const { error: invErr } = await admin.from("inventory_transactions").insert({
       organization_id: org.organizationId,
       product_id: created.id,
       type: "IN",
@@ -260,19 +268,41 @@ export async function createProduct(
       reference_type: "opening",
     });
     if (invErr) {
-      // Product exists — surface stock failure clearly so staff can adjust.
-      revalidatePath("/products");
-      revalidatePath("/in-house");
+      revalidateProducts();
       return {
-        error: `Product saved but opening stock failed: ${invErr.message}. Use Adjust inventory to add stock.`,
+        error: `Product saved but opening stock failed: ${invErr.message}. Use Restock / adjust.`,
       };
+    }
+    const { data: afterOpen } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", created.id)
+      .maybeSingle();
+    const openQty = Number(afterOpen?.stock_quantity);
+    if (!Number.isFinite(openQty) || Math.abs(openQty - openingStock) > 0.0005) {
+      const { data: forced, error: stockErr } = await admin
+        .from("products")
+        .update({
+          stock_quantity: openingStock,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", created.id)
+        .eq("organization_id", org.organizationId)
+        .select("stock_quantity")
+        .maybeSingle();
+      if (stockErr || !forced) {
+        revalidateProducts();
+        return {
+          error: `Product saved but opening qty did not stick: ${
+            stockErr?.message ?? "no row updated"
+          }. Use Restock / adjust.`,
+        };
+      }
     }
   }
 
-  revalidatePath("/products");
-  revalidatePath("/in-house");
+  revalidateProducts();
   revalidatePath("/services");
-  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -329,10 +359,102 @@ export async function updateProduct(
 
   if (error) return { error: error.message };
   if (!updated) return { error: "Product not found or already deleted" };
-  revalidatePath("/products");
-  revalidatePath("/in-house");
+
+  // Optional on-hand qty from Edit (in-house) — apply via inventory movement + verified write.
+  const stockRaw = formData.get("stock_quantity");
+  if (stockRaw != null && String(stockRaw).trim() !== "") {
+    const nextStock = Number(stockRaw);
+    if (!Number.isFinite(nextStock) || nextStock < 0) {
+      return { error: "On-hand quantity cannot be negative" };
+    }
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    let admin;
+    try {
+      admin = createAdminClient();
+    } catch {
+      return {
+        error:
+          "Product saved but stock could not update (missing SUPABASE_SERVICE_ROLE_KEY).",
+      };
+    }
+    const { data: current } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", id)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    const before = Number(current?.stock_quantity) || 0;
+    const target = Math.round(nextStock * 1000) / 1000;
+    if (Math.abs(before - target) > 0.0005) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      let txnType: "IN" | "OUT" | "ADJUSTMENT" = "ADJUSTMENT";
+      let txnQty = target;
+      let txnNotes = "Set on-hand from product edit";
+      if (target === 0) {
+        if (before > 0) {
+          txnType = "OUT";
+          txnQty = before;
+          txnNotes = "Set on-hand to 0 from product edit";
+        } else {
+          txnQty = 0;
+        }
+      }
+      if (txnQty > 0) {
+        const { error: invErr } = await admin.from("inventory_transactions").insert({
+          organization_id: org.organizationId,
+          product_id: id,
+          type: txnType,
+          quantity: txnQty,
+          notes: txnNotes,
+          created_by: user?.id ?? null,
+          reference_type: "manual",
+        });
+        if (invErr) {
+          return {
+            error: `Product saved but stock update failed: ${invErr.message}`,
+          };
+        }
+        const { data: afterRow } = await admin
+          .from("products")
+          .select("stock_quantity")
+          .eq("id", id)
+          .maybeSingle();
+        let afterQty = Number(afterRow?.stock_quantity);
+        if (!Number.isFinite(afterQty) || Math.abs(afterQty - target) > 0.0005) {
+          const { data: forced, error: stockErr } = await admin
+            .from("products")
+            .update({
+              stock_quantity: target,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", id)
+            .eq("organization_id", org.organizationId)
+            .is("deleted_at", null)
+            .select("stock_quantity")
+            .maybeSingle();
+          if (stockErr || !forced) {
+            return {
+              error: `Product saved but stock quantity did not update: ${
+                stockErr?.message ?? "no product row updated"
+              }`,
+            };
+          }
+          afterQty = Number(forced.stock_quantity);
+        }
+        if (!Number.isFinite(afterQty) || Math.abs(afterQty - target) > 0.0005) {
+          return {
+            error: `Product saved but stock still wrong (have ${afterQty}, expected ${target}).`,
+          };
+        }
+      }
+    }
+  }
+
+  revalidateProducts(id);
   revalidatePath("/services");
-  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -362,9 +484,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
     extraPatch: { is_active: false },
   });
   if (result.error) return { error: result.error };
-  revalidatePath("/products");
-  revalidatePath("/in-house");
-  revalidatePath("/pos");
+  revalidateProducts();
   revalidatePath("/services");
   return { success: true };
 }
@@ -373,7 +493,19 @@ export async function adjustInventory(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const org = await requireAction("products.edit");
+  let org;
+  try {
+    org = await requireAction("products.edit");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Insufficient permissions";
+    return {
+      error:
+        msg === "Insufficient permissions"
+          ? "You don’t have permission to update inventory. Ask an admin for products.edit."
+          : msg,
+    };
+  }
+
   const productId = String(formData.get("product_id") ?? "").trim();
   const type = formData.get("type") as "IN" | "OUT" | "ADJUSTMENT";
   const quantity = Number(formData.get("quantity"));
@@ -393,8 +525,19 @@ export async function adjustInventory(
     return { error: "On-hand quantity cannot be negative" };
   }
 
-  const supabase = await createClient();
-  const { data: product } = await supabase
+  // Service role after permission check — user RLS can silently no-op stock updates.
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return {
+      error:
+        "Server is missing SUPABASE_SERVICE_ROLE_KEY — cannot update inventory right now.",
+    };
+  }
+
+  const { data: product } = await admin
     .from("products")
     .select("id, name, stock_quantity")
     .eq("id", productId)
@@ -409,6 +552,7 @@ export async function adjustInventory(
     };
   }
 
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -420,9 +564,7 @@ export async function adjustInventory(
   if (type === "ADJUSTMENT" && quantity === 0) {
     const current = Number(product.stock_quantity) || 0;
     if (current <= 0) {
-      revalidatePath("/products");
-      revalidatePath("/in-house");
-      revalidatePath("/pos");
+      revalidateProducts(productId);
       return { success: true };
     }
     txnType = "OUT";
@@ -430,7 +572,15 @@ export async function adjustInventory(
     txnNotes = notes ? `${notes} (set on-hand to 0)` : "Set on-hand to 0";
   }
 
-  const { error } = await supabase.from("inventory_transactions").insert({
+  const beforeQty = Number(product.stock_quantity) || 0;
+  const expectedQty =
+    txnType === "IN"
+      ? Math.round((beforeQty + txnQty) * 1000) / 1000
+      : txnType === "OUT"
+        ? Math.round((beforeQty - txnQty) * 1000) / 1000
+        : Math.round(txnQty * 1000) / 1000;
+
+  const { error } = await admin.from("inventory_transactions").insert({
     organization_id: org.organizationId,
     product_id: productId,
     type: txnType,
@@ -446,18 +596,61 @@ export async function adjustInventory(
     }
     return { error: msg };
   }
-  revalidatePath("/products");
-  revalidatePath("/in-house");
-  revalidatePath("/pos");
-  return { success: true };
+
+  // Always confirm on-hand. Trigger usually applies; if not, set explicitly.
+  const { data: afterRow } = await admin
+    .from("products")
+    .select("stock_quantity")
+    .eq("id", productId)
+    .eq("organization_id", org.organizationId)
+    .maybeSingle();
+  let afterQty = Number(afterRow?.stock_quantity);
+  if (!Number.isFinite(afterQty) || Math.abs(afterQty - expectedQty) > 0.0005) {
+    const { data: forced, error: stockErr } = await admin
+      .from("products")
+      .update({
+        stock_quantity: expectedQty,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .select("stock_quantity")
+      .maybeSingle();
+    if (stockErr || !forced) {
+      return {
+        error: `Movement recorded but stock quantity did not update: ${
+          stockErr?.message ?? "no product row updated"
+        }`,
+      };
+    }
+    afterQty = Number(forced.stock_quantity);
+  }
+
+  if (!Number.isFinite(afterQty) || Math.abs(afterQty - expectedQty) > 0.0005) {
+    return {
+      error: `Stock still wrong after update (have ${afterQty}, expected ${expectedQty}).`,
+    };
+  }
+
+  revalidateProducts(productId);
+  return {
+    success: true,
+    message: `${product.name}: on-hand is now ${expectedQty}`,
+  };
 }
+
+const PRODUCT_LIST_COLUMNS =
+  "id, organization_id, category_id, name, sku, description, cost_price, retail_price, stock_quantity, low_stock_threshold, unit_label, pack_size, default_usage_qty, product_kind, is_active, created_at, updated_at, deleted_at, category:product_categories(id, name)";
 
 export async function getProductCategories() {
   const org = await requireOrganization();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("product_categories")
-    .select("*")
+    .select(
+      "id, organization_id, name, sort_order, deleted_at, deleted_by, deleted_by_role, created_by, updated_by, created_at, updated_at"
+    )
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
     .order("sort_order")
@@ -471,10 +664,11 @@ export async function getProducts() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
-    .select("*, category:product_categories(id, name)")
+    .select(PRODUCT_LIST_COLUMNS)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
-    .order("name");
+    .order("name")
+    .limit(1000);
   if (error) throw new Error(error.message);
   return data as unknown as (Product & { category: { id: string; name: string } | null })[];
 }
@@ -485,11 +679,13 @@ export async function getRetailProducts() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
-    .select("*, category:product_categories(id, name)")
+    .select(PRODUCT_LIST_COLUMNS)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
+    .eq("is_active", true)
     .in("product_kind", ["RETAIL", "BOTH"])
-    .order("name");
+    .order("name")
+    .limit(1000);
   if (error) throw new Error(error.message);
   return data as unknown as (Product & { category: { id: string; name: string } | null })[];
 }
@@ -587,7 +783,7 @@ export async function getPosCatalog() {
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(2000),
+      .limit(500),
     supabase
       .from("staff")
       .select("id, full_name")
@@ -630,13 +826,13 @@ export async function getInHouseProducts() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
-    .select(
-      "*, category:product_categories(id, name)"
-    )
+    .select(PRODUCT_LIST_COLUMNS)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
+    .eq("is_active", true)
     .in("product_kind", ["IN_HOUSE", "BOTH"])
-    .order("name");
+    .order("name")
+    .limit(1000);
   if (error) throw new Error(error.message);
   return data ?? [];
 }
@@ -658,7 +854,7 @@ export async function getInHouseProductDetail(productId: string) {
 
   const { data: product, error } = await supabase
     .from("products")
-    .select("*, category:product_categories(id, name)")
+    .select(PRODUCT_LIST_COLUMNS)
     .eq("id", productId)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)

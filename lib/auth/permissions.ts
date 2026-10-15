@@ -1,9 +1,11 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import {
   getActiveOrganization,
   requireOrganization,
 } from "@/lib/auth/organization";
 import { assertOrgOperational } from "@/lib/billing/enforce";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   canPerformAction,
   getFeatureCapability,
@@ -16,15 +18,18 @@ import {
   type NavPermissionsConfig,
 } from "@/lib/permissions/nav";
 import { hasMinimumRole } from "@/lib/permissions/roles";
-import { createClient } from "@/lib/supabase/server";
 import type { MemberRole } from "@/types";
 
 /** Actions allowed even when the store subscription is locked */
 const LOCKED_ALLOWED_ACTIONS = new Set<ActionKey>(["billing.manage"]);
 
-async function loadOrgPermissionRows(organizationId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
+export function orgPermissionsCacheTag(organizationId: string) {
+  return `org-permissions:${organizationId}`;
+}
+
+async function loadOrgPermissionRowsUncached(organizationId: string) {
+  const admin = createAdminClient();
+  const { data } = await admin
     .from("organizations")
     .select("nav_permissions, action_permissions")
     .eq("id", organizationId)
@@ -34,6 +39,18 @@ async function loadOrgPermissionRows(organizationId: string) {
     nav: (data?.nav_permissions as NavPermissionsConfig) ?? {},
     actions: (data?.action_permissions as ActionPermissionsConfig) ?? {},
   };
+}
+
+/** Cross-request cache — permissions rarely change; invalidate on role updates. */
+function loadOrgPermissionRows(organizationId: string) {
+  return unstable_cache(
+    () => loadOrgPermissionRowsUncached(organizationId),
+    ["org-permissions", organizationId],
+    {
+      revalidate: 120,
+      tags: [orgPermissionsCacheTag(organizationId)],
+    }
+  )();
 }
 
 /** Cached once per request — used by nav + action checks. */

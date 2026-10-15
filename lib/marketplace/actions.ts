@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { requireAuth } from "@/lib/auth/session";
@@ -20,11 +21,12 @@ type SellerRow = Database["public"]["Tables"]["marketplace_sellers"]["Row"];
 type ProductRow = Database["public"]["Tables"]["marketplace_products"]["Row"];
 type CategoryRow = Database["public"]["Tables"]["marketplace_categories"]["Row"];
 
-export async function getAppMode(): Promise<AppMode> {
+/** Cookie read once per request when layout + pages both ask. */
+export const getAppMode = cache(async (): Promise<AppMode> => {
   const jar = await cookies();
   const v = jar.get(APP_MODE_COOKIE)?.value;
   return v === "marketplace" ? "marketplace" : "saas";
-}
+});
 
 export async function setAppMode(mode: AppMode): Promise<ActionResult & { mode?: AppMode }> {
   const user = await requireAuth();

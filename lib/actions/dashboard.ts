@@ -2,7 +2,6 @@
 
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
-import { getFinancialSummary } from "@/lib/actions/finances";
 import {
   getLocalDateString,
   addLocalDays,
@@ -11,6 +10,7 @@ import {
   isoToLocalDateString,
 } from "@/lib/dates/local";
 import { roundMoney } from "@/lib/sales/calculate";
+import { getInventorySummary } from "@/lib/inventory/valuation";
 
 export type DashboardAppointment = {
   id: string;
@@ -93,7 +93,7 @@ function mapAppointment(appt: ApptRow): DashboardAppointment {
   };
 }
 
-/** Lean dashboard loader — avoids full finance×2, reports, and unbounded customer/sales pulls. */
+/** Lean dashboard — no full finances fan-out; uses RPCs + bounded scans. */
 export async function getDashboardData(): Promise<DashboardData> {
   const org = await requireOrganization();
   const supabase = await createClient();
@@ -102,16 +102,16 @@ export async function getDashboardData(): Promise<DashboardData> {
   const todayStr = getLocalDateString();
   const yesterdayStr = addLocalDays(todayStr, -1);
   const weekAgo = startOfLocalDay(addLocalDays(todayStr, -7));
-  const ninetyDaysAgo = startOfLocalDay(addLocalDays(todayStr, -90));
-  const chartStart = startOfLocalDay(addLocalDays(todayStr, -89));
+  const thirtyDaysAgo = startOfLocalDay(addLocalDays(todayStr, -29));
+  const chartStart = thirtyDaysAgo;
   const todayStart = startOfLocalDay(todayStr);
   const todayEnd = endOfLocalDay(todayStr);
   const yesterdayStart = startOfLocalDay(yesterdayStr);
   const yesterdayEnd = endOfLocalDay(yesterdayStr);
+  const todayLabel = todayStr;
 
   const [
-    todayFinancesRaw,
-    yesterdaySalesRes,
+    twoDaySalesRes,
     appointmentsRes,
     customerCountRes,
     newCustomersRes,
@@ -119,16 +119,20 @@ export async function getDashboardData(): Promise<DashboardData> {
     chartSalesRes,
     retentionSalesRes,
     recentAppointmentsRes,
+    todayDepositsRes,
+    todayExpensesRes,
+    todayStaffPayRes,
+    topServicesRpc,
   ] = await Promise.all([
-    getFinancialSummary(todayStr, todayStr).catch(() => null),
+    // One range covers yesterday + today; split in JS (saves a sales RTT).
     supabase
       .from("sales")
-      .select("total")
+      .select("id, total, completed_at")
       .eq("organization_id", orgId)
       .in("status", ["COMPLETED", "AMENDED"])
       .is("deleted_at", null)
       .gte("completed_at", yesterdayStart.toISOString())
-      .lte("completed_at", yesterdayEnd.toISOString()),
+      .lte("completed_at", todayEnd.toISOString()),
     supabase
       .from("appointments")
       .select(
@@ -143,7 +147,8 @@ export async function getDashboardData(): Promise<DashboardData> {
       .is("deleted_at", null)
       .gte("scheduled_at", todayStart.toISOString())
       .lte("scheduled_at", todayEnd.toISOString())
-      .order("scheduled_at"),
+      .order("scheduled_at")
+      .limit(100),
     supabase
       .from("customers")
       .select("id", { count: "exact", head: true })
@@ -157,12 +162,12 @@ export async function getDashboardData(): Promise<DashboardData> {
       .gte("created_at", weekAgo.toISOString()),
     supabase
       .from("products")
-      .select("id, name, stock_quantity, low_stock_threshold")
+      .select("id, name, stock_quantity, low_stock_threshold, cost_price, retail_price, is_active")
       .eq("organization_id", orgId)
       .eq("is_active", true)
       .is("deleted_at", null)
       .order("stock_quantity")
-      .limit(200),
+      .limit(300),
     supabase
       .from("sales")
       .select("id, total, completed_at")
@@ -170,7 +175,8 @@ export async function getDashboardData(): Promise<DashboardData> {
       .in("status", ["COMPLETED", "AMENDED"])
       .is("deleted_at", null)
       .gte("completed_at", chartStart.toISOString())
-      .order("completed_at"),
+      .order("completed_at")
+      .limit(2000),
     supabase
       .from("sales")
       .select("customer_id, total")
@@ -178,19 +184,74 @@ export async function getDashboardData(): Promise<DashboardData> {
       .in("status", ["COMPLETED", "AMENDED"])
       .is("deleted_at", null)
       .not("customer_id", "is", null)
-      .gte("completed_at", ninetyDaysAgo.toISOString()),
+      .gte("completed_at", thirtyDaysAgo.toISOString())
+      .limit(2000),
     supabase
       .from("appointments")
       .select("scheduled_at")
       .eq("organization_id", orgId)
       .is("deleted_at", null)
-      .gte("scheduled_at", chartStart.toISOString()),
+      .gte("scheduled_at", chartStart.toISOString())
+      .limit(2000),
+    supabase
+      .from("appointment_deposits")
+      .select("amount")
+      .eq("organization_id", orgId)
+      .in("status", ["APPROVED", "REFUNDED"])
+      .gte("paid_at", todayStart.toISOString())
+      .lte("paid_at", todayEnd.toISOString()),
+    supabase
+      .from("expenses")
+      .select("amount")
+      .eq("organization_id", orgId)
+      .eq("expense_date", todayLabel),
+    supabase
+      .from("staff_payments")
+      .select("amount")
+      .eq("organization_id", orgId)
+      .eq("payment_date", todayLabel),
+    supabase.rpc("dashboard_top_services", {
+      p_organization_id: orgId,
+      p_since: thirtyDaysAgo.toISOString(),
+      p_limit: 5,
+    }),
   ]);
 
-  const todayRevenue = roundMoney(todayFinancesRaw?.salesRevenue ?? 0);
-  const yesterdayRevenue = roundMoney(
-    (yesterdaySalesRes.data ?? []).reduce((sum, s) => sum + Number(s.total), 0)
-  );
+  const todayStartMs = todayStart.getTime();
+  const todayEndMs = todayEnd.getTime();
+  const todaySaleIds: string[] = [];
+  let todayRevenueRaw = 0;
+  let yesterdayRevenueRaw = 0;
+  for (const s of twoDaySalesRes.data ?? []) {
+    if (!s.completed_at) continue;
+    const t = new Date(s.completed_at).getTime();
+    const total = Number(s.total);
+    if (t >= todayStartMs && t <= todayEndMs) {
+      todaySaleIds.push(s.id);
+      todayRevenueRaw += total;
+    } else if (t >= yesterdayStart.getTime() && t <= yesterdayEnd.getTime()) {
+      yesterdayRevenueRaw += total;
+    }
+  }
+  const todayRevenue = roundMoney(todayRevenueRaw);
+  const yesterdayRevenue = roundMoney(yesterdayRevenueRaw);
+
+  const productLines =
+    todaySaleIds.length > 0
+      ? await supabase
+          .from("sale_items")
+          .select("name, quantity, line_total, unit_cost")
+          .eq("organization_id", orgId)
+          .eq("item_type", "PRODUCT")
+          .in("sale_id", todaySaleIds)
+      : {
+          data: [] as {
+            name: string;
+            quantity: number;
+            line_total: number;
+            unit_cost: number | null;
+          }[],
+        };
 
   const appointmentsRaw = (appointmentsRes.data ?? []) as unknown as ApptRow[];
   const appointments = appointmentsRaw.map(mapAppointment);
@@ -221,53 +282,31 @@ export async function getDashboardData(): Promise<DashboardData> {
       threshold: p.low_stock_threshold,
     }));
 
+  const inventorySummary = getInventorySummary(productsRes.data ?? []);
+
   const revenueByDayMap: Record<string, number> = {};
-  for (let i = 0; i < 90; i++) {
-    revenueByDayMap[addLocalDays(todayStr, -89 + i)] = 0;
+  for (let i = 0; i < 30; i++) {
+    revenueByDayMap[addLocalDays(todayStr, -29 + i)] = 0;
   }
-  const chartSaleIds: string[] = [];
   for (const sale of chartSalesRes.data ?? []) {
     if (!sale.completed_at) continue;
     const day = isoToLocalDateString(sale.completed_at);
     if (day in revenueByDayMap) {
       revenueByDayMap[day] = roundMoney(revenueByDayMap[day] + Number(sale.total));
     }
-    chartSaleIds.push(sale.id);
   }
   const revenueByDay = Object.entries(revenueByDayMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, revenue]) => ({ date, revenue }));
 
-  // Top services from last 90 days of chart sales (chunked)
-  const serviceAgg = new Map<string, { qty: number; revenue: number }>();
-  if (chartSaleIds.length > 0) {
-    const chunks: string[][] = [];
-    for (let i = 0; i < chartSaleIds.length; i += 200) {
-      chunks.push(chartSaleIds.slice(i, i + 200));
-    }
-    const itemResults = await Promise.all(
-      chunks.map((chunk) =>
-        supabase
-          .from("sale_items")
-          .select("name, quantity, line_total")
-          .eq("organization_id", orgId)
-          .eq("item_type", "SERVICE")
-          .in("sale_id", chunk)
-      )
-    );
-    for (const { data } of itemResults) {
-      for (const item of data ?? []) {
-        const prev = serviceAgg.get(item.name) ?? { qty: 0, revenue: 0 };
-        prev.qty += Number(item.quantity) || 0;
-        prev.revenue = roundMoney(prev.revenue + (Number(item.line_total) || 0));
-        serviceAgg.set(item.name, prev);
-      }
-    }
+  let topServices: { name: string; qty: number; revenue: number }[] = [];
+  if (!topServicesRpc.error && Array.isArray(topServicesRpc.data)) {
+    topServices = topServicesRpc.data.map((r) => ({
+      name: String(r.name),
+      qty: Number(r.qty) || 0,
+      revenue: roundMoney(Number(r.revenue) || 0),
+    }));
   }
-  const topServices = [...serviceAgg.entries()]
-    .map(([name, v]) => ({ name, qty: v.qty, revenue: v.revenue }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
 
   const customerSaleCounts = new Map<string, number>();
   let totalSpend = 0;
@@ -287,8 +326,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     customersWithSales > 0 ? (returningCustomers / customersWithSales) * 100 : null;
 
   const appointmentsByDayMap: Record<string, number> = {};
-  for (let i = 0; i < 90; i++) {
-    appointmentsByDayMap[addLocalDays(todayStr, -89 + i)] = 0;
+  for (let i = 0; i < 30; i++) {
+    appointmentsByDayMap[addLocalDays(todayStr, -29 + i)] = 0;
   }
   for (const appt of recentAppointmentsRes.data ?? []) {
     const day = isoToLocalDateString(appt.scheduled_at);
@@ -299,6 +338,55 @@ export async function getDashboardData(): Promise<DashboardData> {
   const appointmentsByDay = Object.entries(appointmentsByDayMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, count]) => ({ date, count }));
+
+  let unitsSold = 0;
+  let productRetailRevenue = 0;
+  let productCogs = 0;
+  const productAgg = new Map<string, { qty: number; revenue: number; cogs: number }>();
+  for (const line of productLines.data ?? []) {
+    const qty = Number(line.quantity) || 0;
+    const revenue = Number(line.line_total) || 0;
+    const cogs = qty * (Number(line.unit_cost) || 0);
+    unitsSold += qty;
+    productRetailRevenue += revenue;
+    productCogs += cogs;
+    const prev = productAgg.get(line.name) ?? { qty: 0, revenue: 0, cogs: 0 };
+    prev.qty += qty;
+    prev.revenue += revenue;
+    prev.cogs += cogs;
+    productAgg.set(line.name, prev);
+  }
+  productRetailRevenue = roundMoney(productRetailRevenue);
+  productCogs = roundMoney(productCogs);
+  const productGrossProfit = roundMoney(productRetailRevenue - productCogs);
+  const marginPercent =
+    productRetailRevenue > 0
+      ? Math.round((productGrossProfit / productRetailRevenue) * 100)
+      : 0;
+
+  const advancesCollected = roundMoney(
+    (todayDepositsRes.data ?? []).reduce((s, d) => s + Number(d.amount), 0)
+  );
+  const totalExpenses = roundMoney(
+    (todayExpensesRes.data ?? []).reduce((s, e) => s + Number(e.amount), 0)
+  );
+  const staffPayments = roundMoney(
+    (todayStaffPayRes.data ?? []).reduce((s, p) => s + Number(p.amount), 0)
+  );
+  const netProfit = roundMoney(
+    todayRevenue - totalExpenses - staffPayments - productCogs
+  );
+  const netCashFlow = roundMoney(todayRevenue + advancesCollected - totalExpenses - staffPayments);
+
+  const productsSold = [...productAgg.entries()]
+    .map(([name, v]) => ({
+      name,
+      qty: v.qty,
+      revenue: roundMoney(v.revenue),
+      profit: roundMoney(v.revenue - v.cogs),
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
 
   return {
     todayRevenue,
@@ -315,40 +403,33 @@ export async function getDashboardData(): Promise<DashboardData> {
     revenueByDay,
     topServices,
     appointmentsByDay,
-    todayFinances: todayFinancesRaw
-      ? {
-          salesRevenue: todayFinancesRaw.salesRevenue,
-          advancesCollected: todayFinancesRaw.advancesCollected,
-          totalExpenses: todayFinancesRaw.totalExpenses,
-          staffPayments: todayFinancesRaw.staffPayments,
-          productCogs: todayFinancesRaw.productCogs,
-          productGrossProfit: todayFinancesRaw.productGrossProfit,
-          productUnitsSold: todayFinancesRaw.productUnitsSold,
-          productRetailRevenue: todayFinancesRaw.productRetailRevenue,
-          inventoryValueAtCost: todayFinancesRaw.inventoryValueAtCost,
-          netProfit: todayFinancesRaw.netProfit,
-          netCashFlow: todayFinancesRaw.netCashFlow,
-        }
-      : null,
-    inventoryValueAtCost: todayFinancesRaw?.inventoryValueAtCost ?? 0,
-    productGrossProfitToday: todayFinancesRaw?.productGrossProfit ?? 0,
+    todayFinances: {
+      salesRevenue: todayRevenue,
+      advancesCollected,
+      totalExpenses,
+      staffPayments,
+      productCogs,
+      productGrossProfit,
+      productUnitsSold: unitsSold,
+      productRetailRevenue,
+      inventoryValueAtCost: inventorySummary.totalValueAtCost,
+      netProfit,
+      netCashFlow,
+    },
+    inventoryValueAtCost: inventorySummary.totalValueAtCost,
+    productGrossProfitToday: productGrossProfit,
     stockToday: {
-      unitsSold: todayFinancesRaw?.productUnitsSold ?? 0,
-      retailRevenue: todayFinancesRaw?.productRetailRevenue ?? 0,
-      costOfGoodsSold: todayFinancesRaw?.productCogs ?? 0,
-      grossProfit: todayFinancesRaw?.productGrossProfit ?? 0,
-      marginPercent: todayFinancesRaw?.productMarginPercent ?? 0,
-      inventoryValueAtCost: todayFinancesRaw?.inventoryValueAtCost ?? 0,
-      inventoryValueAtRetail: todayFinancesRaw?.inventoryValueAtRetail ?? 0,
-      inventoryUnitsOnHand: todayFinancesRaw?.inventoryUnitsOnHand ?? 0,
-      serviceRevenue: todayFinancesRaw?.serviceRevenue ?? 0,
+      unitsSold,
+      retailRevenue: productRetailRevenue,
+      costOfGoodsSold: productCogs,
+      grossProfit: productGrossProfit,
+      marginPercent,
+      inventoryValueAtCost: inventorySummary.totalValueAtCost,
+      inventoryValueAtRetail: inventorySummary.totalValueAtRetail,
+      inventoryUnitsOnHand: inventorySummary.totalUnits,
+      serviceRevenue: 0,
       lowStockCount: lowStockProducts.length,
-      productsSold: (todayFinancesRaw?.productSaleRows ?? []).slice(0, 5).map((r) => ({
-        name: r.name,
-        qty: r.qtySold,
-        revenue: r.retailRevenue,
-        profit: r.grossProfit,
-      })),
+      productsSold,
     },
   };
 }

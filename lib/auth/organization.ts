@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { getSession } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { enterCurrencyFromCountry } from "@/lib/currency/runtime.server";
 import type { MemberRole } from "@/types";
@@ -12,13 +13,10 @@ export type OrganizationMembership = {
 };
 
 export const getUserMemberships = cache(async (): Promise<OrganizationMembership[]> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getSession();
   if (!user) return [];
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("organization_members")
     .select(

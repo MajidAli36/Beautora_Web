@@ -13,22 +13,29 @@ async function userHasOrganization(
   supabase: ReturnType<typeof createServerClient<Database>>,
   userId: string
 ) {
-  const { count } = await supabase
+  // Existence check only — avoid COUNT(*) on every navigation.
+  const { data } = await supabase
     .from("organization_members")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
-  return (count ?? 0) > 0;
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  return Boolean(data);
 }
 
 async function userIsPartner(
   supabase: ReturnType<typeof createServerClient<Database>>,
   user: { id: string; user_metadata?: Record<string, unknown> }
 ) {
-  if (user.user_metadata?.account_type === "partner") return true;
+  const accountType = user.user_metadata?.account_type;
+  if (accountType === "partner") return true;
+  // Known non-partner account types — skip partners table round-trip.
+  if (accountType === "customer" || accountType === "owner") return false;
   const { data } = await supabase
     .from("partners")
     .select("id")
     .eq("user_id", user.id)
+    .limit(1)
     .maybeSingle();
   return Boolean(data);
 }
@@ -144,7 +151,6 @@ export async function updateSession(request: NextRequest) {
 
   if (user) {
     const isPlatformAdmin = isPlatformAdminEmail(user.email);
-    const isPartner = await userIsPartner(supabase, user);
     const isCustomer = isCustomerAccount(
       user.user_metadata as Record<string, unknown>
     );
@@ -165,6 +171,17 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse;
     }
 
+    // Partner check only when relevant (partner routes / auth redirects / unknown account type)
+    const needsPartnerCheck =
+      isPartnerDashboard ||
+      isAuthRoute ||
+      isOnboardingRoute ||
+      user.user_metadata?.account_type === "partner" ||
+      user.user_metadata?.account_type == null;
+    const isPartner = needsPartnerCheck
+      ? await userIsPartner(supabase, user)
+      : false;
+
     // Partners only ever use the partner dashboard (never salon app / onboarding)
     if (isPartner && !isPlatformAdmin) {
       if (
@@ -181,7 +198,27 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    const hasOrg = await userHasOrganization(supabase, user.id);
+    // Org existence: re-check on auth/onboarding; on protected app routes trust short cookie.
+    const orgCookieName = "x-has-org";
+    const orgCookieFresh = request.cookies.get(orgCookieName)?.value === "1";
+    const mustVerifyOrg = isAuthRoute || isOnboardingRoute || isPartnerDashboard;
+    let hasOrg = true;
+    if (mustVerifyOrg || (isProtectedRoute && !orgCookieFresh)) {
+      hasOrg = await userHasOrganization(supabase, user.id);
+      if (hasOrg) {
+        supabaseResponse.cookies.set(orgCookieName, "1", {
+          path: "/",
+          maxAge: 60 * 30,
+          sameSite: "lax",
+          httpOnly: true,
+        });
+      } else {
+        supabaseResponse.cookies.set(orgCookieName, "", {
+          path: "/",
+          maxAge: 0,
+        });
+      }
+    }
     const ownerLanding = landingPathForProductIntent(
       parseProductIntent(
         (user.user_metadata as Record<string, unknown> | undefined)?.product_intent
@@ -196,13 +233,21 @@ export async function updateSession(request: NextRequest) {
         : hasOrg
           ? ownerLanding
           : "/onboarding";
-      return NextResponse.redirect(url);
+      const redirectRes = NextResponse.redirect(url);
+      supabaseResponse.cookies.getAll().forEach((c) => {
+        redirectRes.cookies.set(c.name, c.value);
+      });
+      return redirectRes;
     }
 
     if (isOnboardingRoute && hasOrg) {
       const url = request.nextUrl.clone();
       url.pathname = ownerLanding;
-      return NextResponse.redirect(url);
+      const redirectRes = NextResponse.redirect(url);
+      supabaseResponse.cookies.getAll().forEach((c) => {
+        redirectRes.cookies.set(c.name, c.value);
+      });
+      return redirectRes;
     }
 
     if (isProtectedRoute && !hasOrg) {

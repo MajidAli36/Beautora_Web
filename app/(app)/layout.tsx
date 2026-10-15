@@ -3,7 +3,7 @@ import { SubscriptionCautionModal } from "@/components/billing/subscription-caut
 import { requireAuth } from "@/lib/auth/session";
 import { getActiveOrganization } from "@/lib/auth/organization";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
-import { getOrgNavPermissions } from "@/lib/actions/role-permissions";
+import { getOrgPermissionConfig } from "@/lib/auth/permissions";
 import { getOrganizationSubscription, getPlatformAdminFlag } from "@/lib/actions/billing";
 import { getAppMode } from "@/lib/marketplace/actions";
 import {
@@ -42,13 +42,14 @@ export default async function AppLayout({
   if (!org) {
     redirect("/onboarding");
   }
-  const [overrides, billing, isPlatformAdmin, linkedStaff, appMode] = await Promise.all([
-    getOrgNavPermissions(),
+  const [permConfig, billing, isPlatformAdmin, linkedStaff, appMode] = await Promise.all([
+    getOrgPermissionConfig(),
     getOrganizationSubscription(),
     getPlatformAdminFlag(),
     getLinkedStaffProfile().catch(() => null),
     getAppMode(),
   ]);
+  const overrides = permConfig.nav;
   const locked = billing?.snapshot.phase === "locked";
   const hasLifetimeAccess =
     billing?.snapshot.phase === "lifetime" ||

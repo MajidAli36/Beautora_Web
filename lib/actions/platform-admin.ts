@@ -1,31 +1,33 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import {
   classifyAuthMetadata,
   type AuthAccountKind,
 } from "@/lib/auth/email-guards";
+import { getSession } from "@/lib/auth/session";
 import {
   isPlatformAdminEmail,
   resolveSubscription,
   SUBSCRIPTION,
   type SubscriptionPhase,
 } from "@/lib/billing/subscription";
+import { orgSubscriptionCacheTag } from "@/lib/billing/enforce";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
 import type { BillingPaymentRow } from "@/lib/actions/billing";
 import type { User } from "@supabase/supabase-js";
 
 async function requirePlatformAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSession();
   if (!user || !isPlatformAdminEmail(user.email)) {
     throw new Error("Platform admin only");
   }
   return user;
+}
+
+function invalidateOrgSubscription(organizationId: string) {
+  updateTag(orgSubscriptionCacheTag(organizationId));
 }
 
 export type PlatformStoreRow = {
@@ -517,6 +519,7 @@ export async function setPlatformStoreEnabled(input: {
     }
   }
 
+  invalidateOrgSubscription(input.organizationId);
   revalidatePath("/platform");
   revalidatePath("/billing");
   revalidatePath("/dashboard");
@@ -579,6 +582,7 @@ export async function setPlatformStoreLifetimeAccess(input: {
     if (error) return { error: error.message };
   }
 
+  invalidateOrgSubscription(input.organizationId);
   revalidatePath("/platform");
   revalidatePath("/billing");
   revalidatePath("/dashboard");

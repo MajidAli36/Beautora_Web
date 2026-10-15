@@ -1,5 +1,7 @@
+import { cache } from "react";
+import { getSession } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth/organization";
+import { getActiveOrganization } from "@/lib/auth/organization";
 
 export type LinkedStaffProfile = {
   id: string;
@@ -11,55 +13,51 @@ export type LinkedStaffProfile = {
 /**
  * Resolve the salon staff profile for the signed-in user.
  * Match by member_id when set, otherwise by email (same rule as Staff hub logins).
+ * Cached once per request — member + email lookups run in parallel (one RTT).
  */
-export async function getLinkedStaffProfile(): Promise<LinkedStaffProfile | null> {
-  const org = await requireOrganization();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+export const getLinkedStaffProfile = cache(
+  async (): Promise<LinkedStaffProfile | null> => {
+    const org = await getActiveOrganization();
+    if (!org) return null;
 
-  const email = user.email?.trim().toLowerCase() ?? "";
+    const user = await getSession();
+    if (!user) return null;
 
-  const { data: byMember } = await supabase
-    .from("staff")
-    .select("id, full_name, email, job_title")
-    .eq("organization_id", org.organizationId)
-    .eq("member_id", user.id)
-    .is("deleted_at", null)
-    .maybeSingle();
+    const supabase = await createClient();
+    const email = user.email?.trim().toLowerCase() ?? "";
 
-  if (byMember) {
+    const [byMemberRes, byEmailRes] = await Promise.all([
+      supabase
+        .from("staff")
+        .select("id, full_name, email, job_title")
+        .eq("organization_id", org.organizationId)
+        .eq("member_id", user.id)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      email
+        ? supabase
+            .from("staff")
+            .select("id, full_name, email, job_title")
+            .eq("organization_id", org.organizationId)
+            .ilike("email", email)
+            .is("deleted_at", null)
+            .eq("is_active", true)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const hit = byMemberRes.data ?? byEmailRes.data;
+    if (!hit) return null;
+
     return {
-      id: byMember.id,
-      fullName: byMember.full_name,
-      email: byMember.email,
-      jobTitle: byMember.job_title,
+      id: hit.id,
+      fullName: hit.full_name,
+      email: hit.email,
+      jobTitle: hit.job_title,
     };
   }
-
-  if (!email) return null;
-
-  const { data: byEmail } = await supabase
-    .from("staff")
-    .select("id, full_name, email, job_title")
-    .eq("organization_id", org.organizationId)
-    .ilike("email", email)
-    .is("deleted_at", null)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-
-  if (!byEmail) return null;
-
-  return {
-    id: byEmail.id,
-    fullName: byEmail.full_name,
-    email: byEmail.email,
-    jobTitle: byEmail.job_title,
-  };
-}
+);
 
 export function isOwnStaffDashboardPath(
   pathname: string,

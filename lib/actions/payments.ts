@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit/log";
 import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
+import { revalidateSales } from "@/lib/cache/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { roundMoney } from "@/lib/sales/calculate";
 import {
@@ -16,14 +17,8 @@ import { endOfLocalDay, startOfLocalDay } from "@/lib/dates/local";
 import type { ActionResult, PaymentMethod } from "@/types/commerce";
 
 function revalidatePaymentPaths(saleId: string, customerId?: string | null) {
-  revalidatePath("/sales");
-  revalidatePath(`/sales/${saleId}`);
-  revalidatePath("/reports");
-  revalidatePath("/finances");
-  revalidatePath("/dashboard");
-  revalidatePath("/customers");
+  revalidateSales(saleId, customerId);
   if (customerId) {
-    revalidatePath(`/customers/${customerId}`);
     revalidatePath(`/customers/${customerId}/statement`);
   }
 }
@@ -39,9 +34,8 @@ export async function receiveSalePayment(input: {
 }): Promise<ActionResult & { changeGiven?: number; amountDue?: number }> {
   const org = await requireAction("pos.sell");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { getSession } = await import("@/lib/auth/session");
+  const user = await getSession();
 
   const { data: sale, error: saleErr } = await supabase
     .from("sales")
@@ -202,9 +196,8 @@ export async function receiveCustomerAccountPayment(input: {
 }): Promise<ActionResult> {
   const org = await requireAction("pos.sell");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { getSession } = await import("@/lib/auth/session");
+  const user = await getSession();
 
   const amount = roundMoney(input.amount);
   if (!(amount > 0)) return { error: "Payment amount must be greater than zero" };

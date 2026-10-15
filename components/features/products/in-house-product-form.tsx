@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createProduct } from "@/lib/actions/products";
 import { useActionToast } from "@/hooks/use-action-toast";
 import { Button } from "@/components/ui/button";
@@ -31,8 +32,14 @@ type PayMode = "all" | "each";
  * - Pieces: razors etc. counted 1:1
  */
 export function InHouseProductForm({ categories }: { categories: ProductCategory[] }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(createProduct, {} as ActionResult);
-  useActionToast(state, { successMessage: "In-house product added." });
+  useActionToast(state, {
+    successMessage: "In-house product added.",
+    onSuccess: () => {
+      window.setTimeout(() => router.refresh(), 200);
+    },
+  });
 
   const [trackMode, setTrackMode] = useState<TrackMode>("bottles");
   const [measureMode, setMeasureMode] = useState<string>("ml");

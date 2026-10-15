@@ -221,7 +221,9 @@ export async function getQueueByDate(date?: string, filters?: { staffId?: string
 
   let query = supabase
     .from("queue_tokens")
-    .select("*")
+    .select(
+      "id, token_number, token_date, customer_id, appointment_id, customer_name, staff_id, chair_id, chair, status, issued_at, called_at, completed_at, device_id, created_at"
+    )
     .eq("organization_id", org.organizationId)
     .eq("token_date", tokenDate)
     .order("token_number");
@@ -241,24 +243,19 @@ export async function getQueueByDate(date?: string, filters?: { staffId?: string
   const customerMap: Record<string, { phone: string | null; email: string | null }> = {};
   const staffMap: Record<string, { id: string; full_name: string }> = {};
 
-  if (customerIds.length > 0) {
-    const { data: customers } = await supabase
-      .from("customers")
-      .select("id, phone, email")
-      .in("id", customerIds);
-    for (const c of customers ?? []) {
-      customerMap[c.id] = { phone: c.phone, email: c.email };
-    }
+  const [customersRes, staffRes] = await Promise.all([
+    customerIds.length
+      ? supabase.from("customers").select("id, phone, email").in("id", customerIds)
+      : Promise.resolve({ data: [] as { id: string; phone: string | null; email: string | null }[] }),
+    staffIds.length
+      ? supabase.from("staff").select("id, full_name").in("id", staffIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+  ]);
+  for (const c of customersRes.data ?? []) {
+    customerMap[c.id] = { phone: c.phone, email: c.email };
   }
-
-  if (staffIds.length > 0) {
-    const { data: staff } = await supabase
-      .from("staff")
-      .select("id, full_name")
-      .in("id", staffIds);
-    for (const s of staff ?? []) {
-      staffMap[s.id] = { id: s.id, full_name: s.full_name };
-    }
+  for (const s of staffRes.data ?? []) {
+    staffMap[s.id] = { id: s.id, full_name: s.full_name };
   }
 
   return rows.map((row) => {

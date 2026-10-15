@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { adjustInventory, deleteProduct, deleteProductCategory } from "@/lib/actions/products";
 import { useActionToast } from "@/hooks/use-action-toast";
@@ -58,8 +59,14 @@ export function DeleteProductCategoryButton({ id, name }: { id: string; name?: s
 }
 
 export function InventoryAdjustForm({ products }: { products: { id: string; name: string; stock_quantity: number }[] }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(adjustInventory, {} as ActionResult);
-  useActionToast(state, { successMessage: "Inventory updated." });
+  useActionToast(state, {
+    successMessage: state?.message || "Inventory updated — quantity saved.",
+    onSuccess: () => {
+      window.setTimeout(() => router.refresh(), 150);
+    },
+  });
   if (products.length === 0) return null;
 
   return (

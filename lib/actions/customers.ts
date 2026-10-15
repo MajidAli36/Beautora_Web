@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
+import { revalidateCustomers } from "@/lib/cache/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/types/commerce";
@@ -178,8 +179,7 @@ export async function createCustomer(
     return { error: result.error ?? "Could not create customer" };
   }
 
-  revalidatePath("/customers");
-  revalidatePath("/pos");
+  revalidateCustomers();
   redirect(`/customers/${result.customerId}`);
 }
 
@@ -214,8 +214,7 @@ export async function createCustomerInline(
     return { error: result.error ?? "Could not create customer" };
   }
 
-  revalidatePath("/customers");
-  revalidatePath("/pos");
+  revalidateCustomers();
   return { success: true, customerId: result.customerId };
 }
 
@@ -249,40 +248,65 @@ export async function getCustomersDirectory(search?: string): Promise<{
   >();
 
   if (customerIds.length > 0) {
-    const chunks: string[][] = [];
-    for (let i = 0; i < customerIds.length; i += 200) {
-      chunks.push(customerIds.slice(i, i + 200));
-    }
-    const salesChunks = await Promise.all(
-      chunks.map((chunk) =>
-        supabase
-          .from("sales")
-          .select("customer_id, total, completed_at")
-          .eq("organization_id", org.organizationId)
-          .in("status", ["COMPLETED", "AMENDED"])
-          .is("deleted_at", null)
-          .in("customer_id", chunk)
-      )
+    const lookback = new Date();
+    lookback.setFullYear(lookback.getFullYear() - 2);
+    const lookbackIso = lookback.toISOString();
+
+    // Prefer SQL aggregate RPC (one round-trip). Fall back to chunked scans if not migrated yet.
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc(
+      "customer_directory_stats",
+      {
+        p_organization_id: org.organizationId,
+        p_customer_ids: customerIds,
+        p_since: lookbackIso,
+      }
     );
-    for (const { data: sales } of salesChunks) {
-      for (const sale of sales ?? []) {
-        const cid = sale.customer_id as string;
-        if (!cid) continue;
-        const prev = byCustomer.get(cid) ?? {
-          totalSpent: 0,
-          visitCount: 0,
-          lastVisitAt: null as string | null,
-        };
-        prev.totalSpent += Number(sale.total) || 0;
-        prev.visitCount += 1;
-        const completed = sale.completed_at as string | null;
-        if (
-          completed &&
-          (!prev.lastVisitAt || new Date(completed) > new Date(prev.lastVisitAt))
-        ) {
-          prev.lastVisitAt = completed;
+
+    if (!rpcErr && Array.isArray(rpcRows)) {
+      for (const row of rpcRows) {
+        byCustomer.set(row.customer_id as string, {
+          totalSpent: Number(row.total_spent) || 0,
+          visitCount: Number(row.visit_count) || 0,
+          lastVisitAt: (row.last_visit_at as string | null) ?? null,
+        });
+      }
+    } else {
+      const chunks: string[][] = [];
+      for (let i = 0; i < customerIds.length; i += 200) {
+        chunks.push(customerIds.slice(i, i + 200));
+      }
+      const salesChunks = await Promise.all(
+        chunks.map((chunk) =>
+          supabase
+            .from("sales")
+            .select("customer_id, total, completed_at")
+            .eq("organization_id", org.organizationId)
+            .in("status", ["COMPLETED", "AMENDED"])
+            .is("deleted_at", null)
+            .in("customer_id", chunk)
+            .gte("completed_at", lookbackIso)
+        )
+      );
+      for (const { data: sales } of salesChunks) {
+        for (const sale of sales ?? []) {
+          const cid = sale.customer_id as string;
+          if (!cid) continue;
+          const prev = byCustomer.get(cid) ?? {
+            totalSpent: 0,
+            visitCount: 0,
+            lastVisitAt: null as string | null,
+          };
+          prev.totalSpent += Number(sale.total) || 0;
+          prev.visitCount += 1;
+          const completed = sale.completed_at as string | null;
+          if (
+            completed &&
+            (!prev.lastVisitAt || new Date(completed) > new Date(prev.lastVisitAt))
+          ) {
+            prev.lastVisitAt = completed;
+          }
+          byCustomer.set(cid, prev);
         }
-        byCustomer.set(cid, prev);
       }
     }
   }
@@ -343,9 +367,7 @@ export async function updateCustomer(
   });
   if (result.error) return { error: result.error };
 
-  revalidatePath("/customers");
-  revalidatePath(`/customers/${id}`);
-  revalidatePath("/pos");
+  revalidateCustomers(id);
   return { success: true };
 }
 
@@ -416,9 +438,7 @@ export async function deleteCustomerInline(id: string): Promise<ActionResult> {
 
   if (result.error) return { error: result.error };
 
-  revalidatePath("/customers");
-  revalidatePath(`/customers/${id}`);
-  revalidatePath("/pos");
+  revalidateCustomers(id);
   return { success: true };
 }
 
@@ -436,7 +456,7 @@ export async function getCustomers(search?: string) {
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(search?.trim() ? 500 : 300);
 
   const raw = search?.trim() ?? "";
   if (raw) {
@@ -470,7 +490,9 @@ export async function getCustomer(id: string) {
 
   const { data, error } = await supabase
     .from("customers")
-    .select("*")
+    .select(
+      "id, organization_id, first_name, last_name, phone, email, notes, tags, deleted_at, deleted_by, deleted_by_role, created_by, updated_by, created_at, updated_at"
+    )
     .eq("id", id)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
@@ -513,7 +535,7 @@ export async function getCustomerHistory(customerId: string): Promise<CustomerHi
   const customer = await getCustomer(customerId);
   if (!customer) return null;
 
-  const [appointmentsRes, salesRes, apptCountRes, salesAggRes] = await Promise.all([
+  const [appointmentsRes, salesRes, apptCountRes, lifetimeRpc] = await Promise.all([
     supabase
       .from("appointments")
       .select(`
@@ -541,28 +563,34 @@ export async function getCustomerHistory(customerId: string): Promise<CustomerHi
       .select("id", { count: "exact", head: true })
       .eq("organization_id", org.organizationId)
       .eq("customer_id", customerId),
-    supabase
-      .from("sales")
-      .select("total, status")
-      .eq("organization_id", org.organizationId)
-      .eq("customer_id", customerId)
-      .in("status", ["COMPLETED", "AMENDED"])
-      .is("deleted_at", null),
+    supabase.rpc("customer_lifetime_stats", {
+      p_organization_id: org.organizationId,
+      p_customer_id: customerId,
+    }),
   ]);
 
   const appointments = appointmentsRes.data ?? [];
   const sales = salesRes.data ?? [];
-  const completedSales = (salesAggRes.data ?? []).filter(
-    (s) => s.status === "COMPLETED" || s.status === "AMENDED"
-  );
-  const totalSpent = completedSales.reduce((sum, s) => sum + Number(s.total), 0);
+
+  let totalSpent = 0;
+  let visitCount = 0;
+  if (!lifetimeRpc.error && Array.isArray(lifetimeRpc.data) && lifetimeRpc.data[0]) {
+    totalSpent = Number(lifetimeRpc.data[0].total_spent) || 0;
+    visitCount = Number(lifetimeRpc.data[0].visit_count) || 0;
+  } else {
+    const completed = sales.filter(
+      (s) => s.status === "COMPLETED" || s.status === "AMENDED"
+    );
+    totalSpent = completed.reduce((sum, s) => sum + Number(s.total), 0);
+    visitCount = completed.length;
+  }
 
   return {
     appointments: appointments as unknown as CustomerHistory["appointments"],
     sales: sales as unknown as CustomerHistory["sales"],
     stats: {
       totalSpent,
-      visitCount: completedSales.length,
+      visitCount,
       appointmentCount: apptCountRes.count ?? appointments.length,
     },
   };

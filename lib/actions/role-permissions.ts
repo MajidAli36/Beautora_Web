@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import {
   getOrgPermissionConfig,
+  orgPermissionsCacheTag,
   requireAction,
 } from "@/lib/auth/permissions";
 import {
@@ -181,6 +182,7 @@ export async function updateRoleNavPermission(
 
   if (error) return { error: error.message };
 
+  updateTag(orgPermissionsCacheTag(org.organizationId));
   revalidatePath("/staff");
   revalidatePath("/", "layout");
   return { success: true };
@@ -243,6 +245,7 @@ export async function updateRoleActionPermission(
 
   if (error) return { error: error.message };
 
+  updateTag(orgPermissionsCacheTag(org.organizationId));
   revalidatePath("/staff");
   revalidatePath("/", "layout");
   return { success: true };
@@ -280,6 +283,7 @@ export async function resetRoleNavPermissions(
 
   if (error) return { error: error.message };
 
+  updateTag(orgPermissionsCacheTag(org.organizationId));
   revalidatePath("/staff");
   revalidatePath("/", "layout");
   return { success: true };

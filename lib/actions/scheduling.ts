@@ -44,7 +44,13 @@ const weeklyScheduleSchema = z.object({
   days: z.array(weeklyDaySchema).length(7),
 });
 
-async function fetchSlotData(organizationId: string, useAdmin = false, onlineOnly = false) {
+async function fetchSlotData(
+  organizationId: string,
+  useAdmin = false,
+  onlineOnly = false,
+  /** Local YYYY-MM-DD — when set, only load that day’s appointments (not full history). */
+  focusDate?: string
+) {
   const admin = useAdmin ? tryCreateAdminClient() : null;
   const client = admin ?? (await createClient());
 
@@ -60,31 +66,46 @@ async function fetchSlotData(organizationId: string, useAdmin = false, onlineOnl
     staffQuery = staffQuery.eq("online_booking_enabled", true);
   }
 
-  const [{ data: staff }, { data: schedules }, { data: appointments }, { data: org }] =
-    await Promise.all([
-      staffQuery,
-      client.from("staff_schedules").select("*").eq("organization_id", organizationId),
-      client
-        .from("appointments")
-        .select("id, staff_id, scheduled_at, duration_minutes, status")
-        .eq("organization_id", organizationId),
-      client
-        .from("organizations")
-        .select("booking_slot_minutes, booking_days_ahead, business_hours")
-        .eq("id", organizationId)
-        .single(),
-    ]);
+  const { data: org } = await client
+    .from("organizations")
+    .select("booking_slot_minutes, booking_days_ahead, business_hours")
+    .eq("id", organizationId)
+    .single();
 
-  const activeAppointments = (appointments ?? []).filter(
-    (a) => !["CANCELLED", "NO_SHOW"].includes(a.status)
+  const daysAhead = org?.booking_days_ahead ?? 30;
+  const { startOfLocalDay, endOfLocalDay, addLocalDays, getLocalDateString } = await import(
+    "@/lib/dates/local"
   );
+  const today = getLocalDateString();
+  const rangeStart = focusDate
+    ? startOfLocalDay(focusDate)
+    : startOfLocalDay(today);
+  const rangeEnd = focusDate
+    ? endOfLocalDay(focusDate)
+    : endOfLocalDay(addLocalDays(today, daysAhead));
+
+  const [{ data: staff }, { data: schedules }, { data: appointments }] = await Promise.all([
+    staffQuery,
+    client
+      .from("staff_schedules")
+      .select("id, staff_id, day_of_week, start_time, end_time")
+      .eq("organization_id", organizationId),
+    client
+      .from("appointments")
+      .select("id, staff_id, scheduled_at, duration_minutes, status")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .gte("scheduled_at", rangeStart.toISOString())
+      .lte("scheduled_at", rangeEnd.toISOString())
+      .not("status", "in", '("CANCELLED","NO_SHOW")'),
+  ]);
 
   return {
     staff: staff ?? [],
     schedules: schedules ?? [],
-    appointments: activeAppointments,
+    appointments: appointments ?? [],
     slotMinutes: org?.booking_slot_minutes ?? 30,
-    daysAhead: org?.booking_days_ahead ?? 30,
+    daysAhead,
     businessHours: parseBusinessHours(org?.business_hours),
   };
 }
@@ -117,7 +138,7 @@ export async function getAvailableSlots(params: {
     duration = sumServiceDuration(services ?? [], duration);
   }
 
-  const data = await fetchSlotData(org.organizationId);
+  const data = await fetchSlotData(org.organizationId, false, false, params.date);
   return computeAvailableSlotsDetailed({
     date: params.date,
     durationMinutes: duration,
@@ -168,7 +189,7 @@ export async function getPublicAvailableSlots(
     duration = sumServiceDuration(services ?? [], 30);
   }
 
-  const data = await fetchSlotData(org.id, true, true);
+  const data = await fetchSlotData(org.id, true, true, date);
   return computeAvailableSlots({
     date,
     durationMinutes: duration,
@@ -196,7 +217,8 @@ export async function validateAppointmentSlot(params: {
   const data = await fetchSlotData(
     params.organizationId,
     params.useAdmin,
-    params.onlineOnly ?? false
+    params.onlineOnly ?? false,
+    date
   );
 
   const slots = computeAvailableSlots({

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateAppointments, revalidateCustomers } from "@/lib/cache/revalidate";
 import { redirect } from "next/navigation";
 import { writeAuditLog } from "@/lib/audit/log";
 import { queueDeviceCommand, findDeviceByType } from "@/lib/devices/helpers";
@@ -217,11 +218,9 @@ export async function createAppointment(
     }
   }
 
-  revalidatePath("/appointments");
+  revalidateAppointments();
   revalidatePath("/appointments/new");
-  revalidatePath("/finances");
-  revalidatePath("/pos");
-  revalidatePath("/customers");
+  revalidateCustomers();
   redirect("/appointments");
 }
 
@@ -283,8 +282,7 @@ export async function checkInAppointment(appointmentId: string): Promise<ActionR
     });
   }
 
-  revalidatePath("/appointments");
-  revalidatePath("/queue");
+  revalidateAppointments();
   return { success: true, tokenNumber: token?.token_number ?? tokenNumber };
 }
 
@@ -351,8 +349,7 @@ export async function recordManualAppointmentPayment(
     await queueOpenCashDrawer(org.organizationId, { reason: "manual_payment" });
   }
 
-  revalidatePath("/appointments");
-  revalidatePath("/finances");
+  revalidateAppointments();
   return { success: true };
 }
 
@@ -435,10 +432,9 @@ export async function getAppointmentsForPos(): Promise<PosAppointment[]> {
   const org = await requireOrganization();
   const supabase = await createClient();
 
-  const [{ data: rows }, { data: depositRows }, { data: billedSales }] = await Promise.all([
-    supabase
-      .from("appointments")
-      .select(`
+  const { data: rows } = await supabase
+    .from("appointments")
+    .select(`
         id,
         customer_id,
         staff_id,
@@ -449,45 +445,54 @@ export async function getAppointmentsForPos(): Promise<PosAppointment[]> {
         staff:staff(full_name),
         services:appointment_services(service_id, service_name, price)
       `)
-      .eq("organization_id", org.organizationId)
-      .is("deleted_at", null)
-      .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
-      .order("scheduled_at"),
-    supabase
-      .from("appointment_deposits")
-      .select("appointment_id, amount")
-      .eq("organization_id", org.organizationId)
-      .eq("status", "APPROVED")
-      .is("applied_to_sale_id", null),
-    // Safety net: hide appointments already invoiced even if status wasn't closed.
-    supabase
-      .from("sales")
-      .select("appointment_id")
-      .eq("organization_id", org.organizationId)
-      .not("appointment_id", "is", null)
-      .in("status", ["COMPLETED", "AMENDED", "REFUNDED"]),
-  ]);
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
+    .order("scheduled_at")
+    .limit(200);
 
-  const billedIds = new Set(
-    (billedSales ?? [])
-      .map((s) => s.appointment_id as string | null)
-      .filter((id): id is string => Boolean(id))
-  );
-
-  // Heal stuck open appointments that already have an invoice/sale.
-  const stuckIds = (rows ?? []).map((r) => r.id).filter((id) => billedIds.has(id));
-  if (stuckIds.length > 0) {
-    await supabase
-      .from("appointments")
-      .update({ status: "COMPLETED", updated_at: new Date().toISOString() })
-      .eq("organization_id", org.organizationId)
-      .in("id", stuckIds)
-      .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")');
-  }
-
+  const openIds = (rows ?? []).map((r) => r.id);
   const depositMap: Record<string, number> = {};
-  for (const d of depositRows ?? []) {
-    depositMap[d.appointment_id] = (depositMap[d.appointment_id] ?? 0) + Number(d.amount);
+  let billedIds = new Set<string>();
+
+  if (openIds.length) {
+    const [{ data: billedSales }, { data: depositRows }] = await Promise.all([
+      supabase
+        .from("sales")
+        .select("appointment_id")
+        .eq("organization_id", org.organizationId)
+        .in("appointment_id", openIds)
+        .is("deleted_at", null)
+        .in("status", ["COMPLETED", "AMENDED", "REFUNDED"]),
+      supabase
+        .from("appointment_deposits")
+        .select("appointment_id, amount")
+        .eq("organization_id", org.organizationId)
+        .eq("status", "APPROVED")
+        .is("applied_to_sale_id", null)
+        .in("appointment_id", openIds),
+    ]);
+
+    billedIds = new Set(
+      (billedSales ?? [])
+        .map((s) => s.appointment_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    );
+
+    for (const d of depositRows ?? []) {
+      depositMap[d.appointment_id] =
+        (depositMap[d.appointment_id] ?? 0) + Number(d.amount);
+    }
+
+    const stuckIds = openIds.filter((id) => billedIds.has(id));
+    if (stuckIds.length > 0) {
+      void supabase
+        .from("appointments")
+        .update({ status: "COMPLETED", updated_at: new Date().toISOString() })
+        .eq("organization_id", org.organizationId)
+        .in("id", stuckIds)
+        .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")');
+    }
   }
 
   return sortPosAppointments(
@@ -503,22 +508,8 @@ export async function getCustomerAdvanceAppointments(
   const org = await requireOrganization();
   const supabase = await createClient();
 
-  const { data: deposits } = await supabase
-    .from("appointment_deposits")
-    .select("appointment_id, amount")
-    .eq("organization_id", org.organizationId)
-    .eq("status", "APPROVED")
-    .is("applied_to_sale_id", null);
-
-  if (!deposits?.length) return [];
-
-  const depositMap: Record<string, number> = {};
-  for (const d of deposits) {
-    depositMap[d.appointment_id] = (depositMap[d.appointment_id] ?? 0) + Number(d.amount);
-  }
-
-  const ids = Object.keys(depositMap);
-  const { data } = await supabase
+  // Customer open appointments first — then deposits only for those IDs.
+  const { data: openAppts } = await supabase
     .from("appointments")
     .select(`
       id,
@@ -533,13 +524,32 @@ export async function getCustomerAdvanceAppointments(
     `)
     .eq("organization_id", org.organizationId)
     .eq("customer_id", customerId)
-    .in("id", ids)
     .is("deleted_at", null)
     .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
-    .order("scheduled_at", { ascending: false });
+    .order("scheduled_at", { ascending: false })
+    .limit(50);
+
+  const ids = (openAppts ?? []).map((a) => a.id);
+  if (!ids.length) return [];
+
+  const { data: deposits } = await supabase
+    .from("appointment_deposits")
+    .select("appointment_id, amount")
+    .eq("organization_id", org.organizationId)
+    .eq("status", "APPROVED")
+    .is("applied_to_sale_id", null)
+    .in("appointment_id", ids);
+
+  const depositMap: Record<string, number> = {};
+  for (const d of deposits ?? []) {
+    depositMap[d.appointment_id] =
+      (depositMap[d.appointment_id] ?? 0) + Number(d.amount);
+  }
 
   return sortPosAppointments(
-    (data ?? []).map((row) => mapPosAppointmentRow(row, depositMap))
+    (openAppts ?? [])
+      .filter((row) => (depositMap[row.id] ?? 0) > 0)
+      .map((row) => mapPosAppointmentRow(row, depositMap))
   );
 }
 
@@ -580,13 +590,15 @@ export async function getAppointments(
   let query = supabase
     .from("appointments")
     .select(`
-      *,
+      id, organization_id, customer_id, staff_id, scheduled_at, status, source,
+      notes, booking_number, created_at, updated_at, deleted_at,
       customer:customers(id, first_name, last_name, phone, email),
       staff:staff(id, full_name),
       services:appointment_services(service_name, price, duration_minutes)
     `)
     .eq("organization_id", org.organizationId)
-    .order("scheduled_at", { ascending: options?.statuses ? false : true });
+    .order("scheduled_at", { ascending: options?.statuses ? false : true })
+    .limit(500);
 
   if (!options?.includeSoftDeleted) {
     query = query.is("deleted_at", null);
@@ -1116,10 +1128,8 @@ export async function markAppointmentNoShow(appointmentId: string): Promise<Acti
     },
   });
 
-  revalidatePath("/appointments");
+  revalidateAppointments();
   revalidatePath("/online-booking");
-  revalidatePath("/pos");
-  revalidatePath("/reports");
   return { success: true };
 }
 
@@ -1284,9 +1294,8 @@ export async function approveAppointmentDeposit(depositId: string): Promise<Acti
 
   await syncAppointmentAfterDepositChange(deposit.appointment_id, org.organizationId);
 
-  revalidatePath("/appointments");
+  revalidateAppointments();
   revalidatePath("/online-booking");
-  revalidatePath("/finances");
   return { success: true };
 }
 

@@ -52,6 +52,7 @@ export default async function InHouseProductDetailPage({
     getProductCategories(),
   ]);
   const canManage = caps.canManage;
+  const canEdit = caps.canEdit;
 
   if (!detail) notFound();
 
@@ -195,7 +196,7 @@ export default async function InHouseProductDetailPage({
           </CardContent>
         </Card>
 
-        {canManage ? (
+        {canEdit ? (
           <Card>
             <CardHeader>
               <CardTitle>Restock / adjust</CardTitle>

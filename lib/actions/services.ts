@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { checkAction, requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
+import { revalidateServices } from "@/lib/cache/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/actions/customers";
 
@@ -53,9 +54,8 @@ export async function createCategory(
     extraUpdate: { sort_order: parsed.data.sort_order },
   });
   if (restored) {
-    revalidatePath("/services");
-    revalidatePath("/");
-    revalidatePath("/book");
+    revalidateServices();
+  revalidatePath("/book");
     return { success: true };
   }
 
@@ -75,17 +75,15 @@ export async function createCategory(
         extraUpdate: { sort_order: parsed.data.sort_order },
       });
       if (again) {
-        revalidatePath("/services");
-        revalidatePath("/");
-        revalidatePath("/book");
+        revalidateServices();
+  revalidatePath("/book");
         return { success: true };
       }
       return { error: "A category with this name already exists" };
     }
     return { error: error.message };
   }
-  revalidatePath("/services");
-  revalidatePath("/");
+  revalidateServices();
   revalidatePath("/book");
   return { success: true };
 }
@@ -115,8 +113,7 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
     before: row as unknown as Record<string, unknown>,
   });
   if (result.error) return { error: result.error };
-  revalidatePath("/services");
-  revalidatePath("/");
+  revalidateServices();
   revalidatePath("/book");
   return { success: true };
 }
@@ -158,10 +155,8 @@ export async function createService(
     },
   });
   if (restored) {
-    revalidatePath("/services");
-    revalidatePath("/");
-    revalidatePath("/book");
-    revalidatePath("/pos");
+    revalidateServices();
+  revalidatePath("/book");
     return { success: true };
   }
 
@@ -195,10 +190,8 @@ export async function createService(
         },
       });
       if (again) {
-        revalidatePath("/services");
-        revalidatePath("/");
-        revalidatePath("/book");
-        revalidatePath("/pos");
+        revalidateServices();
+  revalidatePath("/book");
         return { success: true };
       }
       return { error: "A service with this name already exists" };
@@ -206,10 +199,8 @@ export async function createService(
     return { error: error?.message ?? "Failed to create service" };
   }
 
-  revalidatePath("/services");
-  revalidatePath("/");
+  revalidateServices();
   revalidatePath("/book");
-  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -254,10 +245,8 @@ export async function updateService(
   if (error) return { error: error.message };
   if (!updated) return { error: "Service not found or already deleted" };
 
-  revalidatePath("/services");
-  revalidatePath("/");
+  revalidateServices();
   revalidatePath("/book");
-  revalidatePath("/pos");
   return { success: true };
 }
 
@@ -282,9 +271,8 @@ export async function updateServiceUsageRecipe(
   const usageResult = await replaceServiceUsageRecipe(org.organizationId, serviceId, usage);
   if (usageResult.error) return { error: usageResult.error };
 
-  revalidatePath("/services");
+  revalidateServices();
   revalidatePath("/in-house");
-  revalidatePath("/");
   return { success: true };
 }
 
@@ -577,7 +565,9 @@ export async function getServicesWithUsage() {
   const [{ data: services, error }, { data: usageRows, error: usageErr }] = await Promise.all([
     supabase
       .from("services")
-      .select("*, category:service_categories(id, name)")
+      .select(
+        "id, organization_id, category_id, name, description, duration_minutes, price, is_active, created_at, updated_at, deleted_at, category:service_categories(id, name)"
+      )
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null)
       .order("name"),
@@ -636,8 +626,7 @@ export async function deleteService(id: string): Promise<ActionResult> {
     extraPatch: { is_active: false },
   });
   if (result.error) return { error: result.error };
-  revalidatePath("/services");
-  revalidatePath("/");
+  revalidateServices();
   revalidatePath("/book");
   return { success: true };
 }
@@ -730,8 +719,7 @@ export async function createPackage(
     if (itemsError) return { error: itemsError.message };
   }
 
-  revalidatePath("/services");
-  revalidatePath("/");
+  revalidateServices();
   revalidatePath("/book");
   return { success: true };
 }
@@ -762,8 +750,7 @@ export async function deletePackage(id: string): Promise<ActionResult> {
     extraPatch: { is_active: false },
   });
   if (result.error) return { error: result.error };
-  revalidatePath("/services");
-  revalidatePath("/");
+  revalidateServices();
   revalidatePath("/book");
   return { success: true };
 }
@@ -774,7 +761,9 @@ export async function getServiceCategories() {
 
   const { data, error } = await supabase
     .from("service_categories")
-    .select("*")
+    .select(
+      "id, organization_id, name, sort_order, deleted_at, deleted_by, deleted_by_role, created_by, updated_by, created_at, updated_at"
+    )
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
     .order("sort_order")
@@ -790,7 +779,9 @@ export async function getServices() {
 
   const { data, error } = await supabase
     .from("services")
-    .select("*, category:service_categories(id, name)")
+    .select(
+      "id, organization_id, category_id, name, description, duration_minutes, price, is_active, created_at, updated_at, deleted_at, category:service_categories(id, name)"
+    )
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
     .order("name");

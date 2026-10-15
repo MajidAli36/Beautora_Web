@@ -1,19 +1,23 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization, getActiveOrganization } from "@/lib/auth/organization";
 import { hasMinimumRole } from "@/lib/permissions/roles";
 import {
   isPlatformAdminEmail,
   resolveBillingPlanFromCountry,
-  resolveSubscription,
   SUBSCRIPTION,
   type BillingPlan,
   type SubscriptionSnapshot,
 } from "@/lib/billing/subscription";
+import {
+  getOrgSubscriptionSnapshot,
+  orgSubscriptionCacheTag,
+} from "@/lib/billing/enforce";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import {
   getSubscriptionInvoiceSignedUrl,
   uploadSubscriptionInvoice,
@@ -67,48 +71,14 @@ export async function getOrganizationSubscription(): Promise<{
   const org = await getActiveOrganization();
   if (!org) return null;
 
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("organizations")
-    .select(
-      "id, name, country, trial_ends_at, subscription_ends_at, subscription_locked_at, subscription_status, admin_disabled_at, lifetime_access, created_at"
-    )
-    .eq("id", org.organizationId)
-    .single();
-
-  if (!data) return null;
-
-  // Persist locked status when grace has ended
-  const snapshot = resolveSubscription(data);
-  if (snapshot.phase === "lifetime") {
-    if (data.subscription_status !== "lifetime" || data.subscription_locked_at) {
-      await admin
-        .from("organizations")
-        .update({
-          subscription_status: "lifetime",
-          subscription_locked_at: null,
-        })
-        .eq("id", data.id);
-    }
-  } else if (snapshot.phase === "locked" && !data.subscription_locked_at) {
-    await admin
-      .from("organizations")
-      .update({
-        subscription_status: "locked",
-        subscription_locked_at: new Date().toISOString(),
-      })
-      .eq("id", data.id);
-  } else if (snapshot.phase === "grace" && data.subscription_status !== "grace") {
-    await admin
-      .from("organizations")
-      .update({ subscription_status: "grace" })
-      .eq("id", data.id);
-  }
+  // Read-only snapshot (shared with requireAction via getOrgSubscriptionSnapshot)
+  const snapshot = await getOrgSubscriptionSnapshot(org.organizationId);
+  if (!snapshot) return null;
 
   return {
-    orgId: data.id,
-    orgName: data.name,
-    snapshot: resolveSubscription(data),
+    orgId: org.organizationId,
+    orgName: org.organizationName,
+    snapshot,
   };
 }
 
@@ -429,10 +399,7 @@ export async function reviewSubscriptionPayment(input: {
   decision: "approved" | "rejected";
   reviewNotes?: string;
 }): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSession();
   if (!user || !isPlatformAdminEmail(user.email)) {
     return { error: "Only Beautora platform admins can approve payments" };
   }
@@ -538,6 +505,7 @@ export async function reviewSubscriptionPayment(input: {
     console.error("[billing] subscription activated email failed", err);
   }
 
+  updateTag(orgSubscriptionCacheTag(org.id));
   revalidatePath("/platform/subscriptions");
   revalidatePath("/billing");
   revalidatePath("/dashboard");
@@ -545,9 +513,6 @@ export async function reviewSubscriptionPayment(input: {
 }
 
 export async function getPlatformAdminFlag(): Promise<boolean> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSession();
   return isPlatformAdminEmail(user?.email);
 }

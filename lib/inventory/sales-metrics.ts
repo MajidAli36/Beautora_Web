@@ -44,21 +44,23 @@ export type RevenueSplit = {
 export async function getProductSalesBreakdown(
   organizationId: string,
   from?: string,
-  to?: string
+  to?: string,
+  prefetchedSaleIds?: string[]
 ): Promise<ProductSaleRow[]> {
   const supabase = await createClient();
-  const { start, end } = parseLocalDateRange(from, to);
-
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("status", ["COMPLETED", "AMENDED"])
-    .is("deleted_at", null)
-    .gte("completed_at", start.toISOString())
-    .lte("completed_at", end.toISOString());
-
-  const saleIds = (sales ?? []).map((s) => s.id);
+  let saleIds = prefetchedSaleIds;
+  if (!saleIds) {
+    const { start, end } = parseLocalDateRange(from, to);
+    const { data: sales } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("status", ["COMPLETED", "AMENDED"])
+      .is("deleted_at", null)
+      .gte("completed_at", start.toISOString())
+      .lte("completed_at", end.toISOString());
+    saleIds = (sales ?? []).map((s) => s.id);
+  }
   if (!saleIds.length) return [];
 
   const { data: lines } = await supabase
@@ -155,21 +157,23 @@ export async function getProductSalesBreakdown(
 export async function getRevenueSplit(
   organizationId: string,
   from?: string,
-  to?: string
+  to?: string,
+  prefetchedSaleIds?: string[]
 ): Promise<RevenueSplit> {
   const supabase = await createClient();
-  const { start, end } = parseLocalDateRange(from, to);
-
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("status", ["COMPLETED", "AMENDED"])
-    .is("deleted_at", null)
-    .gte("completed_at", start.toISOString())
-    .lte("completed_at", end.toISOString());
-
-  const saleIds = (sales ?? []).map((s) => s.id);
+  let saleIds = prefetchedSaleIds;
+  if (!saleIds) {
+    const { start, end } = parseLocalDateRange(from, to);
+    const { data: sales } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("status", ["COMPLETED", "AMENDED"])
+      .is("deleted_at", null)
+      .gte("completed_at", start.toISOString())
+      .lte("completed_at", end.toISOString());
+    saleIds = (sales ?? []).map((s) => s.id);
+  }
   const empty: RevenueSplit = {
     services: 0,
     products: 0,
@@ -209,20 +213,22 @@ export async function getRevenueSplit(
 export async function getServiceUsageCogs(
   organizationId: string,
   from?: string,
-  to?: string
+  to?: string,
+  prefetchedSaleIds?: string[]
 ): Promise<number> {
   const supabase = await createClient();
-  const { start, end } = parseLocalDateRange(from, to);
-
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("status", ["COMPLETED", "AMENDED", "VOID", "REFUNDED"])
-    .gte("completed_at", start.toISOString())
-    .lte("completed_at", end.toISOString());
-
-  const saleIds = (sales ?? []).map((s) => s.id);
+  let saleIds = prefetchedSaleIds;
+  if (!saleIds) {
+    const { start, end } = parseLocalDateRange(from, to);
+    const { data: sales } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("status", ["COMPLETED", "AMENDED", "VOID", "REFUNDED"])
+      .gte("completed_at", start.toISOString())
+      .lte("completed_at", end.toISOString());
+    saleIds = (sales ?? []).map((s) => s.id);
+  }
   if (!saleIds.length) return 0;
 
   const { data: usageLines } = await supabase
@@ -274,21 +280,23 @@ export async function getServiceUsageCogs(
 export async function getProductSalesMetrics(
   organizationId: string,
   from?: string,
-  to?: string
+  to?: string,
+  prefetchedSaleIds?: string[]
 ): Promise<ProductSalesMetrics> {
   const supabase = await createClient();
-  const { start, end } = parseLocalDateRange(from, to);
-
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("status", ["COMPLETED", "AMENDED"])
-    .is("deleted_at", null)
-    .gte("completed_at", start.toISOString())
-    .lte("completed_at", end.toISOString());
-
-  const saleIds = (sales ?? []).map((s) => s.id);
+  let saleIds = prefetchedSaleIds;
+  if (!saleIds) {
+    const { start, end } = parseLocalDateRange(from, to);
+    const { data: sales } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("status", ["COMPLETED", "AMENDED"])
+      .is("deleted_at", null)
+      .gte("completed_at", start.toISOString())
+      .lte("completed_at", end.toISOString());
+    saleIds = (sales ?? []).map((s) => s.id);
+  }
   if (!saleIds.length) {
     return {
       unitsSold: 0,
@@ -359,17 +367,25 @@ export async function getProductSalesMetrics(
 export async function getInventoryMoneySnapshot(
   organizationId: string,
   from?: string,
-  to?: string
+  to?: string,
+  prefetchedSaleIds?: string[]
 ): Promise<InventoryMoneySnapshot> {
   const supabase = await createClient();
 
   const { data: products } = await supabase
     .from("products")
     .select("cost_price, retail_price, stock_quantity, low_stock_threshold, is_active")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .is("deleted_at", null);
 
   const summary = getInventorySummary(products ?? []);
-  const productSales = await getProductSalesMetrics(organizationId, from, to);
+  const productSales = await getProductSalesMetrics(
+    organizationId,
+    from,
+    to,
+    prefetchedSaleIds
+  );
 
   return {
     inventoryValueAtCost: summary.totalValueAtCost,

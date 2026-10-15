@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
+import { revalidateStaff } from "@/lib/cache/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
 
@@ -117,11 +118,9 @@ export async function createStaff(
         .maybeSingle();
       if (restoreErr) return { error: restoreErr.message };
       if (restored) {
-        revalidatePath("/staff");
-        revalidatePath("/attendance");
-        revalidatePath("/online-booking");
-        revalidatePath("/appointments");
-        revalidatePath("/pos");
+        revalidateStaff();
+  revalidatePath("/attendance");
+  revalidatePath("/pos");
         return { success: true };
       }
     }
@@ -137,10 +136,8 @@ export async function createStaff(
     online_booking_enabled: true,
   });
   if (error) return { error: error.message };
-  revalidatePath("/staff");
+  revalidateStaff();
   revalidatePath("/attendance");
-  revalidatePath("/online-booking");
-  revalidatePath("/appointments");
   revalidatePath("/pos");
   return { success: true };
 }
@@ -167,11 +164,9 @@ export async function setStaffActive(
 
   if (error) return { error: error.message };
   if (!updated) return { error: "Staff not found or already deleted" };
-  revalidatePath("/staff");
+  revalidateStaff();
   revalidatePath("/attendance");
   revalidatePath("/pos");
-  revalidatePath("/appointments");
-  revalidatePath("/online-booking");
   return { success: true };
 }
 
@@ -212,12 +207,9 @@ export async function deleteStaff(staffId: string): Promise<ActionResult> {
 
   if (result.error) return { error: result.error };
 
-  revalidatePath("/staff");
+  revalidateStaff();
   revalidatePath("/attendance");
   revalidatePath("/pos");
-  revalidatePath("/appointments");
-  revalidatePath("/online-booking");
-  revalidatePath("/finances");
   return { success: true };
 }
 
@@ -339,7 +331,7 @@ export async function recordManualAttendance(
     if (error) return { error: error.message };
   }
 
-  revalidatePath("/staff");
+  revalidateStaff();
   revalidatePath("/attendance");
   return { success: true };
 }
@@ -349,7 +341,9 @@ export async function getStaff() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("staff")
-    .select("*")
+    .select(
+      "id, organization_id, full_name, phone, email, job_title, pin_code, is_active, member_id, online_booking_enabled, thumb_id, thumb_enrolled_at, created_at, updated_at, deleted_at"
+    )
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
     .order("full_name");
@@ -439,7 +433,7 @@ export async function enrollStaffThumb(
 
   if (error) return { error: error.message };
   if (!enrolled) return { error: "Staff not found or already deleted" };
-  revalidatePath("/staff");
+  revalidateStaff();
   revalidatePath("/attendance");
   return { success: true };
 }
@@ -457,7 +451,7 @@ export async function removeStaffThumb(staffId: string): Promise<ActionResult> {
     .maybeSingle();
   if (error) return { error: error.message };
   if (!updated) return { error: "Staff not found or already deleted" };
-  revalidatePath("/staff");
+  revalidateStaff();
   revalidatePath("/attendance");
   return { success: true };
 }

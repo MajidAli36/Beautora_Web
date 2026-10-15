@@ -28,7 +28,9 @@ export async function getAuditLogs(limit = 200): Promise<AuditLogRow[]> {
 
   const { data, error } = await supabase
     .from("audit_logs")
-    .select("*")
+    .select(
+      "id, organization_id, user_id, action, entity_type, entity_id, metadata, actor_email, actor_role, created_at"
+    )
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false })
     .limit(limit);

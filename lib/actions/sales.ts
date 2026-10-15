@@ -7,8 +7,16 @@ import { queueDeviceCommand, findDeviceByType } from "@/lib/devices/helpers";
 import { queueOpenCashDrawer } from "@/lib/devices/cash-drawer";
 import { requireAction } from "@/lib/auth/permissions";
 import { requireOrganization } from "@/lib/auth/organization";
+import { getSession } from "@/lib/auth/session";
+import { revalidateCheckout, revalidateProducts, revalidateSales } from "@/lib/cache/revalidate";
 import { createClient } from "@/lib/supabase/server";
-import type { ActionResult, CheckoutPayload, SalePaymentStatus, SaleStatus } from "@/types/commerce";
+import type {
+  ActionResult,
+  CheckoutPayload,
+  PaymentMethod,
+  SalePaymentStatus,
+  SaleStatus,
+} from "@/types/commerce";
 import type { Sale } from "@/types";
 import { hasMinimumRole } from "@/lib/permissions/roles";
 import { calculateInvoiceTotals, roundMoney } from "@/lib/sales/calculate";
@@ -26,7 +34,6 @@ import {
   applyServiceUsageInventory,
   applyUsageOverrides,
   getPackageUnitUsageCosts,
-  getServiceUnitUsageCosts,
   replaceSaleUsageLines,
   resolveServiceUsageRequirements,
 } from "@/lib/inventory/service-usage";
@@ -34,11 +41,17 @@ import { isSellableProductKind } from "@/lib/products/kinds";
 
 async function nextInvoiceNumber(organizationId: string) {
   const supabase = await createClient();
-  const { count } = await supabase
+  // Avoid COUNT(*) over all invoices — parse the latest number instead.
+  const { data } = await supabase
     .from("invoices")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId);
-  return `INV-${String((count ?? 0) + 1).padStart(5, "0")}`;
+    .select("invoice_number")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const match = /^INV-(\d+)$/i.exec(data?.invoice_number ?? "");
+  const next = match ? Number(match[1]) + 1 : 1;
+  return `INV-${String(Number.isFinite(next) ? next : 1).padStart(5, "0")}`;
 }
 
 /** After sale row exists, always return saleId and resync denorm so POS does not retry. */
@@ -95,22 +108,48 @@ export async function completeCheckout(
   const { subtotal, discount, tax, total } = totals;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Fail closed on oversell before creating the sale
   const productLines = payload.items.filter((i) => i.itemType === "PRODUCT");
   const productCostById = new Map<string, number>();
+  const productIds = [...new Set(productLines.map((i) => i.itemId))];
+  const packageIds = [
+    ...new Set(
+      payload.items.filter((i) => i.itemType === "PACKAGE").map((i) => i.itemId)
+    ),
+  ];
+
+  // Parallel: session + stock + usage recipes (service costs come from same recipe pass)
+  const [user, stockRowsRes, usageResolved, packageUsageCosts] = await Promise.all([
+    getSession(),
+    productIds.length
+      ? supabase
+          .from("products")
+          .select("id, name, stock_quantity, cost_price, product_kind")
+          .eq("organization_id", org.organizationId)
+          .in("id", productIds)
+      : Promise.resolve({
+          data: [] as {
+            id: string;
+            name: string;
+            stock_quantity: number;
+            cost_price: number;
+            product_kind: string | null;
+          }[],
+        }),
+    resolveServiceUsageRequirements(
+      org.organizationId,
+      payload.items.map((i) => ({
+        itemType: i.itemType,
+        itemId: i.itemId,
+        quantity: i.quantity,
+      }))
+    ),
+    getPackageUnitUsageCosts(org.organizationId, packageIds),
+  ]);
+  const serviceUsageCosts = usageResolved.serviceUnitCosts;
+
   if (productLines.length) {
-    const productIds = [...new Set(productLines.map((i) => i.itemId))];
-    const { data: stockRows } = await supabase
-      .from("products")
-      .select("id, name, stock_quantity, cost_price, product_kind")
-      .eq("organization_id", org.organizationId)
-      .in("id", productIds);
     const stockMap = new Map(
-      (stockRows ?? []).map((p) => [
+      (stockRowsRes.data ?? []).map((p) => [
         p.id,
         {
           name: p.name,
@@ -139,14 +178,6 @@ export async function completeCheckout(
     }
   }
 
-  const usageResolved = await resolveServiceUsageRequirements(
-    org.organizationId,
-    payload.items.map((i) => ({
-      itemType: i.itemType,
-      itemId: i.itemId,
-      quantity: i.quantity,
-    }))
-  );
   if (usageResolved.error) return { error: usageResolved.error };
   const usageWithOverrides = await applyUsageOverrides(
     org.organizationId,
@@ -167,7 +198,6 @@ export async function completeCheckout(
     );
     for (const req of usageRequirements) {
       const have = stockMap.get(req.productId) ?? 0;
-      // Also reserve against retail product lines of the same SKU on this ticket
       const alsoSold = productLines
         .filter((l) => l.itemId === req.productId)
         .reduce((s, l) => s + Number(l.quantity), 0);
@@ -178,21 +208,6 @@ export async function completeCheckout(
       }
     }
   }
-
-  const serviceIds = [
-    ...new Set(
-      payload.items.filter((i) => i.itemType === "SERVICE").map((i) => i.itemId)
-    ),
-  ];
-  const packageIds = [
-    ...new Set(
-      payload.items.filter((i) => i.itemType === "PACKAGE").map((i) => i.itemId)
-    ),
-  ];
-  const [serviceUsageCosts, packageUsageCosts] = await Promise.all([
-    getServiceUnitUsageCosts(org.organizationId, serviceIds),
-    getPackageUnitUsageCosts(org.organizationId, packageIds),
-  ]);
 
   let depositApplied = 0;
   let depositRows: { id: string; amount: number }[] = [];
@@ -212,28 +227,29 @@ export async function completeCheckout(
     );
     depositApplied = roundMoney(Math.min(availableDeposit, total));
   } else if (payload.customerId) {
-    const { data: customerDeposits } = await supabase
-      .from("appointment_deposits")
-      .select("id, amount, appointment_id")
+    // Open appointments for this customer first — never scan all org deposits.
+    const { data: openAppts } = await supabase
+      .from("appointments")
+      .select("id")
       .eq("organization_id", org.organizationId)
-      .eq("status", "APPROVED")
-      .is("applied_to_sale_id", null);
+      .eq("customer_id", payload.customerId)
+      .is("deleted_at", null)
+      .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")')
+      .limit(50);
+    const openApptIds = (openAppts ?? []).map((a) => a.id);
 
-    if (customerDeposits?.length) {
-      const apptIds = [...new Set(customerDeposits.map((d) => d.appointment_id))];
-      const { data: appts } = await supabase
-        .from("appointments")
-        .select("id")
+    if (openApptIds.length) {
+      const { data: customerDeposits } = await supabase
+        .from("appointment_deposits")
+        .select("id, amount, appointment_id")
         .eq("organization_id", org.organizationId)
-        .eq("customer_id", payload.customerId)
-        .in("id", apptIds)
-        .not("status", "in", '("COMPLETED","CANCELLED","NO_SHOW")');
+        .eq("status", "APPROVED")
+        .is("applied_to_sale_id", null)
+        .in("appointment_id", openApptIds);
 
-      const validApptIds = new Set((appts ?? []).map((a) => a.id));
-      const rows = customerDeposits.filter((d) => validApptIds.has(d.appointment_id));
-      if (rows.length > 0) {
-        const grouped = new Map<string, typeof rows>();
-        for (const row of rows) {
+      if (customerDeposits?.length) {
+        const grouped = new Map<string, typeof customerDeposits>();
+        for (const row of customerDeposits) {
           const list = grouped.get(row.appointment_id) ?? [];
           list.push(row);
           grouped.set(row.appointment_id, list);
@@ -255,14 +271,23 @@ export async function completeCheckout(
 
   // Prevent double-billing the same appointment (retry / concurrent checkout).
   if (linkedAppointmentId) {
-    const { data: existingSales } = await supabase
-      .from("sales")
-      .select("id, status")
-      .eq("organization_id", org.organizationId)
-      .eq("appointment_id", linkedAppointmentId)
-      .is("deleted_at", null)
-      .neq("status", "VOID")
-      .limit(1);
+    const [{ data: existingSales }, { data: apptRow }] = await Promise.all([
+      supabase
+        .from("sales")
+        .select("id, status")
+        .eq("organization_id", org.organizationId)
+        .eq("appointment_id", linkedAppointmentId)
+        .is("deleted_at", null)
+        .neq("status", "VOID")
+        .limit(1),
+      supabase
+        .from("appointments")
+        .select("id, status")
+        .eq("id", linkedAppointmentId)
+        .eq("organization_id", org.organizationId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+    ]);
     const existingSale = existingSales?.[0];
     if (existingSale) {
       return {
@@ -270,32 +295,10 @@ export async function completeCheckout(
         saleId: existingSale.id,
       };
     }
-    const { data: apptRow } = await supabase
-      .from("appointments")
-      .select("id, status")
-      .eq("id", linkedAppointmentId)
-      .eq("organization_id", org.organizationId)
-      .is("deleted_at", null)
-      .maybeSingle();
     if (!apptRow) {
       return { error: "Linked appointment not found" };
     }
     if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(apptRow.status)) {
-      const { data: billedRows } = await supabase
-        .from("sales")
-        .select("id")
-        .eq("organization_id", org.organizationId)
-        .eq("appointment_id", linkedAppointmentId)
-        .is("deleted_at", null)
-        .neq("status", "VOID")
-        .limit(1);
-      const billed = billedRows?.[0];
-      if (billed) {
-        return {
-          error: "This appointment is already billed",
-          saleId: billed.id,
-        };
-      }
       return { error: `Cannot bill appointment with status ${apptRow.status}` };
     }
   }
@@ -417,25 +420,26 @@ export async function completeCheckout(
             : 0,
   }));
 
-  const { error: itemsError } = await supabase.from("sale_items").insert(saleItems);
-  if (itemsError) {
-    return checkoutFail(org.organizationId, sale.id, itemsError.message);
+  const staffRows = selectedStaffIds.map((staffId) => ({
+    sale_id: sale.id,
+    staff_id: staffId,
+    organization_id: org.organizationId,
+  }));
+
+  const [itemsRes, staffRes, invoiceNumber] = await Promise.all([
+    supabase.from("sale_items").insert(saleItems),
+    staffRows.length
+      ? supabase.from("sale_staff").insert(staffRows)
+      : Promise.resolve({ error: null as { message: string } | null }),
+    nextInvoiceNumber(org.organizationId),
+  ]);
+  if (itemsRes.error) {
+    return checkoutFail(org.organizationId, sale.id, itemsRes.error.message);
+  }
+  if (staffRes.error) {
+    return checkoutFail(org.organizationId, sale.id, staffRes.error.message);
   }
 
-  if (selectedStaffIds.length > 0) {
-    const { error: saleStaffError } = await supabase.from("sale_staff").insert(
-      selectedStaffIds.map((staffId) => ({
-        sale_id: sale.id,
-        staff_id: staffId,
-        organization_id: org.organizationId,
-      }))
-    );
-    if (saleStaffError) {
-      return checkoutFail(org.organizationId, sale.id, saleStaffError.message);
-    }
-  }
-
-  const invoiceNumber = await nextInvoiceNumber(org.organizationId);
   const { error: invoiceError } = await supabase.from("invoices").insert({
     organization_id: org.organizationId,
     sale_id: sale.id,
@@ -488,6 +492,17 @@ export async function completeCheckout(
   }
 
   let remainingTender = tendered;
+  const paymentInserts: {
+    organization_id: string;
+    sale_id: string;
+    amount: number;
+    method: PaymentMethod;
+    created_by: string | null;
+    tendered_amount: number | null;
+    change_given: number | null;
+    notes: string | null;
+    reference?: string | null;
+  }[] = [];
   for (let i = 0; i < paymentLines.length; i++) {
     const line = paymentLines[i];
     const amt = roundMoney(line.amount);
@@ -496,7 +511,7 @@ export async function completeCheckout(
     const lineTendered = isLast ? remainingTender : amt;
     const lineChange = isLast ? roundMoney(Math.max(0, lineTendered - amt)) : 0;
     remainingTender = roundMoney(Math.max(0, remainingTender - amt));
-    const { error: paymentError } = await supabase.from("payments").insert({
+    paymentInserts.push({
       organization_id: org.organizationId,
       sale_id: sale.id,
       amount: amt,
@@ -506,119 +521,136 @@ export async function completeCheckout(
       change_given: line.method === "CASH" ? lineChange : null,
       notes: paymentState.amountDue > 0 ? "Partial payment at checkout" : null,
     });
-    if (paymentError) {
-      return checkoutFail(org.organizationId, sale.id, paymentError.message);
-    }
   }
 
   if (depositApplied > 0) {
-    const { error: depositPaymentError } = await supabase.from("payments").insert({
+    paymentInserts.push({
       organization_id: org.organizationId,
       sale_id: sale.id,
       amount: depositApplied,
       method: "OTHER",
       reference: "APPOINTMENT_DEPOSIT",
       created_by: user?.id ?? null,
+      tendered_amount: null,
+      change_given: null,
+      notes: null,
     });
-    if (depositPaymentError) {
-      return checkoutFail(org.organizationId, sale.id, depositPaymentError.message);
-    }
+  }
 
+  if (paymentInserts.length) {
+    const { error: paymentError } = await supabase
+      .from("payments")
+      .insert(paymentInserts);
+    if (paymentError) {
+      return checkoutFail(org.organizationId, sale.id, paymentError.message);
+    }
+  }
+
+  if (depositApplied > 0 && depositRows.length) {
     let remaining = depositApplied;
+    const fullApplyIds: string[] = [];
+    const partials: { id: string; applyAmount: number; depositAmt: number }[] = [];
+
     for (const deposit of depositRows) {
       if (remaining <= 0) break;
       const depositAmt = roundMoney(Number(deposit.amount));
       const applyAmount = roundMoney(Math.min(remaining, depositAmt));
       if (applyAmount <= 0) continue;
-
       if (applyAmount < depositAmt) {
-        // Partial consume: shrink applied row and keep leftover as a new unused deposit
-        const { data: shrunk, error: shrinkErr } = await supabase
-          .from("appointment_deposits")
-          .update({
-            amount: applyAmount,
-            applied_to_sale_id: sale.id,
-          })
-          .eq("id", deposit.id)
-          .eq("organization_id", org.organizationId)
-          .is("applied_to_sale_id", null)
-          .select("id");
-        if (shrinkErr) {
-          return checkoutFail(org.organizationId, sale.id, shrinkErr.message);
-        }
-        if (!shrunk?.length) {
-          return checkoutFail(org.organizationId, sale.id, "Deposit was already applied or could not be updated");
-        }
-
-        const { data: original } = await supabase
-          .from("appointment_deposits")
-          .select(
-            "appointment_id, method, notes, status, payment_reference, proof_path, approved_at, approved_by, paid_at, created_by"
-          )
-          .eq("id", deposit.id)
-          .eq("organization_id", org.organizationId)
-          .maybeSingle();
-
-        if (!original) {
-          return checkoutFail(org.organizationId, sale.id, "Deposit was partially applied but the original row could not be re-read; leftover was not created. Open this invoice — do not retry checkout.");
-        }
-
-        const leftover = roundMoney(depositAmt - applyAmount);
-        const { error: leftoverErr } = await supabase.from("appointment_deposits").insert({
-          organization_id: org.organizationId,
-          appointment_id: original.appointment_id,
-          amount: leftover,
-          method: original.method,
-          notes: original.notes
-            ? `${original.notes} (leftover after sale apply)`
-            : "Leftover after partial apply to sale",
-          status: original.status,
-          payment_reference: original.payment_reference,
-          proof_path: original.proof_path,
-          approved_at: original.approved_at,
-          approved_by: original.approved_by,
-          applied_to_sale_id: null,
-          paid_at: original.paid_at,
-          created_by: original.created_by,
-        });
-        if (leftoverErr) {
-          return checkoutFail(org.organizationId, sale.id, leftoverErr.message);
-        }
+        partials.push({ id: deposit.id, applyAmount, depositAmt });
       } else {
-        const { data: applied, error: applyErr } = await supabase
-          .from("appointment_deposits")
-          .update({ applied_to_sale_id: sale.id })
-          .eq("id", deposit.id)
-          .eq("organization_id", org.organizationId)
-          .is("applied_to_sale_id", null)
-          .select("id");
-        if (applyErr) {
-          return checkoutFail(org.organizationId, sale.id, applyErr.message);
-        }
-        if (!applied?.length) {
-          return checkoutFail(org.organizationId, sale.id, "Deposit was already applied or could not be updated");
-        }
+        fullApplyIds.push(deposit.id);
       }
       remaining = roundMoney(remaining - applyAmount);
     }
+
+    if (fullApplyIds.length) {
+      const { data: applied, error: applyErr } = await supabase
+        .from("appointment_deposits")
+        .update({ applied_to_sale_id: sale.id })
+        .in("id", fullApplyIds)
+        .eq("organization_id", org.organizationId)
+        .is("applied_to_sale_id", null)
+        .select("id");
+      if (applyErr) {
+        return checkoutFail(org.organizationId, sale.id, applyErr.message);
+      }
+      if ((applied?.length ?? 0) !== fullApplyIds.length) {
+        return checkoutFail(
+          org.organizationId,
+          sale.id,
+          "Deposit was already applied or could not be updated"
+        );
+      }
+    }
+
+    for (const partial of partials) {
+      const { data: shrunk, error: shrinkErr } = await supabase
+        .from("appointment_deposits")
+        .update({
+          amount: partial.applyAmount,
+          applied_to_sale_id: sale.id,
+        })
+        .eq("id", partial.id)
+        .eq("organization_id", org.organizationId)
+        .is("applied_to_sale_id", null)
+        .select(
+          "id, appointment_id, method, notes, status, payment_reference, proof_path, approved_at, approved_by, paid_at, created_by"
+        )
+        .maybeSingle();
+      if (shrinkErr) {
+        return checkoutFail(org.organizationId, sale.id, shrinkErr.message);
+      }
+      if (!shrunk) {
+        return checkoutFail(
+          org.organizationId,
+          sale.id,
+          "Deposit was already applied or could not be updated"
+        );
+      }
+
+      const leftover = roundMoney(partial.depositAmt - partial.applyAmount);
+      const { error: leftoverErr } = await supabase.from("appointment_deposits").insert({
+        organization_id: org.organizationId,
+        appointment_id: shrunk.appointment_id,
+        amount: leftover,
+        method: shrunk.method,
+        notes: shrunk.notes
+          ? `${shrunk.notes} (leftover after sale apply)`
+          : "Leftover after partial apply to sale",
+        status: shrunk.status,
+        payment_reference: shrunk.payment_reference,
+        proof_path: shrunk.proof_path,
+        approved_at: shrunk.approved_at,
+        approved_by: shrunk.approved_by,
+        applied_to_sale_id: null,
+        paid_at: shrunk.paid_at,
+        created_by: shrunk.created_by,
+      });
+      if (leftoverErr) {
+        return checkoutFail(org.organizationId, sale.id, leftoverErr.message);
+      }
+    }
   }
 
-  try {
-    await syncSalePaymentDenorm(org.organizationId, sale.id);
-  } catch {
-    /* denorm already set on insert */
-  }
+  // Denorm already written on sale insert to match checkout totals — skip extra RTT.
 
-  for (const item of payload.items.filter((i) => i.itemType === "PRODUCT")) {
-    const { error: invErr } = await supabase.from("inventory_transactions").insert({
+  const retailInvRows = payload.items
+    .filter((i) => i.itemType === "PRODUCT")
+    .map((item) => ({
       organization_id: org.organizationId,
       product_id: item.itemId,
-      type: "OUT",
+      type: "OUT" as const,
       quantity: item.quantity,
       reference_type: "sale",
       reference_id: sale.id,
       created_by: user?.id ?? null,
-    });
+    }));
+
+  if (retailInvRows.length) {
+    const { error: invErr } = await supabase
+      .from("inventory_transactions")
+      .insert(retailInvRows);
     if (invErr) {
       return checkoutFail(
         org.organizationId,
@@ -629,11 +661,22 @@ export async function completeCheckout(
   }
 
   if (usageRequirements.length) {
-    const snap = await replaceSaleUsageLines({
-      organizationId: org.organizationId,
-      saleId: sale.id,
-      requirements: usageRequirements,
-    });
+    const [snap, usageInv] = await Promise.all([
+      replaceSaleUsageLines({
+        organizationId: org.organizationId,
+        saleId: sale.id,
+        requirements: usageRequirements,
+      }),
+      applyServiceUsageInventory({
+        organizationId: org.organizationId,
+        saleId: sale.id,
+        requirements: usageRequirements,
+        userId: user?.id ?? null,
+        type: "OUT",
+        referenceType: "service_usage",
+        notes: "In-house products used for service",
+      }),
+    ]);
     if (snap.error) {
       return checkoutFail(
         org.organizationId,
@@ -641,16 +684,6 @@ export async function completeCheckout(
         `Sale saved but usage snapshot failed: ${snap.error}`
       );
     }
-
-    const usageInv = await applyServiceUsageInventory({
-      organizationId: org.organizationId,
-      saleId: sale.id,
-      requirements: usageRequirements,
-      userId: user?.id ?? null,
-      type: "OUT",
-      referenceType: "service_usage",
-      notes: "In-house products used for service",
-    });
     if (usageInv.error) {
       return checkoutFail(
         org.organizationId,
@@ -660,34 +693,35 @@ export async function completeCheckout(
     }
   }
 
-  revalidatePath("/sales");
-  revalidatePath("/reports");
-  revalidatePath("/finances");
-  revalidatePath("/appointments");
-  revalidatePath("/online-booking");
-  revalidatePath("/pos");
-  revalidatePath("/products");
-  revalidatePath("/in-house");
-  revalidatePath("/services");
-  revalidatePath("/dashboard");
-  if (payload.customerId) revalidatePath(`/customers/${payload.customerId}`);
-
-  try {
-    if (
-      (paymentLines.some((p) => p.method === "CASH") || payload.paymentMethod === "CASH") &&
-      collectedNow > 0
-    ) {
-      await queueOpenCashDrawer(org.organizationId, { saleId: sale.id, source: "checkout" });
-    }
-    const printerId = await findDeviceByType(org.organizationId, "PRINTER");
-    if (printerId) {
-      await queueDeviceCommand(org.organizationId, printerId, "PRINT_RECEIPT", { saleId: sale.id });
-    }
-  } catch {
-    // Device commands are optional — sale already saved
+  revalidateCheckout(payload.customerId);
+  revalidateProducts();
+  if (payload.appointmentId) {
+    revalidatePath("/appointments");
   }
 
-  await writeAuditLog({
+  // Devices + audit after the critical path — don't block POS return on printer/drawer.
+  const deviceOrgId = org.organizationId;
+  const deviceSaleId = sale.id;
+  const shouldOpenDrawer =
+    (paymentLines.some((p) => p.method === "CASH") || payload.paymentMethod === "CASH") &&
+    collectedNow > 0;
+  void (async () => {
+    try {
+      if (shouldOpenDrawer) {
+        await queueOpenCashDrawer(deviceOrgId, { saleId: deviceSaleId, source: "checkout" });
+      }
+      const printerId = await findDeviceByType(deviceOrgId, "PRINTER");
+      if (printerId) {
+        await queueDeviceCommand(deviceOrgId, printerId, "PRINT_RECEIPT", {
+          saleId: deviceSaleId,
+        });
+      }
+    } catch {
+      // Device commands are optional — sale already saved
+    }
+  })();
+
+  void writeAuditLog({
     organizationId: org.organizationId,
     userId: user?.id,
     action: "sale.complete",
@@ -801,39 +835,46 @@ export async function voidSale(
         Math.round(((net.get(row.product_id) ?? 0) - Number(row.quantity)) * 1000) / 1000
       );
     }
-    for (const [productId, quantity] of net) {
-      if (quantity <= 0.0005) continue;
-      const { error: invErr } = await supabase.from("inventory_transactions").insert({
-        organization_id: org.organizationId,
-        product_id: productId,
-        type: "IN",
-        quantity,
-        reference_type: "sale_void",
-        reference_id: id,
-        notes: `Void restore — ${voidReason}`,
-        created_by: user?.id ?? null,
+    const restoreRows = [...net.entries()]
+      .filter(([, quantity]) => quantity > 0.0005)
+      .map(([productId, quantity]) => {
+        voidRestoredQty.set(productId, quantity);
+        return {
+          organization_id: org.organizationId,
+          product_id: productId,
+          type: "IN" as const,
+          quantity,
+          reference_type: "sale_void",
+          reference_id: id,
+          notes: `Void restore — ${voidReason}`,
+          created_by: user?.id ?? null,
+        };
       });
+    if (restoreRows.length) {
+      const { error: invErr } = await supabase
+        .from("inventory_transactions")
+        .insert(restoreRows);
       if (invErr) {
         return {
           error: `Void aborted — inventory restore failed: ${invErr.message}`,
         };
       }
-      voidRestoredQty.set(productId, quantity);
     }
   }
 
   async function rollbackVoidInventory() {
-    for (const [productId, quantity] of voidRestoredQty) {
-      await supabase.from("inventory_transactions").insert({
-        organization_id: org.organizationId,
-        product_id: productId,
-        type: "OUT",
-        quantity,
-        reference_type: "sale_void_rollback",
-        reference_id: id,
-        notes: "Void aborted — reverse premature stock restore",
-        created_by: user?.id ?? null,
-      });
+    const rows = [...voidRestoredQty.entries()].map(([productId, quantity]) => ({
+      organization_id: org.organizationId,
+      product_id: productId,
+      type: "OUT" as const,
+      quantity,
+      reference_type: "sale_void_rollback",
+      reference_id: id,
+      notes: "Void aborted — reverse premature stock restore",
+      created_by: user?.id ?? null,
+    }));
+    if (rows.length) {
+      await supabase.from("inventory_transactions").insert(rows);
     }
   }
 
@@ -973,19 +1014,9 @@ export async function voidSale(
     },
   });
 
-  revalidatePath("/sales");
-  revalidatePath("/reports");
-  revalidatePath("/finances");
-  revalidatePath("/products");
-  revalidatePath("/in-house");
-  revalidatePath("/dashboard");
-  revalidatePath("/staff");
+  revalidateSales(id, sale.customer_id);
+  revalidateProducts();
   revalidatePath("/appointments");
-  revalidatePath("/pos");
-  if (sale.customer_id) {
-    revalidatePath(`/customers/${sale.customer_id}`);
-  }
-  revalidatePath(`/sales/${id}`);
   return { success: true };
 }
 
@@ -1028,47 +1059,62 @@ export async function getSales(
       }
     }
 
-    const [{ data: customers }, { data: invoices }] = await Promise.all([
-      supabase
-        .from("customers")
-        .select("id")
-        .eq("organization_id", org.organizationId)
-        .is("deleted_at", null)
-        .or(phoneParts.join(",")),
-      supabase
-        .from("invoices")
-        .select("sale_id")
-        .eq("organization_id", org.organizationId)
-        .ilike("invoice_number", like),
-    ]);
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        term
+      );
+    // Skip notes ilike for phone-like / UUID searches (expensive unindexed scan).
+    const skipNotes =
+      isUuid || /^\+?[\d\s\-().]{6,}$/.test(term) || Boolean(normalizedPhone);
+
+    const [{ data: customers }, { data: invoices }, notesRes] =
+      await Promise.all([
+        supabase
+          .from("customers")
+          .select("id")
+          .eq("organization_id", org.organizationId)
+          .is("deleted_at", null)
+          .or(phoneParts.join(",")),
+        supabase
+          .from("invoices")
+          .select("sale_id")
+          .eq("organization_id", org.organizationId)
+          .ilike("invoice_number", like),
+        skipNotes
+          ? Promise.resolve({ data: [] as { id: string }[] })
+          : supabase
+              .from("sales")
+              .select("id")
+              .eq("organization_id", org.organizationId)
+              .ilike("notes", like)
+              .limit(100),
+      ]);
 
     const ids = new Set<string>();
     for (const inv of invoices ?? []) {
       if (inv.sale_id) ids.add(inv.sale_id);
     }
+    for (const row of notesRes.data ?? []) ids.add(row.id);
+    if (isUuid) ids.add(term);
 
     const customerIds = (customers ?? []).map((c) => c.id);
     if (customerIds.length) {
-      for (let i = 0; i < customerIds.length; i += 200) {
-        const chunk = customerIds.slice(i, i + 200);
-        const { data: linked } = await supabase
-          .from("sales")
-          .select("id")
-          .eq("organization_id", org.organizationId)
-          .in("customer_id", chunk);
+      const linkedChunks = await Promise.all(
+        Array.from(
+          { length: Math.ceil(customerIds.length / 200) },
+          (_, i) => {
+            const chunk = customerIds.slice(i * 200, i * 200 + 200);
+            return supabase
+              .from("sales")
+              .select("id")
+              .eq("organization_id", org.organizationId)
+              .in("customer_id", chunk);
+          }
+        )
+      );
+      for (const { data: linked } of linkedChunks) {
         for (const row of linked ?? []) ids.add(row.id);
       }
-    }
-
-    const { data: noteHits } = await supabase
-      .from("sales")
-      .select("id")
-      .eq("organization_id", org.organizationId)
-      .ilike("notes", like);
-    for (const row of noteHits ?? []) ids.add(row.id);
-
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term)) {
-      ids.add(term);
     }
 
     saleIds = [...ids];
@@ -1080,7 +1126,10 @@ export async function getSales(
   let query = supabase
     .from("sales")
     .select(`
-      *,
+      id, organization_id, customer_id, appointment_id, staff_id, status,
+      subtotal, discount, tax, total, deposit_applied,
+      amount_paid, amount_refunded, amount_due, payment_status, payment_version,
+      notes, completed_at, created_at, updated_at, deleted_at,
       customer:customers(id, first_name, last_name, phone),
       invoice:invoices(invoice_number)
     `)
@@ -1114,11 +1163,14 @@ export async function getSale(id: string) {
   const { data, error } = await supabase
     .from("sales")
     .select(`
-      *,
+      id, organization_id, customer_id, appointment_id, staff_id, status,
+      subtotal, discount, tax, total, deposit_applied,
+      amount_paid, amount_refunded, amount_due, payment_status, payment_version,
+      notes, void_reason, current_version, completed_at, created_at, updated_at, deleted_at,
       customer:customers(id, first_name, last_name, phone, email),
-      items:sale_items(*),
-      invoice:invoices(*),
-      payments(*)
+      items:sale_items(id, name, item_type, item_id, quantity, unit_price, line_total, unit_cost),
+      invoice:invoices(invoice_number, issued_at),
+      payments(id, method, amount, paid_at, reference, tendered_amount, change_given, notes)
     `)
     .eq("id", id)
     .eq("organization_id", org.organizationId)

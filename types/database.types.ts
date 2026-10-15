@@ -2332,6 +2332,41 @@ export type Database = {
         };
         Returns: number;
       };
+      customer_directory_stats: {
+        Args: {
+          p_organization_id: string;
+          p_customer_ids: string[];
+          p_since?: string;
+        };
+        Returns: {
+          customer_id: string;
+          total_spent: number;
+          visit_count: number;
+          last_visit_at: string | null;
+        }[];
+      };
+      customer_lifetime_stats: {
+        Args: {
+          p_organization_id: string;
+          p_customer_id: string;
+        };
+        Returns: {
+          total_spent: number;
+          visit_count: number;
+        }[];
+      };
+      dashboard_top_services: {
+        Args: {
+          p_organization_id: string;
+          p_since: string;
+          p_limit?: number;
+        };
+        Returns: {
+          name: string;
+          qty: number;
+          revenue: number;
+        }[];
+      };
     };
     Enums: {
       member_role: MemberRole;

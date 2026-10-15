@@ -40,7 +40,9 @@ export async function getDevices() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("devices")
-    .select("*")
+    .select(
+      "id, name, type, api_key, location, is_active, auto_registered, last_seen_at, created_at"
+    )
     .eq("organization_id", org.organizationId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -62,7 +64,9 @@ export async function getDeviceCommands(limit = 20) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("device_commands")
-    .select("*, device:devices(name, type)")
+    .select(
+      "id, device_id, command_type, payload, status, created_at, completed_at, device:devices(name, type)"
+    )
     .eq("organization_id", org.organizationId)
     .order("created_at", { ascending: false })
     .limit(limit);

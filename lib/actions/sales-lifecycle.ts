@@ -1,8 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit/log";
 import { requireAction } from "@/lib/auth/permissions";
+import { revalidateProducts, revalidateSales } from "@/lib/cache/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/commerce";
 import {
@@ -27,17 +27,9 @@ import {
 } from "@/lib/inventory/service-usage";
 import { roundQty } from "@/lib/products/kinds";
 
-function revalidateSalePaths(saleId: string) {
-  revalidatePath("/sales");
-  revalidatePath(`/sales/${saleId}`);
-  revalidatePath(`/sales/${saleId}/edit`);
-  revalidatePath("/reports");
-  revalidatePath("/finances");
-  revalidatePath("/products");
-  revalidatePath("/in-house");
-  revalidatePath("/services");
-  revalidatePath("/dashboard");
-  revalidatePath("/customers");
+function revalidateSalePaths(saleId: string, customerId?: string | null) {
+  revalidateSales(saleId, customerId);
+  revalidateProducts();
 }
 
 async function sumPayments(saleId: string, organizationId: string) {
@@ -166,24 +158,25 @@ async function applyInventoryDeltas(
   deltas: { productId: string; delta: number }[],
   userId: string | null
 ) {
-  const supabase = await createClient();
-  for (const { productId, delta } of deltas) {
-    if (delta === 0) continue;
-    // delta > 0 → more stock out; delta < 0 → restore stock (IN)
-    const type = delta > 0 ? "OUT" : "IN";
-    const quantity = Math.abs(delta);
-    const { error } = await supabase.from("inventory_transactions").insert({
-      organization_id: organizationId,
-      product_id: productId,
-      type,
-      quantity,
-      reference_type: type === "OUT" ? "sale_amend" : "sale_amend_reverse",
-      reference_id: saleId,
-      notes: type === "OUT" ? "Amendment stock out" : "Amendment stock restore",
-      created_by: userId,
+  const rows = deltas
+    .filter((d) => d.delta !== 0)
+    .map(({ productId, delta }) => {
+      const type = delta > 0 ? ("OUT" as const) : ("IN" as const);
+      return {
+        organization_id: organizationId,
+        product_id: productId,
+        type,
+        quantity: Math.abs(delta),
+        reference_type: type === "OUT" ? "sale_amend" : "sale_amend_reverse",
+        reference_id: saleId,
+        notes: type === "OUT" ? "Amendment stock out" : "Amendment stock restore",
+        created_by: userId,
+      };
     });
-    if (error) throw new Error(`Inventory update failed: ${error.message}`);
-  }
+  if (!rows.length) return;
+  const supabase = await createClient();
+  const { error } = await supabase.from("inventory_transactions").insert(rows);
+  if (error) throw new Error(`Inventory update failed: ${error.message}`);
 }
 
 /**
@@ -231,20 +224,24 @@ async function reverseAllProductStock(
   }
 
   const restored: { productId: string; quantity: number }[] = [];
-  for (const [productId, quantity] of net) {
-    if (quantity <= 0.0005) continue;
-    const { error } = await supabase.from("inventory_transactions").insert({
-      organization_id: organizationId,
-      product_id: productId,
-      type: "IN",
-      quantity,
-      reference_type: referenceType,
-      reference_id: saleId,
-      notes: "Stock restored",
-      created_by: userId,
+  const restoreRows = [...net.entries()]
+    .filter(([, quantity]) => quantity > 0.0005)
+    .map(([productId, quantity]) => {
+      restored.push({ productId, quantity });
+      return {
+        organization_id: organizationId,
+        product_id: productId,
+        type: "IN" as const,
+        quantity,
+        reference_type: referenceType,
+        reference_id: saleId,
+        notes: "Stock restored",
+        created_by: userId,
+      };
     });
+  if (restoreRows.length) {
+    const { error } = await supabase.from("inventory_transactions").insert(restoreRows);
     if (error) throw new Error(`Inventory restore failed: ${error.message}`);
-    restored.push({ productId, quantity });
   }
   return restored;
 }
@@ -258,22 +255,22 @@ async function compensateRetailRestore(
 ) {
   if (!restored.length) return;
   const supabase = await createClient();
-  for (const row of restored) {
-    const { error } = await supabase.from("inventory_transactions").insert({
+  const { error } = await supabase.from("inventory_transactions").insert(
+    restored.map((row) => ({
       organization_id: organizationId,
       product_id: row.productId,
-      type: "OUT",
+      type: "OUT" as const,
       quantity: row.quantity,
       reference_type: "sale_refund_compensate",
       reference_id: saleId,
       notes: "Compensate — refund money commit failed after retail restore",
       created_by: userId,
-    });
-    if (error) {
-      throw new Error(
-        `Refund aborted and retail compensate failed for ${row.productId}: ${error.message}. Check stock manually.`
-      );
-    }
+    }))
+  );
+  if (error) {
+    throw new Error(
+      `Refund aborted and retail compensate failed: ${error.message}. Check stock manually.`
+    );
   }
 }
 
@@ -284,7 +281,7 @@ export async function previewSaleAmendment(payload: AmendPayload) {
 
   const { data: sale } = await supabase
     .from("sales")
-    .select("*")
+    .select("id, status, total, current_version")
     .eq("id", payload.saleId)
     .eq("organization_id", org.organizationId)
     .single();
@@ -295,11 +292,12 @@ export async function previewSaleAmendment(payload: AmendPayload) {
   }
 
   const totals = calculateInvoiceTotals(payload.items, payload.discount, payload.tax ?? 0);
-  const paymentsTotal = await sumPayments(sale.id, org.organizationId);
-  const refundsTotal = await sumRefunds(sale.id, org.organizationId);
-  const cashRefundable = roundMoney(
-    (await sumRefundablePayments(sale.id, org.organizationId)) - refundsTotal
-  );
+  const [paymentsTotal, refundsTotal, refundablePayments] = await Promise.all([
+    sumPayments(sale.id, org.organizationId),
+    sumRefunds(sale.id, org.organizationId),
+    sumRefundablePayments(sale.id, org.organizationId),
+  ]);
+  const cashRefundable = roundMoney(refundablePayments - refundsTotal);
   const rawAdjustment = calculatePaymentAdjustment({
     oldTotal: Number(sale.total),
     newTotal: totals.total,
@@ -324,9 +322,8 @@ export async function amendCompletedSale(
 ): Promise<ActionResult & { saleId?: string; version?: number }> {
   const org = await requireAction("sales.edit");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { getSession } = await import("@/lib/auth/session");
+  const user = await getSession();
   const userId = user?.id ?? null;
 
   const reason = payload.changeReason?.trim() ?? "";
@@ -335,7 +332,9 @@ export async function amendCompletedSale(
 
   const { data: sale, error: saleErr } = await supabase
     .from("sales")
-    .select("*")
+    .select(
+      "id, status, total, subtotal, discount, tax, customer_id, appointment_id, staff_id, current_version, payment_version, amount_paid, amount_refunded, amount_due, payment_status, deposit_applied, notes"
+    )
     .eq("id", payload.saleId)
     .eq("organization_id", org.organizationId)
     .single();
@@ -861,7 +860,7 @@ export async function amendCompletedSale(
       },
     });
 
-    revalidateSalePaths(sale.id);
+    revalidateSalePaths(sale.id, sale.customer_id);
     return { success: true, saleId: sale.id, version: newVersion };
   } catch (e) {
     // Best-effort compensation (no multi-statement DB txn via client)
@@ -946,9 +945,8 @@ export async function refundSale(input: {
 }): Promise<ActionResult> {
   const org = await requireAction("sales.refund");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { getSession } = await import("@/lib/auth/session");
+  const user = await getSession();
 
   const reason = input.reason?.trim() ?? "";
   if (reason.length < 3) return { error: "Refund reason is required" };
@@ -957,7 +955,9 @@ export async function refundSale(input: {
 
   const { data: sale } = await supabase
     .from("sales")
-    .select("*")
+    .select(
+      "id, status, total, customer_id, appointment_id, payment_version, amount_paid, amount_refunded, amount_due, payment_status"
+    )
     .eq("id", input.saleId)
     .eq("organization_id", org.organizationId)
     .single();
@@ -967,9 +967,11 @@ export async function refundSale(input: {
     return { error: "Cannot refund this sale status" };
   }
 
-  const cashPayments = await sumRefundablePayments(sale.id, org.organizationId);
-  const allPayments = await sumPayments(sale.id, org.organizationId);
-  const refundsTotal = await sumRefunds(sale.id, org.organizationId);
+  const [cashPayments, allPayments, refundsTotal] = await Promise.all([
+    sumRefundablePayments(sale.id, org.organizationId),
+    sumPayments(sale.id, org.organizationId),
+    sumRefunds(sale.id, org.organizationId),
+  ]);
   const refundable = Math.round((cashPayments - refundsTotal) * 100) / 100;
   if (amount > refundable + 0.009) {
     return { error: `Refund exceeds refundable cash/card collected (max ${refundable})` };
@@ -1104,7 +1106,7 @@ export async function refundSale(input: {
     },
   });
 
-  revalidateSalePaths(sale.id);
+  revalidateSalePaths(sale.id, sale.customer_id);
   return {
     success: true,
     message: fullyRefunded
@@ -1119,7 +1121,9 @@ export async function getSaleVersions(saleId: string) {
 
   const { data, error } = await supabase
     .from("sale_versions")
-    .select("*, items:sale_version_items(*)")
+    .select(
+      "id, sale_id, version_number, status, subtotal, discount, tax, total, notes, change_reason, changed_at, changed_by, items:sale_version_items(id, item_type, item_id, name, quantity, unit_price, line_total)"
+    )
     .eq("sale_id", saleId)
     .eq("organization_id", org.organizationId)
     .order("version_number", { ascending: true });
@@ -1133,7 +1137,7 @@ export async function getSaleRefunds(saleId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sale_refunds")
-    .select("*")
+    .select("id, amount, method, reason, created_at, created_by, reference")
     .eq("sale_id", saleId)
     .eq("organization_id", org.organizationId)
     .order("created_at", { ascending: false });

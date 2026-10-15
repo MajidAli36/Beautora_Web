@@ -21,7 +21,16 @@ export type UsageRequirement = {
 export async function resolveServiceUsageRequirements(
   organizationId: string,
   lines: SaleLineForUsage[]
-): Promise<{ requirements: UsageRequirement[]; error?: string }> {
+): Promise<{
+  requirements: UsageRequirement[];
+  /** Per-service recipe cost (one unit) — avoids a second recipe query at checkout. */
+  serviceUnitCosts: Map<string, number>;
+  error?: string;
+}> {
+  const empty = {
+    requirements: [] as UsageRequirement[],
+    serviceUnitCosts: new Map<string, number>(),
+  };
   const supabase = await createClient();
   const neededByService = new Map<string, number>();
 
@@ -34,21 +43,46 @@ export async function resolveServiceUsageRequirements(
   }
 
   const packageLines = lines.filter((l) => l.itemType === "PACKAGE");
-  if (packageLines.length) {
-    const packageIds = [...new Set(packageLines.map((l) => l.itemId))];
-    const { data: pkgItems, error } = await supabase
-      .from("package_items")
-      .select("package_id, service_id, quantity")
-      .eq("organization_id", organizationId)
-      .in("package_id", packageIds);
-    if (error) return { requirements: [], error: error.message };
+  const packageIds = [...new Set(packageLines.map((l) => l.itemId))];
+  const directServiceIds = [...neededByService.keys()];
 
+  // Parallel: package expansion + recipes for direct service lines
+  const [pkgRes, directRecipeRes] = await Promise.all([
+    packageIds.length
+      ? supabase
+          .from("package_items")
+          .select("package_id, service_id, quantity")
+          .eq("organization_id", organizationId)
+          .in("package_id", packageIds)
+      : Promise.resolve({
+          data: [] as { package_id: string; service_id: string; quantity: number }[],
+          error: null as { message: string } | null,
+        }),
+    directServiceIds.length
+      ? supabase
+          .from("service_product_usage")
+          .select("service_id, product_id, quantity_per_service")
+          .eq("organization_id", organizationId)
+          .in("service_id", directServiceIds)
+      : Promise.resolve({
+          data: [] as {
+            service_id: string;
+            product_id: string;
+            quantity_per_service: number;
+          }[],
+          error: null as { message: string } | null,
+        }),
+  ]);
+
+  if (pkgRes.error) return { ...empty, error: pkgRes.error.message };
+  if (directRecipeRes.error) return { ...empty, error: directRecipeRes.error.message };
+
+  if (packageLines.length) {
     const pkgQtySold = new Map<string, number>();
     for (const line of packageLines) {
       pkgQtySold.set(line.itemId, (pkgQtySold.get(line.itemId) ?? 0) + Number(line.quantity));
     }
-
-    for (const row of pkgItems ?? []) {
+    for (const row of pkgRes.data ?? []) {
       const packagesSold = pkgQtySold.get(row.package_id) ?? 0;
       const servicesNeeded = packagesSold * Number(row.quantity);
       if (servicesNeeded <= 0) continue;
@@ -59,16 +93,22 @@ export async function resolveServiceUsageRequirements(
     }
   }
 
-  if (!neededByService.size) return { requirements: [] };
+  if (!neededByService.size) return empty;
 
-  const serviceIds = [...neededByService.keys()];
-  const { data: recipes, error: recipeErr } = await supabase
-    .from("service_product_usage")
-    .select("service_id, product_id, quantity_per_service")
-    .eq("organization_id", organizationId)
-    .in("service_id", serviceIds);
-  if (recipeErr) return { requirements: [], error: recipeErr.message };
-  if (!recipes?.length) return { requirements: [] };
+  const allServiceIds = [...neededByService.keys()];
+  const missingServiceIds = allServiceIds.filter((id) => !directServiceIds.includes(id));
+
+  let recipes = [...(directRecipeRes.data ?? [])];
+  if (missingServiceIds.length) {
+    const { data: extraRecipes, error: recipeErr } = await supabase
+      .from("service_product_usage")
+      .select("service_id, product_id, quantity_per_service")
+      .eq("organization_id", organizationId)
+      .in("service_id", missingServiceIds);
+    if (recipeErr) return { ...empty, error: recipeErr.message };
+    recipes = recipes.concat(extraRecipes ?? []);
+  }
+  if (!recipes.length) return empty;
 
   const productIds = [...new Set(recipes.map((r) => r.product_id))];
   const { data: products, error: prodErr } = await supabase
@@ -76,7 +116,7 @@ export async function resolveServiceUsageRequirements(
     .select("id, name, cost_price, stock_quantity, is_active, deleted_at, unit_label")
     .eq("organization_id", organizationId)
     .in("id", productIds);
-  if (prodErr) return { requirements: [], error: prodErr.message };
+  if (prodErr) return { ...empty, error: prodErr.message };
 
   const productMap = new Map(
     (products ?? []).map((p) => [
@@ -91,11 +131,19 @@ export async function resolveServiceUsageRequirements(
     ])
   );
 
+  const serviceUnitCosts = new Map<string, number>();
   const qtyByProduct = new Map<string, number>();
   for (const recipe of recipes) {
+    const perService = Number(recipe.quantity_per_service);
+    const unitCost = perService * (productMap.get(recipe.product_id)?.cost ?? 0);
+    serviceUnitCosts.set(
+      recipe.service_id,
+      roundMoney((serviceUnitCosts.get(recipe.service_id) ?? 0) + unitCost)
+    );
+
     const serviceQty = neededByService.get(recipe.service_id) ?? 0;
     if (serviceQty <= 0) continue;
-    const add = roundQty(serviceQty * Number(recipe.quantity_per_service));
+    const add = roundQty(serviceQty * perService);
     if (add <= 0) continue;
     qtyByProduct.set(recipe.product_id, roundQty((qtyByProduct.get(recipe.product_id) ?? 0) + add));
   }
@@ -105,7 +153,7 @@ export async function resolveServiceUsageRequirements(
     const meta = productMap.get(productId);
     if (!meta || !meta.ok) {
       return {
-        requirements: [],
+        ...empty,
         error: "An in-house product linked to a service is missing or inactive",
       };
     }
@@ -119,7 +167,7 @@ export async function resolveServiceUsageRequirements(
     });
   }
 
-  return { requirements };
+  return { requirements, serviceUnitCosts };
 }
 
 /**
@@ -406,10 +454,9 @@ export async function applyServiceUsageInventory(params: {
   referenceType: string;
   notes: string;
 }): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  for (const req of params.requirements) {
-    if (req.quantity <= 0) continue;
-    const { error } = await supabase.from("inventory_transactions").insert({
+  const rows = params.requirements
+    .filter((req) => req.quantity > 0)
+    .map((req) => ({
       organization_id: params.organizationId,
       product_id: req.productId,
       type: params.type,
@@ -418,12 +465,15 @@ export async function applyServiceUsageInventory(params: {
       reference_id: params.saleId,
       notes: params.notes,
       created_by: params.userId,
-    });
-    if (error) {
-      return {
-        error: `In-house stock ${params.type === "OUT" ? "deduction" : "restore"} failed for ${req.productName}: ${error.message}`,
-      };
-    }
+    }));
+  if (!rows.length) return {};
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("inventory_transactions").insert(rows);
+  if (error) {
+    return {
+      error: `In-house stock ${params.type === "OUT" ? "deduction" : "restore"} failed: ${error.message}`,
+    };
   }
   return {};
 }
@@ -467,18 +517,23 @@ export async function reverseRecordedServiceUsage(params: {
     net.set(row.product_id, roundQty((net.get(row.product_id) ?? 0) - Number(row.quantity)));
   }
 
-  for (const [productId, quantity] of net) {
-    if (quantity <= 0.0005) continue;
-    const { error: invErr } = await supabase.from("inventory_transactions").insert({
+  const restoreRows = [...net.entries()]
+    .filter(([, quantity]) => quantity > 0.0005)
+    .map(([productId, quantity]) => ({
       organization_id: params.organizationId,
       product_id: productId,
-      type: "IN",
+      type: "IN" as const,
       quantity,
       reference_type: params.referenceType,
       reference_id: params.saleId,
       notes: "In-house usage restored",
       created_by: params.userId,
-    });
+    }));
+
+  if (restoreRows.length) {
+    const { error: invErr } = await supabase
+      .from("inventory_transactions")
+      .insert(restoreRows);
     if (invErr) return { error: `In-house stock restore failed: ${invErr.message}` };
   }
   return {};
