@@ -14,6 +14,7 @@ import { ReportEmpty, ReportUnavailable } from "@/components/features/reports/ui
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 export function ServicesTab({ data }: { data: ServicesReport }) {
   const [q, setQ] = useState("");
@@ -102,50 +103,49 @@ export function ServicesTab({ data }: { data: ServicesReport }) {
           </Button>
         }
       >
-        {!data.detail.length ? (
-          <ReportEmpty message="No service sales found for the selected period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Input
-              placeholder="Search service or category…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="mb-3 max-w-sm print:hidden"
-            />
-            {!filtered.length ? (
-              <ReportEmpty message="No services match your search." />
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Usage cost</TableHead>
-                  <TableHead className="text-right">Profit</TableHead>
-                  <TableHead className="text-right">Margin</TableHead>
-                  <TableHead className="text-right">%</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((r) => (
-                  <TableRow key={r.serviceId}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell>{r.category ?? "—"}</TableCell>
-                    <TableCell className="text-right">{r.qty}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.usageCost)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.grossProfit)}</TableCell>
-                    <TableCell className="text-right">{r.marginPercent}%</TableCell>
-                    <TableCell className="text-right">{r.pctOfServiceRevenue.toFixed(1)}%</TableCell>
+        <Input
+          placeholder="Search service or category…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="mb-3 max-w-sm print:hidden"
+        />
+        <PaginatedList
+          items={filtered}
+          empty={<ReportEmpty message="No service sales found for the selected period." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Usage cost</TableHead>
+                    <TableHead className="text-right">Profit</TableHead>
+                    <TableHead className="text-right">Margin</TableHead>
+                    <TableHead className="text-right">%</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((r) => (
+                    <TableRow key={r.serviceId}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell>{r.category ?? "—"}</TableCell>
+                      <TableCell className="text-right">{r.qty}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(r.revenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(r.usageCost)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(r.grossProfit)}</TableCell>
+                      <TableCell className="text-right">{r.marginPercent}%</TableCell>
+                      <TableCell className="text-right">{r.pctOfServiceRevenue.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
     </div>
   );

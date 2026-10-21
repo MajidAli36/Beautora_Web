@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { priceFieldLabel } from "@/lib/currency/labels";
+import { PricingProfitFields } from "@/components/marketplace/pricing-profit-fields";
 
 type Category = Database["public"]["Tables"]["marketplace_categories"]["Row"];
 
@@ -27,7 +27,14 @@ function formatMb(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function SellerProductStudio({ categories }: { categories: Category[] }) {
+export function SellerProductStudio({
+  categories,
+  commissionRate = 0,
+}: {
+  categories: Category[];
+  /** Current platform commission (0 = seller keeps 100%). */
+  commissionRate?: number;
+}) {
   const [pending, startTransition] = useTransition();
   const [images, setImages] = useState<LocalFile[]>([]);
   const [productVideo, setProductVideo] = useState<LocalFile | null>(null);
@@ -152,13 +159,8 @@ export function SellerProductStudio({ categories }: { categories: Category[] }) 
               <Label htmlFor="title">Title</Label>
               <Input id="title" name="title" required className="h-11 text-base" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="price">{priceFieldLabel("Price")}</Label>
-              <Input id="price" name="price" type="number" min={0} step="0.01" required defaultValue={0} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sale_price">Sale price (optional)</Label>
-              <Input id="sale_price" name="sale_price" type="number" min={0} step="0.01" />
+            <div className="space-y-2 lg:col-span-2">
+              <PricingProfitFields commissionRate={commissionRate} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="stock">Stock / inventory</Label>

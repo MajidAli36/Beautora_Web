@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 export function InventoryTab({ data }: { data: InventoryReport }) {
   const [q, setQ] = useState("");
@@ -86,88 +87,90 @@ export function InventoryTab({ data }: { data: InventoryReport }) {
           onChange={(e) => setQ(e.target.value)}
           className="mb-3 max-w-sm print:hidden"
         />
-        {!filtered.length ? (
-          <ReportEmpty message="No products found." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Cost value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.slice(0, 300).map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell>{p.sku ?? "—"}</TableCell>
-                    <TableCell className="text-right">{p.stock}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={p.status === "ok" ? "secondary" : "destructive"}
-                        className={
-                          p.status === "low"
-                            ? "bg-amber-100 text-amber-900 hover:bg-amber-100"
-                            : undefined
-                        }
-                      >
-                        {p.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(p.valueAtCost)}</TableCell>
+        <PaginatedList
+          items={filtered}
+          empty={<ReportEmpty message="No products found." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Cost value</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell>{p.sku ?? "—"}</TableCell>
+                      <TableCell className="text-right">{p.stock}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={p.status === "ok" ? "secondary" : "destructive"}
+                          className={
+                            p.status === "low"
+                              ? "bg-amber-100 text-amber-900 hover:bg-amber-100"
+                              : undefined
+                          }
+                        >
+                          {p.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.valueAtCost)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
 
       <ReportSection title="Inventory transactions" defaultOpen>
-        {!data.transactions.length ? (
-          <ReportEmpty message="No inventory transactions in this period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Input
-              placeholder="Search product, type, reference…"
-              value={txQ}
-              onChange={(e) => setTxQ(e.target.value)}
-              className="mb-3 max-w-sm print:hidden"
-            />
-            {!filteredTransactions.length ? (
-              <ReportEmpty message="No transactions match your search." />
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead>Ref</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTransactions.slice(0, 200).map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {formatDateTime(t.createdAt)}
-                    </TableCell>
-                    <TableCell>{t.productName}</TableCell>
-                    <TableCell>{t.type}</TableCell>
-                    <TableCell className="text-right">{t.quantity}</TableCell>
-                    <TableCell>{t.referenceType ?? "—"}</TableCell>
+        <Input
+          placeholder="Search product, type, reference…"
+          value={txQ}
+          onChange={(e) => setTxQ(e.target.value)}
+          className="mb-3 max-w-sm print:hidden"
+        />
+        <PaginatedList
+          items={filteredTransactions}
+          empty={<ReportEmpty message="No inventory transactions in this period." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead>Ref</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {formatDateTime(t.createdAt)}
+                      </TableCell>
+                      <TableCell>{t.productName}</TableCell>
+                      <TableCell>{t.type}</TableCell>
+                      <TableCell className="text-right">{t.quantity}</TableCell>
+                      <TableCell>{t.referenceType ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
 
       <ReportSection title="Notes">

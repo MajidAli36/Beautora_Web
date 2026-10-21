@@ -10,34 +10,12 @@ import { getCapabilities } from "@/lib/auth/permissions";
 import { EditProductButton } from "@/components/features/products/edit-product-dialog";
 import { LinkProductToServiceButton } from "@/components/features/products/link-product-to-service-dialog";
 import { InventoryAdjustForm } from "@/components/features/products/product-actions";
+import { InHouseTransactionsList } from "@/components/features/products/in-house-transactions-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCurrency, formatDateTime } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { packCostFromUnitCost } from "@/lib/products/in-house-math";
-
-function movementLabel(type: string, referenceType?: string | null) {
-  const ref = String(referenceType ?? "");
-  if (ref === "service_usage") return "POS auto-deduct";
-  if (ref === "service_usage_amend") return "Amend deduct";
-  if (ref === "service_usage_void") return "Restored — invoice deleted";
-  if (ref === "service_usage_restore") return "Restored — full refund";
-  if (ref === "service_usage_amend_reverse") return "Amend restore";
-  if (ref === "manual" || !ref) {
-    if (type === "IN") return "Stock in";
-    if (type === "OUT") return "Stock out";
-    return "Adjustment";
-  }
-  return type;
-}
 
 export default async function InHouseProductDetailPage({
   params,
@@ -227,61 +205,11 @@ export default async function InHouseProductDetailPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!transactions.length ? (
-            <p className="text-sm text-muted-foreground">No movements yet.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Value</TableHead>
-                    <TableHead>Invoice / notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((t) => {
-                    const qty = Number(t.quantity) || 0;
-                    const signed = t.type === "OUT" ? -qty : t.type === "IN" ? qty : qty;
-                    const value = signed * stats.unitCost;
-                    return (
-                      <TableRow key={t.id}>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {formatDateTime(t.created_at)}
-                        </TableCell>
-                        <TableCell>{movementLabel(t.type, t.reference_type)}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {signed > 0 ? "+" : ""}
-                          {signed} {unit}
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {formatCurrency(value)}
-                        </TableCell>
-                        <TableCell className="max-w-[16rem] text-muted-foreground">
-                          {t.reference_id &&
-                          String(t.reference_type ?? "").startsWith("service_usage") ? (
-                            <span className="block truncate">
-                              <Link
-                                href={`/sales/${t.reference_id}`}
-                                className="text-primary underline-offset-2 hover:underline"
-                              >
-                                Open invoice
-                              </Link>
-                              {t.notes ? ` · ${t.notes}` : ""}
-                            </span>
-                          ) : (
-                            <span className="block truncate">{t.notes ?? "—"}</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <InHouseTransactionsList
+            transactions={transactions}
+            unitLabel={unit}
+            unitCost={stats.unitCost}
+          />
         </CardContent>
       </Card>
     </div>

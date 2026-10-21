@@ -2107,7 +2107,15 @@ export type Database = {
           variant_id: string | null;
           variant_name: string | null;
           product_title: string;
+          product_sku: string | null;
+          /** Charged (effective) unit price at sale time. */
           unit_price: number;
+          /** List/selling price snapshot before discount. */
+          list_unit_price: number;
+          /** Cost snapshot at sale time (private). */
+          unit_cost: number;
+          /** Per-unit discount (list − charged). */
+          unit_discount: number;
           quantity: number;
           line_total: number;
           fulfillment_status:
@@ -2129,7 +2137,11 @@ export type Database = {
           variant_id?: string | null;
           variant_name?: string | null;
           product_title: string;
+          product_sku?: string | null;
           unit_price: number;
+          list_unit_price?: number;
+          unit_cost?: number;
+          unit_discount?: number;
           quantity: number;
           line_total: number;
           fulfillment_status?:

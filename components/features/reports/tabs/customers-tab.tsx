@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 export function CustomersTab({ data }: { data: CustomersReport }) {
   const [q, setQ] = useState("");
@@ -97,40 +98,43 @@ export function CustomersTab({ data }: { data: CustomersReport }) {
           onChange={(e) => setQ(e.target.value)}
           className="mb-3 max-w-sm print:hidden"
         />
-        {!filtered.length ? (
-          <ReportEmpty message="No customers found." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead className="text-right">Visits</TableHead>
-                  <TableHead className="text-right">Spend</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last visit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.slice(0, 250).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell>{r.phone ?? "—"}</TableCell>
-                    <TableCell className="text-right">{r.visits}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.totalSpend)}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{r.segment}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {r.lastVisit ? formatDate(r.lastVisit) : "—"}
-                    </TableCell>
+        <PaginatedList
+          items={filtered}
+          empty={<ReportEmpty message="No customers found." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="text-right">Visits</TableHead>
+                    <TableHead className="text-right">Spend</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last visit</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell>{r.phone ?? "—"}</TableCell>
+                      <TableCell className="text-right">{r.visits}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(r.totalSpend)}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{r.segment}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {r.lastVisit ? formatDate(r.lastVisit) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
     </div>
   );

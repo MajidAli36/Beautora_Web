@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useState } from "react";
 import type { StaffAppointmentItem, StaffMonthlyDetail } from "@/lib/actions/reports";
 import { createStaffNote, deleteStaffNote } from "@/lib/actions/staff-notes";
 import { useActionToast } from "@/hooks/use-action-toast";
@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import { CalendarClock, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/toast";
@@ -364,42 +365,6 @@ export function StaffMonthlyDetailView({
   const prev = shiftMonth(data.yearMonth, -1);
   const next = shiftMonth(data.yearMonth, 1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [sessionQ, setSessionQ] = useState("");
-  const [conductQ, setConductQ] = useState("");
-  const [paymentQ, setPaymentQ] = useState("");
-
-  const filteredSessions = useMemo(() => {
-    const term = sessionQ.trim().toLowerCase();
-    if (!term) return data.attendance.recentSessions;
-    return data.attendance.recentSessions.filter(
-      (s) =>
-        attendanceMethodLabel(s.method).toLowerCase().includes(term) ||
-        s.method.toLowerCase().includes(term) ||
-        (s.checkOutAt ? "checked out" : "on duty").includes(term)
-    );
-  }, [data.attendance.recentSessions, sessionQ]);
-
-  const filteredConduct = useMemo(() => {
-    const term = conductQ.trim().toLowerCase();
-    if (!term) return data.conduct.entries;
-    return data.conduct.entries.filter(
-      (e) =>
-        noteTypeLabel(e.noteType).toLowerCase().includes(term) ||
-        e.title.toLowerCase().includes(term) ||
-        (e.details ?? "").toLowerCase().includes(term)
-    );
-  }, [data.conduct.entries, conductQ]);
-
-  const filteredPayments = useMemo(() => {
-    const term = paymentQ.trim().toLowerCase();
-    if (!term) return data.payments;
-    return data.payments.filter(
-      (p) =>
-        p.paymentType.toLowerCase().includes(term) ||
-        (p.notes ?? "").toLowerCase().includes(term) ||
-        String(p.amount).includes(term)
-    );
-  }, [data.payments, paymentQ]);
 
   const attendanceHref = `/attendance?from=${data.from}&to=${data.to}&staff=${data.staffId}`;
   const defaultNoteDate =
@@ -601,52 +566,52 @@ export function StaffMonthlyDetailView({
             </div>
           </div>
 
-          {!data.attendance.recentSessions.length ? (
-            <p className="text-sm text-muted-foreground">
-              No attendance sessions this month. Record check-ins on the Attendance page.
-            </p>
-          ) : (
-            <>
-            <Input
-              placeholder="Search method…"
-              value={sessionQ}
-              onChange={(e) => setSessionQ(e.target.value)}
-              className="mb-3 max-w-sm"
-            />
-            {filteredSessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sessions match your search.</p>
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Check in</TableHead>
-                  <TableHead>Check out</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead className="text-right">Duty</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSessions.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      {formatDateTime(s.checkInAt)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {s.checkOutAt ? formatDateTime(s.checkOutAt) : "Still on duty"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{attendanceMethodLabel(s.method)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-sm">
-                      {s.durationMinutes != null ? formatDuration(s.durationMinutes) : "—"}
-                    </TableCell>
+          <PaginatedList
+            items={data.attendance.recentSessions}
+            empty={
+              <p className="text-sm text-muted-foreground">
+                No attendance sessions this month. Record check-ins on the Attendance page.
+              </p>
+            }
+            search={{
+              placeholder: "Search method…",
+              getText: (s) =>
+                `${attendanceMethodLabel(s.method)} ${s.method} ${
+                  s.checkOutAt ? "checked out" : "on duty"
+                }`,
+            }}
+          >
+            {(slice) => (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Check in</TableHead>
+                    <TableHead>Check out</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Duty</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {slice.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {formatDateTime(s.checkInAt)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {s.checkOutAt ? formatDateTime(s.checkOutAt) : "Still on duty"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{attendanceMethodLabel(s.method)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {s.durationMinutes != null ? formatDuration(s.durationMinutes) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-            </>
-          )}
+          </PaginatedList>
         </CardContent>
       </Card>
 
@@ -687,67 +652,65 @@ export function StaffMonthlyDetailView({
             />
           )}
 
-          {!data.conduct.entries.length ? (
-            <p className="text-sm text-muted-foreground">
-              No warnings, complaints, praise, or notes recorded this month.
-            </p>
-          ) : (
-            <>
-            <Input
-              placeholder="Search type, title, details…"
-              value={conductQ}
-              onChange={(e) => setConductQ(e.target.value)}
-              className="mb-3 max-w-sm"
-            />
-            {filteredConduct.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No entries match your search.</p>
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Details</TableHead>
-                  {canManage && <TableHead className="w-[80px]" />}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredConduct.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      {formatDate(e.occurredOn)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={noteBadgeVariant(e.noteType)}>
-                        {noteTypeLabel(e.noteType)}
-                        {e.severity > 1 ? ` · ${e.severity}` : ""}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{e.title}</TableCell>
-                    <TableCell className="max-w-[240px] truncate text-sm text-muted-foreground">
-                      {e.details ?? "—"}
-                    </TableCell>
-                    {canManage && (
-                      <TableCell>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={deletingId === e.id}
-                          onClick={() => onDeleteNote(e.id)}
-                        >
-                          Remove
-                        </Button>
-                      </TableCell>
-                    )}
+          <PaginatedList
+            items={data.conduct.entries}
+            empty={
+              <p className="text-sm text-muted-foreground">
+                No warnings, complaints, praise, or notes recorded this month.
+              </p>
+            }
+            search={{
+              placeholder: "Search type, title, details…",
+              getText: (e) =>
+                `${noteTypeLabel(e.noteType)} ${e.title} ${e.details ?? ""}`,
+            }}
+          >
+            {(slice) => (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Details</TableHead>
+                    {canManage && <TableHead className="w-[80px]" />}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {slice.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {formatDate(e.occurredOn)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={noteBadgeVariant(e.noteType)}>
+                          {noteTypeLabel(e.noteType)}
+                          {e.severity > 1 ? ` · ${e.severity}` : ""}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{e.title}</TableCell>
+                      <TableCell className="max-w-[240px] truncate text-sm text-muted-foreground">
+                        {e.details ?? "—"}
+                      </TableCell>
+                      {canManage && (
+                        <TableCell>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={deletingId === e.id}
+                            onClick={() => onDeleteNote(e.id)}
+                          >
+                            Remove
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-            </>
-          )}
+          </PaginatedList>
         </CardContent>
       </Card>
 
@@ -760,42 +723,41 @@ export function StaffMonthlyDetailView({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!data.payments.length ? (
-            <p className="text-sm text-muted-foreground">No staff payments recorded this month.</p>
-          ) : (
-            <>
-            <Input
-              placeholder="Search type, notes, amount…"
-              value={paymentQ}
-              onChange={(e) => setPaymentQ(e.target.value)}
-              className="mb-3 max-w-sm"
-            />
-            {filteredPayments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No payments match your search.</p>
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPayments.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>{formatDate(p.paymentDate)}</TableCell>
-                    <TableCell>{p.paymentType}</TableCell>
-                    <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(p.amount)}</TableCell>
+          <PaginatedList
+            items={data.payments}
+            empty={
+              <p className="text-sm text-muted-foreground">
+                No staff payments recorded this month.
+              </p>
+            }
+            search={{
+              placeholder: "Search type, notes, amount…",
+              getText: (p) => `${p.paymentType} ${p.notes ?? ""} ${p.amount}`,
+            }}
+          >
+            {(slice) => (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {slice.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{formatDate(p.paymentDate)}</TableCell>
+                      <TableCell>{p.paymentType}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-            </>
-          )}
+          </PaginatedList>
         </CardContent>
       </Card>
     </div>

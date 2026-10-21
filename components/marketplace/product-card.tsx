@@ -7,6 +7,7 @@ import type { PublicProductCard } from "@/lib/marketplace/actions";
 import {
   effectiveProductPrice,
   formatMarketplaceMoney,
+  publicDiscountPercentage,
 } from "@/lib/marketplace/pricing";
 import { MarketplaceQuickViewContext } from "@/components/marketplace/product-quick-view";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ export function MarketplaceProductCard({
   const price = effectiveProductPrice(product);
   const list = Number(product.price);
   const onSale = price < list;
+  const discountPct = onSale ? publicDiscountPercentage(product) : 0;
 
   return (
     <article
@@ -48,7 +50,7 @@ export function MarketplaceProductCard({
         </Link>
         {onSale ? (
           <span className="pointer-events-none absolute top-2 left-2 z-[1] bg-[var(--m-ink)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--m-paper)]">
-            Sale
+            −{discountPct}%
           </span>
         ) : null}
         {quickView ? (

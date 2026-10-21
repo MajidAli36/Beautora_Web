@@ -198,7 +198,7 @@ export async function upsertSellerProduct(
   const brandId = String(formData.get("brand_id") ?? "").trim() || null;
   const price = Number(formData.get("price") ?? 0);
   const salePriceRaw = String(formData.get("sale_price") ?? "").trim();
-  const salePrice = salePriceRaw ? Number(salePriceRaw) : null;
+  const costPriceRaw = String(formData.get("cost_price") ?? "").trim();
   const stock = Math.max(0, Math.floor(Number(formData.get("stock") ?? 0)));
   const imageUrl = String(formData.get("image_url") ?? "").trim() || null;
   const sku = String(formData.get("sku") ?? "").trim() || null;
@@ -208,8 +208,15 @@ export async function upsertSellerProduct(
   const submitForReview = String(formData.get("submit_for_review") ?? "") === "1";
 
   if (title.length < 2) return { error: "Title is required." };
-  if (!(price >= 0)) return { error: "Invalid price." };
-  if (salePrice != null && !(salePrice >= 0)) return { error: "Invalid sale price." };
+
+  const { validateMarketplacePricing } = await import("@/lib/marketplace/pricing");
+  const pricing = validateMarketplacePricing({
+    costPrice: costPriceRaw === "" ? 0 : Number(costPriceRaw),
+    sellingPrice: price,
+    discountPrice: salePriceRaw === "" ? null : Number(salePriceRaw),
+  });
+  if (!pricing.ok) return { error: pricing.error };
+  const { costPrice, sellingPrice, discountPrice: salePrice } = pricing;
 
   const slug = slugify(title);
   const supabase = await createClient();
@@ -224,8 +231,9 @@ export async function upsertSellerProduct(
       short_description: shortDescription,
       category_id: categoryId,
       brand_id: brandId,
-      price,
+      price: sellingPrice,
       sale_price: salePrice,
+      cost_price: costPrice,
       stock,
       image_url: imageUrl,
       sku,
@@ -253,8 +261,9 @@ export async function upsertSellerProduct(
       short_description: shortDescription,
       category_id: categoryId,
       brand_id: brandId,
-      price,
+      price: sellingPrice,
       sale_price: salePrice,
+      cost_price: costPrice,
       stock,
       image_url: imageUrl,
       sku,
@@ -590,8 +599,21 @@ export async function getPublicMarketplaceProduct(
   const avg =
     list.length > 0 ? list.reduce((s, r) => s + r.rating, 0) / list.length : null;
 
+  // Public DTO only — never expose cost_price or internal profit fields.
   return {
-    ...p,
+    id: p.id,
+    seller_id: p.seller_id,
+    category_id: p.category_id,
+    title: p.title,
+    slug: p.slug,
+    description: p.description,
+    short_description: p.short_description,
+    price: Number(p.price),
+    sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+    stock: Number(p.stock),
+    image_url: p.image_url,
+    status: p.status,
+    updated_at: p.updated_at,
     seller_name: p.marketplace_sellers.shop_name,
     seller_slug: p.marketplace_sellers.slug,
     category_name: p.marketplace_categories?.name ?? null,
@@ -647,17 +669,21 @@ export async function placeMarketplaceCodOrder(input: {
   const { data: products } = await admin
     .from("marketplace_products")
     .select(
-      "id, title, price, sale_price, stock, seller_id, status, marketplace_sellers!inner(status, country, organization_id)"
+      "id, title, sku, price, sale_price, cost_price, stock, seller_id, status, marketplace_sellers!inner(status, country, organization_id)"
     )
     .in("id", productIds);
 
   if (!products?.length) return { error: "Products not found." };
 
+  const { effectiveProductPrice, roundMoney } = await import("@/lib/marketplace/pricing");
+
   type P = {
     id: string;
     title: string;
+    sku: string | null;
     price: number;
     sale_price: number | null;
+    cost_price: number | null;
     stock: number;
     seller_id: string;
     status: string;
@@ -701,7 +727,11 @@ export async function placeMarketplaceCodOrder(input: {
     product_id: string;
     seller_id: string;
     product_title: string;
+    product_sku: string | null;
     unit_price: number;
+    list_unit_price: number;
+    unit_cost: number;
+    unit_discount: number;
     quantity: number;
     line_total: number;
     variant_id: string | null;
@@ -716,18 +746,21 @@ export async function placeMarketplaceCodOrder(input: {
       return { error: "One or more products are unavailable." };
     }
 
-    let unitPrice = Number(p.sale_price ?? p.price);
+    let listUnitPrice = roundMoney(Number(p.price));
+    let unitPrice = effectiveProductPrice({ price: p.price, sale_price: p.sale_price });
     let stock = p.stock;
     let variantId: string | null = null;
     let variantName: string | null = null;
     let title = p.title;
+    const unitCost = roundMoney(Math.max(0, Number(p.cost_price) || 0));
 
     if (item.variantId) {
       const v = variantById.get(item.variantId);
       if (!v || v.product_id !== p.id || !v.is_active) {
         return { error: `Variant unavailable for ${p.title}.` };
       }
-      unitPrice = Number(v.sale_price ?? v.price);
+      listUnitPrice = roundMoney(Number(v.price));
+      unitPrice = effectiveProductPrice({ price: v.price, sale_price: v.sale_price });
       stock = v.stock;
       variantId = v.id;
       variantName = v.name;
@@ -737,13 +770,18 @@ export async function placeMarketplaceCodOrder(input: {
     if (item.quantity < 1 || item.quantity > stock) {
       return { error: `Insufficient stock for ${title}.` };
     }
-    const lineTotal = unitPrice * item.quantity;
+    const unitDiscount = roundMoney(Math.max(0, listUnitPrice - unitPrice));
+    const lineTotal = roundMoney(unitPrice * item.quantity);
     subtotal += lineTotal;
     lines.push({
       product_id: p.id,
       seller_id: p.seller_id,
       product_title: title,
+      product_sku: p.sku,
       unit_price: unitPrice,
+      list_unit_price: listUnitPrice,
+      unit_cost: unitCost,
+      unit_discount: unitDiscount,
       quantity: item.quantity,
       line_total: lineTotal,
       variant_id: variantId,
@@ -751,6 +789,7 @@ export async function placeMarketplaceCodOrder(input: {
       fulfillment_status: "placed",
     });
   }
+  subtotal = roundMoney(subtotal);
 
   const { data: orderNumData } = await admin.rpc("next_marketplace_order_number");
   const orderNumber =
@@ -829,13 +868,49 @@ export async function placeMarketplaceCodOrder(input: {
     sellerOrderIdBySeller.set(sellerId, sellerOrder.id);
   }
 
-  const { error: itemsErr } = await admin.from("marketplace_order_items").insert(
-    lines.map((l) => ({
-      ...l,
-      order_id: order.id,
-      seller_order_id: sellerOrderIdBySeller.get(l.seller_id) ?? null,
-    }))
-  );
+  const itemRows = lines.map((l) => ({
+    ...l,
+    order_id: order.id,
+    seller_order_id: sellerOrderIdBySeller.get(l.seller_id) ?? null,
+  }));
+  let { error: itemsErr } = await admin.from("marketplace_order_items").insert(itemRows);
+  // Soft fallback before pricing-snapshot migration is applied.
+  if (
+    itemsErr &&
+    (itemsErr.message.includes("unit_cost") ||
+      itemsErr.message.includes("list_unit_price") ||
+      itemsErr.message.includes("unit_discount") ||
+      itemsErr.message.includes("product_sku"))
+  ) {
+    const legacy = itemRows.map(
+      ({
+        product_id,
+        seller_id,
+        product_title,
+        unit_price,
+        quantity,
+        line_total,
+        variant_id,
+        variant_name,
+        fulfillment_status,
+        order_id,
+        seller_order_id,
+      }) => ({
+        product_id,
+        seller_id,
+        product_title,
+        unit_price,
+        quantity,
+        line_total,
+        variant_id,
+        variant_name,
+        fulfillment_status,
+        order_id,
+        seller_order_id,
+      })
+    );
+    ({ error: itemsErr } = await admin.from("marketplace_order_items").insert(legacy));
+  }
   if (itemsErr) {
     return cancelOrphanOrder(itemsErr.message);
   }
@@ -1278,22 +1353,35 @@ export async function getSellerDashboardStats() {
   const seller = await getMyMarketplaceSeller();
   if (!seller) return null;
   const supabase = await createClient();
-  const [{ count: productCount }, orders, payouts] = await Promise.all([
+  const [{ data: productRows }, orders, payouts] = await Promise.all([
     supabase
       .from("marketplace_products")
-      .select("id", { count: "exact", head: true })
+      .select("id, price, sale_price, cost_price, stock, status")
       .eq("seller_id", seller.id),
     listSellerOrders(),
     getSellerPayoutSummary(),
   ]);
+  const products = productRows ?? [];
+  const {
+    applyCommissionToInventoryKpis,
+    summarizeMarketplaceInventory,
+  } = await import("@/lib/marketplace/pricing");
+  const { getDefaultCommissionRate } = await import("@/lib/marketplace/commission");
+  const commissionRate = await getDefaultCommissionRate();
+  const inventory = applyCommissionToInventoryKpis(
+    summarizeMarketplaceInventory(products),
+    commissionRate
+  );
   const openOrders = orders.filter((o) =>
     ["placed", "confirmed", "shipped"].includes(o.order.status)
   ).length;
   return {
     seller,
-    productCount: productCount ?? 0,
+    productCount: inventory.totalProducts,
     openOrders,
     owedCommission: payouts.owed,
+    commissionRate,
+    inventory,
   };
 }
 

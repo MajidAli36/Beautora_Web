@@ -15,6 +15,7 @@ import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 export function SalesTab({ data }: { data: SalesReport }) {
   const [q, setQ] = useState("");
@@ -94,43 +95,43 @@ export function SalesTab({ data }: { data: SalesReport }) {
           onChange={(e) => setQ(e.target.value)}
           className="mb-3 max-w-sm print:hidden"
         />
-        {!filtered.length ? (
-          <ReportEmpty message="No sales found for the selected period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Pay</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.slice(0, 200).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {r.completedAt ? formatDateTime(r.completedAt) : "—"}
-                    </TableCell>
-                    <TableCell className="font-medium">{r.invoiceNumber ?? "—"}</TableCell>
-                    <TableCell>{r.customerName ?? "Walk-in"}</TableCell>
-                    <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
-                      {r.itemSummary || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.total)}</TableCell>
-                    <TableCell>{r.paymentMethod}</TableCell>
+        <PaginatedList
+          items={filtered}
+          empty={<ReportEmpty message="No sales found for the selected period." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Pay</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {filtered.length > 200 ? (
-              <p className="mt-2 text-xs text-muted-foreground">Showing first 200 of {filtered.length}. Export CSV for full list.</p>
-            ) : null}
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {r.completedAt ? formatDateTime(r.completedAt) : "—"}
+                      </TableCell>
+                      <TableCell className="font-medium">{r.invoiceNumber ?? "—"}</TableCell>
+                      <TableCell>{r.customerName ?? "Walk-in"}</TableCell>
+                      <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
+                        {r.itemSummary || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(r.total)}</TableCell>
+                      <TableCell>{r.paymentMethod}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
     </div>
   );

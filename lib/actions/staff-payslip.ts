@@ -31,6 +31,7 @@ export type StaffPayslipBundle = {
     dutyStart: string | null;
     dutyEnd: string | null;
     expectedHoursPerDay: number;
+    expectedDaysPerWeek: number;
     overtimeEligible: boolean;
     overtimeMultiplier: number;
   };
@@ -209,6 +210,7 @@ export async function getStaffPayslipBundle(
         ? String(staff.schedule_end_time).slice(0, 5)
         : policy.default_duty_end,
       expectedHoursPerDay: Number(staff.expected_hours_per_day ?? 8),
+      expectedDaysPerWeek: Number(staff.expected_days_per_week ?? 6),
       overtimeEligible: Boolean(staff.overtime_eligible),
       overtimeMultiplier: Number(staff.overtime_multiplier ?? 1.5),
     },

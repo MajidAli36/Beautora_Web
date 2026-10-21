@@ -39,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import type { PayrollRunStatus } from "@/lib/payroll/types";
 import { cn } from "@/lib/utils";
 
@@ -147,12 +148,12 @@ export function PayrollDashboard({
     () => data.fines.filter((f) => f.status === "OPEN"),
     [data.fines]
   );
-  const shownFines = view === "fines" ? openFines : data.fines.slice(0, 12);
-  const shownPayments =
+  const finesList = view === "fines" ? openFines : data.fines;
+  const paymentsList =
     view === "paid"
       ? data.payments.filter((p) => p.payment_type === "SALARY")
-      : data.payments.slice(0, 12);
-  const shownAbsences = view === "absent" ? data.absences : data.absences.slice(0, 12);
+      : data.payments;
+  const absencesList = data.absences;
 
   function applyRange() {
     pushRange(router, month, from, to, view);
@@ -494,50 +495,60 @@ export function PayrollDashboard({
               </Button>
             </CardHeader>
             <CardContent>
-              {shownFines.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  No fines in this range.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {shownFines.map((f) => (
-                    <li
-                      key={f.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          href={`/staff/${f.staff_id}`}
-                          className="font-medium underline-offset-2 hover:underline"
-                        >
-                          {f.staff_name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {f.work_date} · {f.reason}
-                          {f.minutes_late != null ? ` · ${f.minutes_late}m late` : ""}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold tabular-nums">
-                          {formatCurrency(f.amount)}
-                        </span>
-                        <Badge variant="outline">{f.status}</Badge>
-                        {canManage && f.status === "OPEN" ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={pending}
-                            onClick={() => waiveFine(f.id)}
+              <PaginatedList
+                items={finesList}
+                empty={
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No fines in this range.
+                  </p>
+                }
+                search={{
+                  placeholder: "Search fines…",
+                  getText: (f) =>
+                    `${f.staff_name} ${f.work_date} ${f.reason} ${f.status}`,
+                }}
+              >
+                {(slice) => (
+                  <ul className="space-y-2">
+                    {slice.map((f) => (
+                      <li
+                        key={f.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            href={`/staff/${f.staff_id}`}
+                            className="font-medium underline-offset-2 hover:underline"
                           >
-                            Waive
-                          </Button>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                            {f.staff_name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            {f.work_date} · {f.reason}
+                            {f.minutes_late != null ? ` · ${f.minutes_late}m late` : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold tabular-nums">
+                            {formatCurrency(f.amount)}
+                          </span>
+                          <Badge variant="outline">{f.status}</Badge>
+                          {canManage && f.status === "OPEN" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={pending}
+                              onClick={() => waiveFine(f.id)}
+                            >
+                              Waive
+                            </Button>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </PaginatedList>
             </CardContent>
           </Card>
         )}
@@ -573,35 +584,47 @@ export function PayrollDashboard({
             <CardContent>
               {view === "pending" ? (
                 unpaidPreview(data, filteredLines)
-              ) : shownPayments.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  No staff payments in this range.
-                </p>
               ) : (
-                <ul className="space-y-2">
-                  {shownPayments.map((p) => (
-                    <li
-                      key={p.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                    >
-                      <div>
-                        <Link
-                          href={`/staff/${p.staff_id}`}
-                          className="font-medium underline-offset-2 hover:underline"
+                <PaginatedList
+                  items={paymentsList}
+                  empty={
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      No staff payments in this range.
+                    </p>
+                  }
+                  search={{
+                    placeholder: "Search payments…",
+                    getText: (p) =>
+                      `${p.staff_name} ${p.payment_date} ${p.payment_type} ${p.notes ?? ""}`,
+                  }}
+                >
+                  {(slice) => (
+                    <ul className="space-y-2">
+                      {slice.map((p) => (
+                        <li
+                          key={p.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
                         >
-                          {p.staff_name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {p.payment_date} · {p.payment_type}
-                          {p.notes ? ` · ${p.notes}` : ""}
-                        </p>
-                      </div>
-                      <span className="font-semibold tabular-nums">
-                        {formatCurrency(p.amount)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                          <div>
+                            <Link
+                              href={`/staff/${p.staff_id}`}
+                              className="font-medium underline-offset-2 hover:underline"
+                            >
+                              {p.staff_name}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">
+                              {p.payment_date} · {p.payment_type}
+                              {p.notes ? ` · ${p.notes}` : ""}
+                            </p>
+                          </div>
+                          <span className="font-semibold tabular-nums">
+                            {formatCurrency(p.amount)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </PaginatedList>
               )}
             </CardContent>
           </Card>
@@ -624,31 +647,40 @@ export function PayrollDashboard({
               </Button>
             </CardHeader>
             <CardContent>
-              {shownAbsences.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  No absence/leave day records in this range.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {shownAbsences.map((a) => (
-                    <li
-                      key={`${a.staff_id}-${a.work_date}-${a.status}`}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                    >
-                      <div>
-                        <Link
-                          href={`/staff/${a.staff_id}`}
-                          className="font-medium underline-offset-2 hover:underline"
-                        >
-                          {a.staff_name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">{a.work_date}</p>
-                      </div>
-                      <Badge variant="outline">{a.status.replace("_", " ")}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <PaginatedList
+                items={absencesList}
+                empty={
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No absence/leave day records in this range.
+                  </p>
+                }
+                search={{
+                  placeholder: "Search absences…",
+                  getText: (a) => `${a.staff_name} ${a.work_date} ${a.status}`,
+                }}
+              >
+                {(slice) => (
+                  <ul className="space-y-2">
+                    {slice.map((a) => (
+                      <li
+                        key={`${a.staff_id}-${a.work_date}-${a.status}`}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <Link
+                            href={`/staff/${a.staff_id}`}
+                            className="font-medium underline-offset-2 hover:underline"
+                          >
+                            {a.staff_name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{a.work_date}</p>
+                        </div>
+                        <Badge variant="outline">{a.status.replace("_", " ")}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </PaginatedList>
             </CardContent>
           </Card>
         )}
@@ -710,77 +742,82 @@ export function PayrollDashboard({
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            {filteredLines.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No matching staff lines.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Rate</TableHead>
-                    <TableHead className="text-right">Present</TableHead>
-                    <TableHead className="text-right">Absent</TableHead>
-                    <TableHead className="text-right">Regular h</TableHead>
-                    <TableHead className="text-right">OT h</TableHead>
-                    <TableHead className="text-right">Gross</TableHead>
-                    <TableHead className="text-right">Deductions</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLines.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell className="font-mono text-xs">
-                        {l.employee_code ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/staff/${l.staff_id}`}
-                          className="font-medium underline-offset-2 hover:underline"
-                        >
-                          {l.staff_name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{l.pay_type}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(l.base_rate)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {l.days_present}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {l.days_absent}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {l.regular_hours}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {l.overtime_hours}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(l.gross_earnings)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(l.total_deductions)}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {formatCurrency(l.net_pay)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {l.payment_id ? "PAID" : run.status}
-                        </Badge>
-                      </TableCell>
+            <PaginatedList
+              items={filteredLines}
+              empty={
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No matching staff lines.
+                </p>
+              }
+            >
+              {(slice) => (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">Present</TableHead>
+                      <TableHead className="text-right">Absent</TableHead>
+                      <TableHead className="text-right">Regular h</TableHead>
+                      <TableHead className="text-right">OT h</TableHead>
+                      <TableHead className="text-right">Gross</TableHead>
+                      <TableHead className="text-right">Deductions</TableHead>
+                      <TableHead className="text-right">Net</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                  </TableHeader>
+                  <TableBody>
+                    {slice.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="font-mono text-xs">
+                          {l.employee_code ?? "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Link
+                            href={`/staff/${l.staff_id}`}
+                            className="font-medium underline-offset-2 hover:underline"
+                          >
+                            {l.staff_name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{l.pay_type}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(l.base_rate)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {l.days_present}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {l.days_absent}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {l.regular_hours}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {l.overtime_hours}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(l.gross_earnings)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(l.total_deductions)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {formatCurrency(l.net_pay)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {l.payment_id ? "PAID" : run.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </PaginatedList>
           </CardContent>
         </Card>
       )}
@@ -807,26 +844,30 @@ function unpaidPreview(
     );
   }
   return (
-    <ul className="space-y-2">
-      {lines.map((l) => (
-        <li
-          key={l.id}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-        >
-          <div>
-            <Link
-              href={`/staff/${l.staff_id}`}
-              className="font-medium underline-offset-2 hover:underline"
+    <PaginatedList items={lines}>
+      {(slice) => (
+        <ul className="space-y-2">
+          {slice.map((l) => (
+            <li
+              key={l.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
             >
-              {l.staff_name}
-            </Link>
-            <p className="text-xs text-muted-foreground">
-              Run {data.run?.status} · absent {l.days_absent}d
-            </p>
-          </div>
-          <span className="font-semibold tabular-nums">{formatCurrency(l.net_pay)}</span>
-        </li>
-      ))}
-    </ul>
+              <div>
+                <Link
+                  href={`/staff/${l.staff_id}`}
+                  className="font-medium underline-offset-2 hover:underline"
+                >
+                  {l.staff_name}
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  Run {data.run?.status} · absent {l.days_absent}d
+                </p>
+              </div>
+              <span className="font-semibold tabular-nums">{formatCurrency(l.net_pay)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PaginatedList>
   );
 }

@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { getStaff } from "@/lib/actions/staff";
+import { listAttendanceDays } from "@/lib/actions/attendance-days";
 import {
   getTeamMembers,
   getPendingTeamInvitations,
@@ -11,10 +12,11 @@ import { StaffHub } from "@/components/features/staff/staff-hub";
 import { getSupabaseServiceRoleKey } from "@/lib/supabase/env";
 
 export default async function StaffPage() {
-  const [staffList, staffCaps, canTeam] = await Promise.all([
+  const [staffList, staffCaps, canTeam, holidayDays] = await Promise.all([
     getStaff(),
     getCapabilities("staff"),
     canManageTeam(),
+    listAttendanceDays({ limit: 40 }).catch(() => []),
   ]);
 
   const canManage = staffCaps.canManage;
@@ -46,6 +48,7 @@ export default async function StaffPage() {
         canTeam={canTeam}
         canInvite={canInvite}
         canConfigureRoles={canManagePermissions}
+        holidayDays={holidayDays}
       />
     </div>
   );

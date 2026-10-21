@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import Link from "next/link";
 
 type StaffDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -79,7 +80,14 @@ export default async function StaffDetailPage({
             <CardDescription>
               Monthly or hourly pay, personal duty start/end (overrides salon default),
               breaks, overtime, and weekly offs. Late grace/fines are set under Settings →
-              Attendance & late.
+              Attendance & late. One-off holidays and leave are managed on{" "}
+              <Link
+                href="/staff#holidays-leave"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Staff → Holidays & leave
+              </Link>{" "}
+              or Attendance.
             </CardDescription>
           </CardHeader>
           <CardContent>

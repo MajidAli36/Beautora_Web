@@ -15,6 +15,7 @@ import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 export function PaymentsTab({ data }: { data: PaymentsReport }) {
   const [discountQ, setDiscountQ] = useState("");
@@ -95,32 +96,35 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                 onChange={(e) => setDiscountQ(e.target.value)}
                 className="mb-3 max-w-sm print:hidden"
               />
-              {!filteredDiscountSales.length ? (
-                <ReportEmpty message="No discounted sales match your search." />
-              ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead className="text-right">Discount</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDiscountSales.slice(0, 50).map((r) => (
-                    <TableRow key={r.saleId}>
-                      <TableCell className="text-xs">
-                        {r.completedAt ? formatDateTime(r.completedAt) : "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        {formatCurrency(r.discount)}
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(r.total)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              )}
+              <PaginatedList
+                items={filteredDiscountSales}
+                empty={<ReportEmpty message="No discounted sales match your search." />}
+              >
+                {(slice) => (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>When</TableHead>
+                        <TableHead className="text-right">Discount</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {slice.map((r) => (
+                        <TableRow key={r.saleId}>
+                          <TableCell className="text-xs">
+                            {r.completedAt ? formatDateTime(r.completedAt) : "—"}
+                          </TableCell>
+                          <TableCell className="text-right text-destructive">
+                            {formatCurrency(r.discount)}
+                          </TableCell>
+                          <TableCell className="text-right">{formatCurrency(r.total)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </PaginatedList>
             </div>
           )}
         </ReportSection>
@@ -135,30 +139,33 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
                 onChange={(e) => setRefundQ(e.target.value)}
                 className="mb-3 max-w-sm print:hidden"
               />
-              {!filteredDepositRefunds.length ? (
-                <ReportEmpty message="No deposit refunds match your search." />
-              ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDepositRefunds.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs">
-                        {r.refundedAt ? formatDateTime(r.refundedAt) : "—"}
-                      </TableCell>
-                      <TableCell>{r.method ?? "—"}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(r.amount)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              )}
+              <PaginatedList
+                items={filteredDepositRefunds}
+                empty={<ReportEmpty message="No deposit refunds match your search." />}
+              >
+                {(slice) => (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>When</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {slice.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-xs">
+                            {r.refundedAt ? formatDateTime(r.refundedAt) : "—"}
+                          </TableCell>
+                          <TableCell>{r.method ?? "—"}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(r.amount)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </PaginatedList>
             </div>
           )}
         </ReportSection>
@@ -194,32 +201,35 @@ export function PaymentsTab({ data }: { data: PaymentsReport }) {
               onChange={(e) => setLedgerQ(e.target.value)}
               className="mb-3 max-w-sm print:hidden"
             />
-            {!filteredLedger.length ? (
-              <ReportEmpty message="No payments match your search." />
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Reference</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLedger.slice(0, 250).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {formatDateTime(r.paidAt)}
-                    </TableCell>
-                    <TableCell>{r.method}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.amount)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.reference ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
+            <PaginatedList
+              items={filteredLedger}
+              empty={<ReportEmpty message="No payments match your search." />}
+            >
+              {(slice) => (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Reference</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {slice.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="whitespace-nowrap text-xs">
+                          {formatDateTime(r.paidAt)}
+                        </TableCell>
+                        <TableCell>{r.method}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(r.amount)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.reference ?? "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </PaginatedList>
           </div>
         )}
       </ReportSection>

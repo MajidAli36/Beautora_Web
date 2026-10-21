@@ -4,6 +4,7 @@ import {
   listMarketplaceCategories,
   listSellerProducts,
 } from "@/lib/marketplace/actions";
+import { getDefaultCommissionRate } from "@/lib/marketplace/commission";
 import { SellerProductStudio } from "@/components/marketplace/seller-product-studio";
 import { MarketplaceProductsList } from "@/components/marketplace/seller-searchable-lists";
 import { redirect } from "next/navigation";
@@ -14,9 +15,10 @@ export default async function MarketplaceProductsPage() {
   const seller = await getMyMarketplaceSeller();
   if (!seller) redirect("/marketplace/onboarding");
 
-  const [products, categories] = await Promise.all([
+  const [products, categories, commissionRate] = await Promise.all([
     listSellerProducts(),
     listMarketplaceCategories(),
+    getDefaultCommissionRate(),
   ]);
 
   return (
@@ -25,7 +27,7 @@ export default async function MarketplaceProductsPage() {
         title="Marketplace products"
         description="Next-level catalog for Beautora Marketplace — multi-image gallery, product video, TikTok reel, and rich description. Does not change Salon POS stock."
       />
-      <SellerProductStudio categories={categories} />
+      <SellerProductStudio categories={categories} commissionRate={commissionRate} />
       <div className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Your catalog</h2>
         <MarketplaceProductsList products={products} />

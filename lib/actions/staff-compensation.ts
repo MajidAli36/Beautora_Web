@@ -47,9 +47,14 @@ const compensationSchema = z
     }
   });
 
+/**
+ * Parse weekly offs from the form.
+ * Empty / "none" = work all 7 days (no weekly off). Do NOT default to Sunday.
+ */
 function parseWeeklyOffs(raw?: string): number[] {
-  if (!raw?.trim()) return [0];
-  const days = raw
+  const t = raw?.trim() ?? "";
+  if (!t || t === "none" || t === "__none__") return [];
+  const days = t
     .split(",")
     .map((s) => Number(s.trim()))
     .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
@@ -110,7 +115,7 @@ export async function updateStaffCompensation(
     overtime_eligible: bool("overtime_eligible"),
     overtime_multiplier: formData.get("overtime_multiplier") || 1.5,
     salary_policy: formData.get("salary_policy") || "FIXED",
-    weekly_off_days: String(formData.get("weekly_off_days") ?? "0"),
+    weekly_off_days: String(formData.get("weekly_off_days") ?? "none"),
     schedule_start_time: String(formData.get("schedule_start_time") ?? ""),
     schedule_end_time: String(formData.get("schedule_end_time") ?? ""),
     salary_effective_from: String(formData.get("salary_effective_from") ?? ""),
@@ -125,14 +130,23 @@ export async function updateStaffCompensation(
 
   const d = parsed.data;
   const weeklyOff = parseWeeklyOffs(d.weekly_off_days);
+  const { syncPayRates } = await import("@/lib/payroll/rate-math");
+  // Always keep monthly + hourly in sync so overtime / hour views work for both modes.
+  const synced = syncPayRates({
+    payType: d.pay_type,
+    monthlySalary: d.monthly_salary ?? 0,
+    hourlyRate: d.hourly_rate ?? 0,
+    hoursPerDay: d.expected_hours_per_day,
+    daysPerWeek: d.expected_days_per_week,
+  });
   const supabase = await createClient();
 
   const patch = {
     employee_code: emptyToNull(d.employee_code),
     department: emptyToNull(d.department),
     pay_type: d.pay_type,
-    monthly_salary: d.pay_type === "MONTHLY" ? d.monthly_salary ?? 0 : null,
-    hourly_rate: d.pay_type === "HOURLY" ? d.hourly_rate ?? 0 : null,
+    monthly_salary: synced.monthlySalary,
+    hourly_rate: synced.hourlyRate,
     expected_hours_per_day: d.expected_hours_per_day,
     expected_days_per_week: d.expected_days_per_week,
     break_minutes_per_day: d.break_minutes_per_day,

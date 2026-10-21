@@ -8,8 +8,8 @@ import { KpiCard } from "@/components/features/reports/ui/kpi-card";
 import { ReportSection } from "@/components/features/reports/ui/report-section";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 export function DuesTab({ data }: { data: DuesReport }) {
   const [q, setQ] = useState("");
@@ -51,79 +51,78 @@ export function DuesTab({ data }: { data: DuesReport }) {
       </ReportSection>
 
       <ReportSection title="Due invoices" description="Open receivables">
-        {data.ledger.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No outstanding invoices.</p>
-        ) : (
-          <>
-          <Input
-            placeholder="Search customer, phone, invoice, status…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="mb-3 max-w-sm print:hidden"
-          />
-          {!filtered.length ? (
-            <ReportEmpty message="No invoices match your search." />
-          ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Due</TableHead>
-                <TableHead>Last payment</TableHead>
-                <TableHead>Days</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((row) => (
-                <TableRow key={row.saleId}>
-                  <TableCell>
-                    {row.customerId ? (
-                      <Link
-                        href={`/customers/${row.customerId}`}
-                        className="text-primary hover:underline"
-                      >
-                        {row.customerName}
-                      </Link>
-                    ) : (
-                      row.customerName
-                    )}
-                  </TableCell>
-                  <TableCell>{row.phone ?? "—"}</TableCell>
-                  <TableCell>
-                    <Link href={`/sales/${row.saleId}`} className="text-primary hover:underline">
-                      {row.invoiceNumber ?? row.saleId.slice(0, 8)}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    {row.invoiceDate ? formatDate(row.invoiceDate) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">{formatCurrency(row.total)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(row.paid)}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(row.due)}
-                  </TableCell>
-                  <TableCell>
-                    {row.lastPaymentAt ? formatDate(row.lastPaymentAt) : "—"}
-                  </TableCell>
-                  <TableCell>{row.daysOutstanding}</TableCell>
-                  <TableCell>
-                    <Badge variant={row.status === "OVERDUE" ? "destructive" : "secondary"}>
-                      {row.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <Input
+          placeholder="Search customer, phone, invoice, status…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="mb-3 max-w-sm print:hidden"
+        />
+        <PaginatedList
+          items={filtered}
+          empty={<p className="text-sm text-muted-foreground">No outstanding invoices.</p>}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Due</TableHead>
+                    <TableHead>Last payment</TableHead>
+                    <TableHead>Days</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {slice.map((row) => (
+                    <TableRow key={row.saleId}>
+                      <TableCell>
+                        {row.customerId ? (
+                          <Link
+                            href={`/customers/${row.customerId}`}
+                            className="text-primary hover:underline"
+                          >
+                            {row.customerName}
+                          </Link>
+                        ) : (
+                          row.customerName
+                        )}
+                      </TableCell>
+                      <TableCell>{row.phone ?? "—"}</TableCell>
+                      <TableCell>
+                        <Link href={`/sales/${row.saleId}`} className="text-primary hover:underline">
+                          {row.invoiceNumber ?? row.saleId.slice(0, 8)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {row.invoiceDate ? formatDate(row.invoiceDate) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(row.total)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(row.paid)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(row.due)}
+                      </TableCell>
+                      <TableCell>
+                        {row.lastPaymentAt ? formatDate(row.lastPaymentAt) : "—"}
+                      </TableCell>
+                      <TableCell>{row.daysOutstanding}</TableCell>
+                      <TableCell>
+                        <Badge variant={row.status === "OVERDUE" ? "destructive" : "secondary"}>
+                          {row.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
-          </>
-        )}
+        </PaginatedList>
       </ReportSection>
 
       {data.notes.length ? (

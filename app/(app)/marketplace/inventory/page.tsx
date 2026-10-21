@@ -3,8 +3,10 @@ import { AlertTriangle, Boxes, PackageCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { getMyMarketplaceSeller, listSellerProducts } from "@/lib/marketplace/actions";
 import { MarketplaceInventoryList } from "@/components/marketplace/seller-searchable-lists";
+import { summarizeMarketplaceInventory } from "@/lib/marketplace/pricing";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/format";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +15,9 @@ export default async function MarketplaceInventoryPage() {
   const seller = await getMyMarketplaceSeller();
   if (!seller) redirect("/marketplace");
   const products = await listSellerProducts();
+  const valuation = summarizeMarketplaceInventory(products);
 
-  const totalUnits = products.reduce((s, p) => s + Number(p.stock ?? 0), 0);
+  const totalUnits = valuation.totalUnitsInStock;
   const lowStock = products.filter((p) => {
     const stock = Number(p.stock ?? 0);
     const threshold = Number(
@@ -40,7 +43,7 @@ export default async function MarketplaceInventoryPage() {
             <CardTitle className="text-3xl tabular-nums">{products.length}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            {totalUnits} units across catalog
+            {totalUnits} units · cost {formatCurrency(valuation.inventoryCostValue)}
           </CardContent>
         </Card>
         <Card>
@@ -64,7 +67,7 @@ export default async function MarketplaceInventoryPage() {
             <CardTitle className="text-3xl tabular-nums">{outOfStock.length}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            Buyers cannot purchase until restocked
+            Potential sales {formatCurrency(valuation.potentialSalesValue)}
           </CardContent>
         </Card>
       </div>

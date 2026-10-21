@@ -10,6 +10,7 @@ import {
 } from "@/lib/dates/local";
 import { roundMoney } from "@/lib/sales/calculate";
 import { detectLateDays, proposeLateFines, resolveDutyWindow } from "@/lib/payroll/late";
+import { resolveEffectiveHourlyRate } from "@/lib/payroll/rate-math";
 import type {
   AttendanceDayOverride,
   AttendanceSessionInput,
@@ -218,9 +219,12 @@ export function calculateStaffPayrollLine(
           weeklyOffCounted += 1;
           break;
         case "HOLIDAY":
+          // Paid holiday (national / assigned) — counts toward attendance-adjusted pay.
           holidayDays += 1;
+          daysPresent += 1;
           break;
         case "ON_LEAVE":
+          // Unpaid leave request — does not count as present.
           daysLeave += 1;
           break;
         case "ABSENT":
@@ -373,8 +377,13 @@ export function calculateStaffPayrollLine(
   let regularEarnings = 0;
   let overtimeEarnings = 0;
 
+  const effectiveHourly = resolveEffectiveHourlyRate(c, {
+    expectedWorkingDays:
+      expectedWorkingDays > 0 ? expectedWorkingDays : undefined,
+  });
+
   if (c.payType === "HOURLY") {
-    baseRate = roundMoney(c.hourlyRate);
+    baseRate = effectiveHourly > 0 ? effectiveHourly : roundMoney(c.hourlyRate);
     regularEarnings = roundMoney(regularHours * baseRate);
     overtimeEarnings = roundMoney(
       overtimeHours * baseRate * (c.overtimeEligible ? c.overtimeMultiplier : 1)
@@ -416,11 +425,10 @@ export function calculateStaffPayrollLine(
       }
     }
 
+    // Overtime always uses equivalent hourly (monthly ÷ expected hours in period).
     overtimeEarnings = roundMoney(
       overtimeHours *
-        (c.expectedHoursPerDay > 0
-          ? fullMonthSalary / (expectedWorkingDays * c.expectedHoursPerDay || 1)
-          : 0) *
+        effectiveHourly *
         (c.overtimeEligible ? c.overtimeMultiplier : 0)
     );
     if (!c.overtimeEligible) overtimeEarnings = 0;

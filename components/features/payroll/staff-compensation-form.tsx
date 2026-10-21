@@ -1,14 +1,22 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { updateStaffCompensation } from "@/lib/actions/staff-compensation";
 import { useActionToast } from "@/hooks/use-action-toast";
+import {
+  hourlyFromMonthly,
+  monthlyFromHourly,
+  monthlyHoursEstimate,
+  syncPayRates,
+} from "@/lib/payroll/rate-math";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionResult } from "@/types/commerce";
 import type { StaffPayType, StaffSalaryPolicy } from "@/lib/payroll/types";
+import { cn } from "@/lib/utils";
 
 export type CompensationFormValues = {
   id: string;
@@ -43,6 +51,12 @@ const WEEKDAYS = [
   { v: 6, label: "Sat" },
 ];
 
+/** Preserve empty array = works all week. Do not force Sunday. */
+function initialWeeklyOffs(raw: number[] | null | undefined): number[] {
+  if (Array.isArray(raw)) return [...raw].sort((a, b) => a - b);
+  return [0];
+}
+
 export function StaffCompensationForm({
   staff,
 }: {
@@ -51,8 +65,27 @@ export function StaffCompensationForm({
   const [payType, setPayType] = useState<StaffPayType>(
     staff.pay_type ?? "MONTHLY"
   );
-  const [offs, setOffs] = useState<number[]>(
-    staff.weekly_off_days?.length ? staff.weekly_off_days : [0]
+  const [policy, setPolicy] = useState<StaffSalaryPolicy>(
+    staff.salary_policy ?? "FIXED"
+  );
+  const [monthlySalary, setMonthlySalary] = useState(
+    staff.monthly_salary != null && staff.monthly_salary > 0
+      ? String(staff.monthly_salary)
+      : ""
+  );
+  const [hourlyRate, setHourlyRate] = useState(
+    staff.hourly_rate != null && staff.hourly_rate > 0
+      ? String(staff.hourly_rate)
+      : ""
+  );
+  const [hoursPerDay, setHoursPerDay] = useState(
+    String(staff.expected_hours_per_day ?? 8)
+  );
+  const [daysPerWeek, setDaysPerWeek] = useState(
+    String(staff.expected_days_per_week ?? 6)
+  );
+  const [offs, setOffs] = useState<number[]>(() =>
+    initialWeeklyOffs(staff.weekly_off_days)
   );
   const [state, formAction, pending] = useActionState(
     updateStaffCompensation,
@@ -60,242 +93,436 @@ export function StaffCompensationForm({
   );
   useActionToast(state, { successMessage: "Salary configuration saved." });
 
+  const hDay = Number(hoursPerDay) || 8;
+  const dWeek = Number(daysPerWeek) || 6;
+
+  const liveRates = useMemo(() => {
+    const monthly = Number(monthlySalary) || 0;
+    const hourly = Number(hourlyRate) || 0;
+    return syncPayRates({
+      payType,
+      monthlySalary: monthly,
+      hourlyRate: hourly,
+      hoursPerDay: hDay,
+      daysPerWeek: dWeek,
+    });
+  }, [payType, monthlySalary, hourlyRate, hDay, dWeek]);
+
+  const estHours = monthlyHoursEstimate(hDay, dWeek);
+
   function toggleOff(day: number) {
     setOffs((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
     );
   }
 
+  function onMonthlyChange(value: string) {
+    setMonthlySalary(value);
+    const n = Number(value);
+    if (Number.isFinite(n) && n >= 0 && value.trim() !== "") {
+      setHourlyRate(String(hourlyFromMonthly(n, hDay, dWeek) || ""));
+    }
+  }
+
+  function onHourlyChange(value: string) {
+    setHourlyRate(value);
+    const n = Number(value);
+    if (Number.isFinite(n) && n >= 0 && value.trim() !== "") {
+      setMonthlySalary(String(monthlyFromHourly(n, hDay, dWeek) || ""));
+    }
+  }
+
+  function onHoursOrDaysChange(
+    kind: "hours" | "days",
+    value: string
+  ) {
+    if (kind === "hours") setHoursPerDay(value);
+    else setDaysPerWeek(value);
+    const nextH = kind === "hours" ? Number(value) || 8 : hDay;
+    const nextD = kind === "days" ? Number(value) || 6 : dWeek;
+    if (payType === "MONTHLY") {
+      const m = Number(monthlySalary) || 0;
+      if (m > 0) setHourlyRate(String(hourlyFromMonthly(m, nextH, nextD) || ""));
+    } else {
+      const h = Number(hourlyRate) || 0;
+      if (h > 0) setMonthlySalary(String(monthlyFromHourly(h, nextH, nextD) || ""));
+    }
+  }
+
   return (
-    <form action={formAction} className="grid gap-4 sm:grid-cols-2">
+    <form action={formAction} className="space-y-8">
       <input type="hidden" name="staff_id" value={staff.id} />
-      <input type="hidden" name="weekly_off_days" value={offs.join(",")} />
+      {/* "none" when empty so the server never falls back to Sunday */}
+      <input
+        type="hidden"
+        name="weekly_off_days"
+        value={offs.length ? offs.join(",") : "none"}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="employee_code">Employee ID</Label>
-        <Input
-          id="employee_code"
-          name="employee_code"
-          defaultValue={staff.employee_code ?? ""}
-          placeholder="EMP-001"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="department">Department</Label>
-        <Input
-          id="department"
-          name="department"
-          defaultValue={staff.department ?? ""}
-          placeholder="Floor / Spa"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="pay_type">Payment type *</Label>
-        <select
-          id="pay_type"
-          name="pay_type"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-          value={payType}
-          onChange={(e) => setPayType(e.target.value as StaffPayType)}
-        >
-          <option value="MONTHLY">Monthly salary</option>
-          <option value="HOURLY">Hourly wage</option>
-        </select>
-      </div>
-
-      {payType === "MONTHLY" ? (
-        <>
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Profile</h3>
+          <p className="text-xs text-muted-foreground">
+            Employee ID and department for payroll and reports.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="monthly_salary">Monthly base salary *</Label>
+            <Label htmlFor="employee_code">Employee ID</Label>
+            <Input
+              id="employee_code"
+              name="employee_code"
+              defaultValue={staff.employee_code ?? ""}
+              placeholder="EMP-001"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="department">Department</Label>
+            <Input
+              id="department"
+              name="department"
+              defaultValue={staff.department ?? ""}
+              placeholder="Floor / Spa"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t border-border pt-6">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Pay</h3>
+          <p className="text-xs text-muted-foreground">
+            Enter monthly or hourly — the other amount is calculated automatically from
+            expected hours. Overtime and hour views always use the hourly rate.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="pay_type">Payment type *</Label>
+            <select
+              id="pay_type"
+              name="pay_type"
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+              value={payType}
+              onChange={(e) => {
+                const next = e.target.value as StaffPayType;
+                setPayType(next);
+                if (next === "MONTHLY") {
+                  const m = Number(monthlySalary) || 0;
+                  if (m > 0) {
+                    setHourlyRate(String(hourlyFromMonthly(m, hDay, dWeek) || ""));
+                  }
+                } else {
+                  const h = Number(hourlyRate) || 0;
+                  if (h > 0) {
+                    setMonthlySalary(
+                      String(monthlyFromHourly(h, hDay, dWeek) || "")
+                    );
+                  }
+                }
+              }}
+            >
+              <option value="MONTHLY">Monthly salary</option>
+              <option value="HOURLY">Hourly wage</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="monthly_salary">
+              Monthly base salary{payType === "MONTHLY" ? " *" : " (auto)"}
+            </Label>
             <Input
               id="monthly_salary"
               name="monthly_salary"
               type="number"
               min={0}
               step="0.01"
-              required
-              defaultValue={staff.monthly_salary ?? ""}
+              required={payType === "MONTHLY"}
+              readOnly={payType === "HOURLY"}
+              value={monthlySalary}
+              onChange={(e) => onMonthlyChange(e.target.value)}
+              className={cn(payType === "HOURLY" && "bg-muted/40")}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="hourly_rate">
+              Hourly rate{payType === "HOURLY" ? " *" : " (auto)"}
+            </Label>
+            <Input
+              id="hourly_rate"
+              name="hourly_rate"
+              type="number"
+              min={0}
+              step="0.01"
+              required={payType === "HOURLY"}
+              readOnly={payType === "MONTHLY"}
+              value={hourlyRate}
+              onChange={(e) => onHourlyChange(e.target.value)}
+              className={cn(payType === "MONTHLY" && "bg-muted/40")}
+            />
+          </div>
+
+          {payType === "MONTHLY" ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="salary_policy">Salary policy</Label>
+              <select
+                id="salary_policy"
+                name="salary_policy"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                value={policy}
+                onChange={(e) =>
+                  setPolicy(e.target.value as StaffSalaryPolicy)
+                }
+              >
+                <option value="FIXED">
+                  Fixed monthly — full base pay (absences do not cut salary)
+                </option>
+                <option value="ATTENDANCE_ADJUSTED">
+                  Attendance-adjusted — pay only for days present
+                </option>
+              </select>
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+                {policy === "FIXED" ? (
+                  <>
+                    <p className="font-medium text-foreground">
+                      Fixed monthly (recommended for most salons)
+                    </p>
+                    <p className="mt-1">
+                      Staff get the full monthly salary even if they miss a day.
+                      Late fines still apply. The auto hourly rate is used for
+                      overtime and hour reports.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">
+                      Attendance-adjusted
+                    </p>
+                    <p className="mt-1">
+                      Salary = base × (days present ÷ expected working days).
+                      Paid holidays still count as present. Overtime uses the
+                      equivalent hourly rate.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <input type="hidden" name="salary_policy" value="FIXED" />
+          )}
+
+          <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed">
+            <p className="font-medium text-foreground">Hour form (both modes)</p>
+            <dl className="mt-2 grid gap-1.5 sm:grid-cols-3">
+              <div className="flex justify-between gap-2 sm:block">
+                <dt className="text-muted-foreground">Effective hourly</dt>
+                <dd className="font-medium tabular-nums text-foreground">
+                  {formatCurrency(liveRates.hourlyRate)} / hr
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2 sm:block">
+                <dt className="text-muted-foreground">Equivalent monthly</dt>
+                <dd className="font-medium tabular-nums text-foreground">
+                  {formatCurrency(liveRates.monthlySalary)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2 sm:block">
+                <dt className="text-muted-foreground">Est. hours / month</dt>
+                <dd className="font-medium tabular-nums text-foreground">
+                  {estHours > 0 ? estHours.toFixed(1) : "—"}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-2 text-muted-foreground">
+              Formula: monthly ÷ (hours/day × days/week × 52/12). Change duty hours
+              below and both sides stay in sync when you save.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t border-border pt-6">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Duty hours</h3>
+          <p className="text-xs text-muted-foreground">
+            Expected shift and break — used for late fines, overtime, and
+            monthly↔hourly conversion.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="expected_hours_per_day">Expected hours / day</Label>
+            <Input
+              id="expected_hours_per_day"
+              name="expected_hours_per_day"
+              type="number"
+              min={0.5}
+              max={24}
+              step="0.5"
+              value={hoursPerDay}
+              onChange={(e) => onHoursOrDaysChange("hours", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="expected_days_per_week">Expected days / week</Label>
+            <Input
+              id="expected_days_per_week"
+              name="expected_days_per_week"
+              type="number"
+              min={0.5}
+              max={7}
+              step="0.5"
+              value={daysPerWeek}
+              onChange={(e) => onHoursOrDaysChange("days", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="schedule_start_time">Scheduled start</Label>
+            <Input
+              id="schedule_start_time"
+              name="schedule_start_time"
+              type="time"
+              defaultValue={staff.schedule_start_time?.slice(0, 5) ?? ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="schedule_end_time">Scheduled end</Label>
+            <Input
+              id="schedule_end_time"
+              name="schedule_end_time"
+              type="time"
+              defaultValue={staff.schedule_end_time?.slice(0, 5) ?? ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="break_minutes_per_day">Break minutes / day</Label>
+            <Input
+              id="break_minutes_per_day"
+              name="break_minutes_per_day"
+              type="number"
+              min={0}
+              max={480}
+              defaultValue={staff.break_minutes_per_day ?? 0}
+            />
+          </div>
+          <div className="flex items-end gap-2 pb-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="break_paid"
+                defaultChecked={Boolean(staff.break_paid)}
+              />
+              Breaks are paid
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t border-border pt-6">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Weekly off days</h3>
+          <p className="text-xs text-muted-foreground">
+            Recurring days this person does not work every week. Leave all unchecked
+            if they work all 7 days. One-off holidays are assigned separately under
+            Holidays & leave.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {WEEKDAYS.map((d) => {
+            const on = offs.includes(d.v);
+            return (
+              <button
+                key={d.v}
+                type="button"
+                onClick={() => toggleOff(d.v)}
+                aria-pressed={on}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                  on
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input bg-background text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {d.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {offs.length === 0
+            ? "No weekly offs — works every day of the week."
+            : `Off: ${offs.map((d) => WEEKDAYS.find((w) => w.v === d)?.label).join(", ")}`}
+        </p>
+      </section>
+
+      <section className="space-y-4 border-t border-border pt-6">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Overtime & dates</h3>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex items-end gap-2 pb-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="overtime_eligible"
+                defaultChecked={Boolean(staff.overtime_eligible)}
+              />
+              Overtime eligible
+            </label>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="overtime_multiplier">Overtime multiplier</Label>
+            <Input
+              id="overtime_multiplier"
+              name="overtime_multiplier"
+              type="number"
+              min={1}
+              max={5}
+              step="0.1"
+              defaultValue={staff.overtime_multiplier ?? 1.5}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="salary_effective_from">Salary effective from</Label>
+            <Input
+              id="salary_effective_from"
+              name="salary_effective_from"
+              type="date"
+              defaultValue={staff.salary_effective_from ?? ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hired_on">Hired on</Label>
+            <Input
+              id="hired_on"
+              name="hired_on"
+              type="date"
+              defaultValue={staff.hired_on ?? ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="left_on">Left on</Label>
+            <Input
+              id="left_on"
+              name="left_on"
+              type="date"
+              defaultValue={staff.left_on ?? ""}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="salary_policy">Salary policy</Label>
-            <select
-              id="salary_policy"
-              name="salary_policy"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-              defaultValue={staff.salary_policy ?? "FIXED"}
-            >
-              <option value="FIXED">Fixed monthly (attendance does not reduce base)</option>
-              <option value="ATTENDANCE_ADJUSTED">
-                Attendance-adjusted (unpaid absences reduce pay)
-              </option>
-            </select>
+            <Label htmlFor="notes">Change notes</Label>
+            <Textarea
+              id="notes"
+              name="notes"
+              rows={2}
+              placeholder="Optional audit note for this salary change"
+            />
           </div>
-        </>
-      ) : (
-        <div className="space-y-2">
-          <Label htmlFor="hourly_rate">Hourly rate *</Label>
-          <Input
-            id="hourly_rate"
-            name="hourly_rate"
-            type="number"
-            min={0}
-            step="0.01"
-            required
-            defaultValue={staff.hourly_rate ?? ""}
-          />
-          <input type="hidden" name="salary_policy" value="FIXED" />
         </div>
-      )}
+      </section>
 
-      <div className="space-y-2">
-        <Label htmlFor="expected_hours_per_day">Expected hours / day</Label>
-        <Input
-          id="expected_hours_per_day"
-          name="expected_hours_per_day"
-          type="number"
-          min={0.5}
-          max={24}
-          step="0.5"
-          defaultValue={staff.expected_hours_per_day ?? 8}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="expected_days_per_week">Expected days / week</Label>
-        <Input
-          id="expected_days_per_week"
-          name="expected_days_per_week"
-          type="number"
-          min={0.5}
-          max={7}
-          step="0.5"
-          defaultValue={staff.expected_days_per_week ?? 6}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="schedule_start_time">Scheduled start</Label>
-        <Input
-          id="schedule_start_time"
-          name="schedule_start_time"
-          type="time"
-          defaultValue={staff.schedule_start_time?.slice(0, 5) ?? ""}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="schedule_end_time">Scheduled end</Label>
-        <Input
-          id="schedule_end_time"
-          name="schedule_end_time"
-          type="time"
-          defaultValue={staff.schedule_end_time?.slice(0, 5) ?? ""}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="break_minutes_per_day">Break minutes / day</Label>
-        <Input
-          id="break_minutes_per_day"
-          name="break_minutes_per_day"
-          type="number"
-          min={0}
-          max={480}
-          defaultValue={staff.break_minutes_per_day ?? 0}
-        />
-      </div>
-      <div className="flex items-end gap-2 pb-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="break_paid"
-            defaultChecked={Boolean(staff.break_paid)}
-          />
-          Breaks are paid
-        </label>
-      </div>
-
-      <div className="sm:col-span-2 space-y-2">
-        <Label>Weekly off days</Label>
-        <div className="flex flex-wrap gap-2">
-          {WEEKDAYS.map((d) => (
-            <button
-              key={d.v}
-              type="button"
-              onClick={() => toggleOff(d.v)}
-              className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
-                offs.includes(d.v)
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input text-muted-foreground"
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-end gap-2 pb-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="overtime_eligible"
-            defaultChecked={Boolean(staff.overtime_eligible)}
-          />
-          Overtime eligible
-        </label>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="overtime_multiplier">Overtime multiplier</Label>
-        <Input
-          id="overtime_multiplier"
-          name="overtime_multiplier"
-          type="number"
-          min={1}
-          max={5}
-          step="0.1"
-          defaultValue={staff.overtime_multiplier ?? 1.5}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="salary_effective_from">Salary effective from</Label>
-        <Input
-          id="salary_effective_from"
-          name="salary_effective_from"
-          type="date"
-          defaultValue={staff.salary_effective_from ?? ""}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="hired_on">Hired on</Label>
-        <Input
-          id="hired_on"
-          name="hired_on"
-          type="date"
-          defaultValue={staff.hired_on ?? ""}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="left_on">Left on</Label>
-        <Input
-          id="left_on"
-          name="left_on"
-          type="date"
-          defaultValue={staff.left_on ?? ""}
-        />
-      </div>
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="notes">Change notes</Label>
-        <Textarea
-          id="notes"
-          name="notes"
-          rows={2}
-          placeholder="Optional audit note for this salary change"
-        />
-      </div>
-
-      <div className="sm:col-span-2">
+      <div>
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save salary configuration"}
         </Button>

@@ -9,6 +9,7 @@ import type { NavPermissionsConfig } from "@/lib/permissions/nav";
 import type { MemberRole } from "@/types";
 import type { AppMode } from "@/lib/marketplace/constants";
 import type { ProductIntent } from "@/lib/auth/account-types";
+import { workspaceLanding } from "@/lib/workspaces";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -49,11 +50,8 @@ export function AppShell({
 }: AppShellProps) {
   const isMarketplace = appMode === "marketplace";
   const isCustomerApp = appMode === "customer_app";
-  const modeLanding = isMarketplace
-    ? "/marketplace"
-    : isCustomerApp
-      ? "/customer-app"
-      : landingPath;
+  const modeLanding =
+    appMode === "saas" ? landingPath : workspaceLanding(appMode);
   return (
     <CurrencyProvider country={organizationCountry}>
       <SidebarProvider>
@@ -75,6 +73,9 @@ export function AppShell({
             userEmail={userEmail}
             userRole={userRole}
             hasLifetimeAccess={hasLifetimeAccess}
+            appMode={appMode}
+            productIntent={productIntent}
+            customerAppEnabled={customerAppEnabled}
           />
           <NavRouteGuard
             role={memberRole}

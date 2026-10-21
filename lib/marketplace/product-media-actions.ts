@@ -35,7 +35,7 @@ export async function upsertSellerProductWithMedia(
   const categoryId = String(formData.get("category_id") ?? "").trim() || null;
   const price = Number(formData.get("price") ?? 0);
   const salePriceRaw = String(formData.get("sale_price") ?? "").trim();
-  const salePrice = salePriceRaw ? Number(salePriceRaw) : null;
+  const costPriceRaw = String(formData.get("cost_price") ?? "").trim();
   const stock = Math.max(0, Math.floor(Number(formData.get("stock") ?? 0)));
   const lowStock = Math.max(0, Math.floor(Number(formData.get("low_stock_threshold") ?? 0)));
   const sku = String(formData.get("sku") ?? "").trim() || null;
@@ -45,8 +45,15 @@ export async function upsertSellerProductWithMedia(
   const submitForReview = intent === "1";
 
   if (title.length < 2) return { error: "Title is required." };
-  if (!(price >= 0)) return { error: "Invalid price." };
-  if (salePrice != null && !(salePrice >= 0)) return { error: "Invalid sale price." };
+
+  const { validateMarketplacePricing } = await import("@/lib/marketplace/pricing");
+  const pricing = validateMarketplacePricing({
+    costPrice: costPriceRaw === "" ? 0 : Number(costPriceRaw),
+    sellingPrice: price,
+    discountPrice: salePriceRaw === "" ? null : Number(salePriceRaw),
+  });
+  if (!pricing.ok) return { error: pricing.error };
+  const { costPrice, sellingPrice, discountPrice: salePrice } = pricing;
 
   const imageFiles: File[] = [];
   const count = Math.min(
@@ -101,8 +108,9 @@ export async function upsertSellerProductWithMedia(
       description_html: descriptionHtml,
       short_description: shortDescription,
       category_id: categoryId,
-      price,
+      price: sellingPrice,
       sale_price: salePrice,
+      cost_price: costPrice,
       stock,
       low_stock_threshold: lowStock,
       sku,
@@ -126,8 +134,9 @@ export async function upsertSellerProductWithMedia(
           description: plain || descriptionHtml,
           short_description: shortDescription,
           category_id: categoryId,
-          price,
+          price: sellingPrice,
           sale_price: salePrice,
+          cost_price: costPrice,
           stock,
           sku,
           seo_title: seoTitle,

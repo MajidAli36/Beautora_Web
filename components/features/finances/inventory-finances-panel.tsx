@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { FinancialSummary } from "@/lib/actions/finances";
 import { formatCurrency } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -16,24 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 type InventoryFinancesPanelProps = {
   summary: FinancialSummary;
 };
 
 export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps) {
-  const [q, setQ] = useState("");
-  const filteredRows = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return summary.productSaleRows;
-    return summary.productSaleRows.filter(
-      (row) =>
-        row.name.toLowerCase().includes(term) ||
-        (row.sku ?? "").toLowerCase().includes(term)
-    );
-  }, [summary.productSaleRows, q]);
   const hasSales = summary.productUnitsSold > 0;
-  const showTotalRow = !q.trim();
 
   return (
     <Card className="border-primary/25">
@@ -137,68 +125,66 @@ export function InventoryFinancesPanel({ summary }: InventoryFinancesPanelProps)
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
-            <Input
-              placeholder="Search product or SKU…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="m-3 max-w-sm"
-            />
-            {!filteredRows.length ? (
-              <p className="px-3 pb-3 text-sm text-muted-foreground">No products match your search.</p>
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product sold</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">COGS</TableHead>
-                  <TableHead className="text-right">Profit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRows.map((row) => (
-                  <TableRow key={row.productId}>
-                    <TableCell>
-                      <span className="font-medium">{row.name}</span>
-                      {row.sku && (
-                        <span className="ml-2 text-xs text-muted-foreground">{row.sku}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">{row.qtySold}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(row.retailRevenue)}
-                    </TableCell>
-                    <TableCell className="text-right text-orange-700">
-                      {formatCurrency(row.costOfGoodsSold)}
-                    </TableCell>
-                    <TableCell className="text-right text-green-700">
-                      {formatCurrency(row.grossProfit)}
-                      <Badge variant="secondary" className="ml-2 text-[10px]">
-                        {row.marginPercent}%
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {showTotalRow ? (
-                <TableRow className="bg-muted/40 font-semibold">
-                  <TableCell>Total stock sold</TableCell>
-                  <TableCell className="text-right">{summary.productUnitsSold}</TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(summary.productRetailRevenue)}
-                  </TableCell>
-                  <TableCell className="text-right text-orange-700">
-                    {formatCurrency(summary.productCogs)}
-                  </TableCell>
-                  <TableCell className="text-right text-green-700">
-                    {formatCurrency(summary.productGrossProfit)}
-                  </TableCell>
-                </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-            )}
+          <div className="overflow-x-auto rounded-lg border p-3">
+            <PaginatedList
+              items={summary.productSaleRows}
+              search={{
+                placeholder: "Search product or SKU…",
+                getText: (row) => `${row.name} ${row.sku ?? ""}`,
+              }}
+            >
+              {(slice) => (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product sold</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">COGS</TableHead>
+                      <TableHead className="text-right">Profit</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {slice.map((row) => (
+                      <TableRow key={row.productId}>
+                        <TableCell>
+                          <span className="font-medium">{row.name}</span>
+                          {row.sku && (
+                            <span className="ml-2 text-xs text-muted-foreground">{row.sku}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">{row.qtySold}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(row.retailRevenue)}
+                        </TableCell>
+                        <TableCell className="text-right text-orange-700">
+                          {formatCurrency(row.costOfGoodsSold)}
+                        </TableCell>
+                        <TableCell className="text-right text-green-700">
+                          {formatCurrency(row.grossProfit)}
+                          <Badge variant="secondary" className="ml-2 text-[10px]">
+                            {row.marginPercent}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/40 font-semibold">
+                      <TableCell>Total stock sold</TableCell>
+                      <TableCell className="text-right">{summary.productUnitsSold}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(summary.productRetailRevenue)}
+                      </TableCell>
+                      <TableCell className="text-right text-orange-700">
+                        {formatCurrency(summary.productCogs)}
+                      </TableCell>
+                      <TableCell className="text-right text-green-700">
+                        {formatCurrency(summary.productGrossProfit)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
+            </PaginatedList>
           </div>
         )}
       </CardContent>

@@ -5,10 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { getPageTitle } from "@/lib/navigation";
 import { getInitials } from "@/lib/format";
+import type { ProductIntent } from "@/lib/auth/account-types";
+import type { AppMode } from "@/lib/marketplace/constants";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AppLauncher } from "@/components/layout/app-launcher";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
 
@@ -35,6 +38,9 @@ type AppHeaderProps = {
   organizationName?: string;
   /** Lifetime / complimentary store — cheatsheet must not show pay instructions. */
   hasLifetimeAccess?: boolean;
+  appMode?: AppMode;
+  productIntent?: ProductIntent | null;
+  customerAppEnabled?: boolean;
 };
 
 export function AppHeader({
@@ -42,6 +48,9 @@ export function AppHeader({
   userRole,
   organizationName,
   hasLifetimeAccess = false,
+  appMode = "saas",
+  productIntent = "both",
+  customerAppEnabled = false,
 }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -57,8 +66,13 @@ export function AppHeader({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1.5 border-b border-border bg-card/95 px-2 pt-[env(safe-area-inset-top,0px)] sm:h-16 sm:gap-3 sm:bg-card/90 sm:px-6 sm:backdrop-blur-md sm:supports-[backdrop-filter]:bg-card/70">
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-1.5 border-b border-border bg-card/95 px-2 pt-[env(safe-area-inset-top,0px)] sm:h-16 sm:gap-3 sm:bg-card/90 sm:px-6 sm:backdrop-blur-md sm:supports-[backdrop-filter]:bg-card/70">
       <SidebarTrigger className="touch-target -ml-0.5 size-10 shrink-0 sm:size-9" />
+      <AppLauncher
+        mode={appMode}
+        productIntent={productIntent}
+        customerAppEnabled={customerAppEnabled}
+      />
       <Separator orientation="vertical" className="hidden h-4 sm:block" />
 
       {/* Title — capped width so it never collides with guide pills */}

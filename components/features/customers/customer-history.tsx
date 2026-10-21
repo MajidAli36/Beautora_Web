@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { CustomerHistory } from "@/lib/actions/customers";
 import { AccountReceivePaymentDialog } from "@/components/features/customers/account-receive-payment-dialog";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
@@ -9,8 +9,8 @@ import { isDeletedSaleStatus, saleStatusLabel } from "@/lib/sales/lifecycle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
 
 type FinancialSummary = {
@@ -40,8 +40,6 @@ export function CustomerHistoryPanel({
   showDueOnly = false,
 }: CustomerHistoryPanelProps) {
   const [payOpen, setPayOpen] = useState(false);
-  const [salesQ, setSalesQ] = useState("");
-  const [apptQ, setApptQ] = useState("");
 
   const sales = showDueOnly
     ? history.sales.filter(
@@ -50,36 +48,6 @@ export function CustomerHistoryPanel({
           Number((s as { amount_due?: number }).amount_due ?? 0) > 0
       )
     : history.sales;
-
-  const filteredSales = useMemo(() => {
-    const term = salesQ.trim().toLowerCase();
-    if (!term) return sales;
-    return sales.filter((sale) => {
-      const inv = Array.isArray(sale.invoice) ? sale.invoice[0] : sale.invoice;
-      const items = sale.items?.map((i) => i.name).join(" ") ?? "";
-      const payment = (sale as { payment_status?: string }).payment_status ?? "";
-      return (
-        (inv?.invoice_number ?? "").toLowerCase().includes(term) ||
-        items.toLowerCase().includes(term) ||
-        saleStatusLabel(sale.status).toLowerCase().includes(term) ||
-        payment.replaceAll("_", " ").toLowerCase().includes(term) ||
-        String(sale.total).includes(term)
-      );
-    });
-  }, [sales, salesQ]);
-
-  const filteredAppointments = useMemo(() => {
-    const term = apptQ.trim().toLowerCase();
-    if (!term) return history.appointments;
-    return history.appointments.filter((a) => {
-      const services = a.services?.map((s) => s.service_name).join(" ") ?? "";
-      return (
-        (a.staff?.full_name ?? "").toLowerCase().includes(term) ||
-        services.toLowerCase().includes(term) ||
-        a.status.toLowerCase().includes(term)
-      );
-    });
-  }, [history.appointments, apptQ]);
 
   return (
     <div className="space-y-6">
@@ -193,121 +161,129 @@ export function CustomerHistoryPanel({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {sales.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {showDueOnly ? "No outstanding invoices." : "No sales yet."}
-            </p>
-          ) : (
-            <>
-            <Input
-              placeholder="Search invoice, items, status…"
-              value={salesQ}
-              onChange={(e) => setSalesQ(e.target.value)}
-              className="mb-3 max-w-sm"
-            />
-            {filteredSales.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sales match your search.</p>
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Sale</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Due</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSales.map((sale) => {
-                  const inv = Array.isArray(sale.invoice) ? sale.invoice[0] : sale.invoice;
-                  const s = sale as typeof sale & {
-                    amount_paid?: number;
-                    amount_due?: number;
-                    payment_status?: string;
-                  };
-                  const deleted = isDeletedSaleStatus(sale.status);
-                  return (
-                    <TableRow
-                      key={sale.id}
-                      className={cn(deleted && "bg-muted/40 text-muted-foreground opacity-80")}
-                    >
-                      <TableCell>
-                        {sale.completed_at ? formatDate(sale.completed_at) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/sales/${sale.id}`}
-                          className="text-primary hover:underline"
-                        >
-                          <span
-                            className={cn(
-                              deleted && "line-through decoration-muted-foreground/60"
-                            )}
+          <PaginatedList
+            items={sales}
+            empty={
+              <p className="text-sm text-muted-foreground">
+                {showDueOnly ? "No outstanding invoices." : "No sales yet."}
+              </p>
+            }
+            search={{
+              placeholder: "Search invoice, items, status…",
+              getText: (sale) => {
+                const inv = Array.isArray(sale.invoice) ? sale.invoice[0] : sale.invoice;
+                const items = sale.items?.map((i) => i.name).join(" ") ?? "";
+                const payment = (sale as { payment_status?: string }).payment_status ?? "";
+                return [
+                  inv?.invoice_number ?? "",
+                  items,
+                  saleStatusLabel(sale.status),
+                  payment.replaceAll("_", " "),
+                  String(sale.total),
+                ].join(" ");
+              },
+            }}
+          >
+            {(slice) => (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Sale</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Due</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {slice.map((sale) => {
+                    const inv = Array.isArray(sale.invoice) ? sale.invoice[0] : sale.invoice;
+                    const s = sale as typeof sale & {
+                      amount_paid?: number;
+                      amount_due?: number;
+                      payment_status?: string;
+                    };
+                    const deleted = isDeletedSaleStatus(sale.status);
+                    return (
+                      <TableRow
+                        key={sale.id}
+                        className={cn(deleted && "bg-muted/40 text-muted-foreground opacity-80")}
+                      >
+                        <TableCell>
+                          {sale.completed_at ? formatDate(sale.completed_at) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Link
+                            href={`/sales/${sale.id}`}
+                            className="text-primary hover:underline"
                           >
-                            {inv?.invoice_number ?? sale.id.slice(0, 8)}
-                          </span>
-                          {deleted ? (
-                            <Badge
-                              variant="outline"
-                              className="ml-2 border-destructive/40 text-destructive"
+                            <span
+                              className={cn(
+                                deleted && "line-through decoration-muted-foreground/60"
+                              )}
                             >
-                              Del
-                            </Badge>
-                          ) : null}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate text-muted-foreground">
-                        {sale.items?.map((i) => i.name).join(", ") || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            deleted
-                              ? "destructive"
-                              : sale.status === "COMPLETED" || sale.status === "AMENDED"
-                                ? "default"
-                                : "secondary"
-                          }
-                        >
-                          {saleStatusLabel(sale.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {deleted
-                            ? "Disabled"
-                            : (s.payment_status ?? "—").replaceAll("_", " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(sale.total)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(s.amount_paid ?? 0)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {deleted ? (
-                          "—"
-                        ) : Number(s.amount_due ?? 0) > 0 ? (
-                          <span className="font-medium text-amber-700 dark:text-amber-400">
-                            {formatCurrency(s.amount_due ?? 0)}
-                          </span>
-                        ) : (
-                          formatCurrency(0)
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                              {inv?.invoice_number ?? sale.id.slice(0, 8)}
+                            </span>
+                            {deleted ? (
+                              <Badge
+                                variant="outline"
+                                className="ml-2 border-destructive/40 text-destructive"
+                              >
+                                Del
+                              </Badge>
+                            ) : null}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate text-muted-foreground">
+                          {sale.items?.map((i) => i.name).join(", ") || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              deleted
+                                ? "destructive"
+                                : sale.status === "COMPLETED" || sale.status === "AMENDED"
+                                  ? "default"
+                                  : "secondary"
+                            }
+                          >
+                            {saleStatusLabel(sale.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {deleted
+                              ? "Disabled"
+                              : (s.payment_status ?? "—").replaceAll("_", " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(sale.total)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(s.amount_paid ?? 0)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {deleted ? (
+                            "—"
+                          ) : Number(s.amount_due ?? 0) > 0 ? (
+                            <span className="font-medium text-amber-700 dark:text-amber-400">
+                              {formatCurrency(s.amount_due ?? 0)}
+                            </span>
+                          ) : (
+                            formatCurrency(0)
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             )}
-            </>
-          )}
+          </PaginatedList>
         </CardContent>
       </Card>
 
@@ -316,46 +292,46 @@ export function CustomerHistoryPanel({
           <CardTitle>Appointment history</CardTitle>
         </CardHeader>
         <CardContent>
-          {history.appointments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No appointments yet.</p>
-          ) : (
-            <>
-            <Input
-              placeholder="Search staff, services, status…"
-              value={apptQ}
-              onChange={(e) => setApptQ(e.target.value)}
-              className="mb-3 max-w-sm"
-            />
-            {filteredAppointments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No appointments match your search.</p>
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Staff</TableHead>
-                  <TableHead>Services</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAppointments.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell>{formatDateTime(a.scheduled_at)}</TableCell>
-                    <TableCell>{a.staff?.full_name ?? "—"}</TableCell>
-                    <TableCell className="max-w-xs truncate text-muted-foreground">
-                      {a.services?.map((s) => s.service_name).join(", ") || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{a.status}</Badge>
-                    </TableCell>
+          <PaginatedList
+            items={history.appointments}
+            empty={
+              <p className="text-sm text-muted-foreground">No appointments yet.</p>
+            }
+            search={{
+              placeholder: "Search staff, services, status…",
+              getText: (a) => {
+                const services = a.services?.map((s) => s.service_name).join(" ") ?? "";
+                return `${a.staff?.full_name ?? ""} ${services} ${a.status}`;
+              },
+            }}
+          >
+            {(slice) => (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Staff</TableHead>
+                    <TableHead>Services</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {slice.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell>{formatDateTime(a.scheduled_at)}</TableCell>
+                      <TableCell>{a.staff?.full_name ?? "—"}</TableCell>
+                      <TableCell className="max-w-xs truncate text-muted-foreground">
+                        {a.services?.map((s) => s.service_name).join(", ") || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{a.status}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-            </>
-          )}
+          </PaginatedList>
         </CardContent>
       </Card>
 

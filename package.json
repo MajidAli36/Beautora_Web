@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test:sales": "npx tsx --test lib/sales/calculate.test.ts lib/sales/payment-balance.test.ts",
     "test:payroll": "npx tsx --test lib/payroll/calculate.test.ts lib/payroll/late.test.ts",
+    "test:marketplace": "npx tsx --test lib/marketplace/pricing.test.ts",
     "db:push": "node scripts/db-push.mjs",
     "db:link": "node scripts/db-link.mjs",
     "db:seed": "node scripts/seed-data.mjs",

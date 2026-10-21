@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ChevronLeft, ChevronRight, Star } from "lucide-react";
@@ -493,39 +494,50 @@ function FeedbackDashboardPanel({ data }: { data: FeedbackDashboard }) {
             <CardDescription>Visits averaging under {IMPROVEMENT_THRESHOLD}/10</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Staff</TableHead>
-                  <TableHead className="text-right">Avg</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.lowScores.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDateTime(row.createdAt)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {row.customerName}
-                      {row.isWalkIn && (
-                        <Badge variant="secondary" className="ml-2">
-                          Walk-in
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {row.staffName ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-destructive">
-                      {row.averageScore}/10
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <PaginatedList
+              items={data.lowScores}
+              search={{
+                placeholder: "Search customer, staff…",
+                getText: (row) =>
+                  `${row.customerName} ${row.staffName ?? ""} ${row.averageScore}`,
+              }}
+            >
+              {(slice) => (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Staff</TableHead>
+                      <TableHead className="text-right">Avg</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {slice.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {formatDateTime(row.createdAt)}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {row.customerName}
+                          {row.isWalkIn && (
+                            <Badge variant="secondary" className="ml-2">
+                              Walk-in
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {row.staffName ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums text-destructive">
+                          {row.averageScore}/10
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </PaginatedList>
           </CardContent>
         </Card>
       )}
@@ -535,45 +547,53 @@ function FeedbackDashboardPanel({ data }: { data: FeedbackDashboard }) {
           <CardTitle className="text-base">Recent feedback</CardTitle>
         </CardHeader>
         <CardContent>
-          {!data.recent.length ? (
-            <p className="text-sm text-muted-foreground">No responses yet.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Staff</TableHead>
-                  <TableHead>Overall</TableHead>
-                  <TableHead className="text-right">Avg</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.recent.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDateTime(row.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{row.customerName}</div>
-                      {row.comment && (
-                        <p className="max-w-[220px] truncate text-xs text-muted-foreground">
-                          {row.comment}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {row.staffName ?? "—"}
-                    </TableCell>
-                    <TableCell className="tabular-nums">{row.overall}/10</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
-                      {row.averageScore}/10
-                    </TableCell>
+          <PaginatedList
+            items={data.recent}
+            empty={<p className="text-sm text-muted-foreground">No responses yet.</p>}
+            search={{
+              placeholder: "Search customer, staff, comment…",
+              getText: (row) =>
+                `${row.customerName} ${row.staffName ?? ""} ${row.comment ?? ""}`,
+            }}
+          >
+            {(slice) => (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Staff</TableHead>
+                    <TableHead>Overall</TableHead>
+                    <TableHead className="text-right">Avg</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {formatDateTime(row.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{row.customerName}</div>
+                        {row.comment && (
+                          <p className="max-w-[220px] truncate text-xs text-muted-foreground">
+                            {row.comment}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.staffName ?? "—"}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{row.overall}/10</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {row.averageScore}/10
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </PaginatedList>
         </CardContent>
       </Card>
     </div>
@@ -582,20 +602,13 @@ function FeedbackDashboardPanel({ data }: { data: FeedbackDashboard }) {
 
 function AllReviewsPanel({ reviews }: { reviews: FeedbackListItem[] }) {
   const [filter, setFilter] = useState<"all" | "customer" | "walkin" | "staff">("all");
-  const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
-    let rows = reviews;
-    if (filter === "customer") rows = rows.filter((r) => !r.isWalkIn);
-    if (filter === "walkin") rows = rows.filter((r) => r.isWalkIn);
-    if (filter === "staff") rows = rows.filter((r) => Boolean(r.staffName));
-    const needle = q.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((r) => {
-      const hay = `${r.customerName} ${r.staffName ?? ""} ${r.comment ?? ""}`.toLowerCase();
-      return hay.includes(needle);
-    });
-  }, [reviews, filter, q]);
+    if (filter === "customer") return reviews.filter((r) => !r.isWalkIn);
+    if (filter === "walkin") return reviews.filter((r) => r.isWalkIn);
+    if (filter === "staff") return reviews.filter((r) => Boolean(r.staffName));
+    return reviews;
+  }, [reviews, filter]);
 
   return (
     <div className="space-y-4">
@@ -628,60 +641,65 @@ function AllReviewsPanel({ reviews }: { reviews: FeedbackListItem[] }) {
               </Button>
             ))}
           </div>
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search guest, stylist, or comment…"
-          />
-          {!filtered.length ? (
-            <p className="text-sm text-muted-foreground">No reviews match this filter.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Guest</TableHead>
-                    <TableHead>Stylist</TableHead>
-                    <TableHead>Overall</TableHead>
-                    <TableHead className="text-right">Avg</TableHead>
-                    <TableHead>Comment</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDateTime(row.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{row.customerName}</span>
-                        {row.isWalkIn ? (
-                          <Badge variant="secondary" className="ml-2">
-                            Walk-in
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="ml-2">
-                            Customer
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {row.staffName ?? "Salon overall"}
-                      </TableCell>
-                      <TableCell className="tabular-nums">{row.overall}/10</TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {row.averageScore}/10
-                      </TableCell>
-                      <TableCell className="max-w-[240px] truncate text-sm text-muted-foreground">
-                        {row.comment ?? "—"}
-                      </TableCell>
+          <PaginatedList
+            items={filtered}
+            empty={
+              <p className="text-sm text-muted-foreground">No reviews match this filter.</p>
+            }
+            search={{
+              placeholder: "Search guest, stylist, or comment…",
+              getText: (row) =>
+                `${row.customerName} ${row.staffName ?? ""} ${row.comment ?? ""}`,
+            }}
+          >
+            {(slice) => (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Guest</TableHead>
+                      <TableHead>Stylist</TableHead>
+                      <TableHead>Overall</TableHead>
+                      <TableHead className="text-right">Avg</TableHead>
+                      <TableHead>Comment</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  </TableHeader>
+                  <TableBody>
+                    {slice.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {formatDateTime(row.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{row.customerName}</span>
+                          {row.isWalkIn ? (
+                            <Badge variant="secondary" className="ml-2">
+                              Walk-in
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="ml-2">
+                              Customer
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {row.staffName ?? "Salon overall"}
+                        </TableCell>
+                        <TableCell className="tabular-nums">{row.overall}/10</TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {row.averageScore}/10
+                        </TableCell>
+                        <TableCell className="max-w-[240px] truncate text-sm text-muted-foreground">
+                          {row.comment ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </PaginatedList>
         </CardContent>
       </Card>
     </div>

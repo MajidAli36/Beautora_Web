@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -153,48 +154,47 @@ export function AppointmentsTab({ data }: { data: AppointmentsReport }) {
           </Button>
         }
       >
-        {!data.ledger.length ? (
-          <ReportEmpty message="No appointments found for the selected period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Input
-              placeholder="Search customer, staff, services, status…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="mb-3 max-w-sm print:hidden"
-            />
-            {!filtered.length ? (
-              <ReportEmpty message="No appointments match your search." />
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Staff</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Services</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.slice(0, 200).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {formatDateTime(r.scheduledAt)}
-                    </TableCell>
-                    <TableCell className="font-medium">{r.customerName}</TableCell>
-                    <TableCell>{r.staffName ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{r.status}</Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-xs">{r.services || "—"}</TableCell>
+        <Input
+          placeholder="Search customer, staff, services, status…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="mb-3 max-w-sm print:hidden"
+        />
+        <PaginatedList
+          items={filtered}
+          empty={<ReportEmpty message="No appointments found for the selected period." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Staff</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Services</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {formatDateTime(r.scheduledAt)}
+                      </TableCell>
+                      <TableCell className="font-medium">{r.customerName}</TableCell>
+                      <TableCell>{r.staffName ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{r.status}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate text-xs">{r.services || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
     </div>
   );

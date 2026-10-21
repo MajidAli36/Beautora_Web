@@ -163,7 +163,12 @@ function mapCompensation(row: {
     overtimeEligible: Boolean(row.overtime_eligible),
     overtimeMultiplier: Number(row.overtime_multiplier ?? 1.5),
     salaryPolicy: (row.salary_policy as StaffSalaryPolicy) || "FIXED",
-    weeklyOffDays: Array.isArray(row.weekly_off_days) ? row.weekly_off_days : [0],
+    // Empty array = works every day. Only default Sunday when the column is null/missing.
+    weeklyOffDays: Array.isArray(row.weekly_off_days)
+      ? row.weekly_off_days
+      : row.weekly_off_days == null
+        ? [0]
+        : [],
     scheduleStartTime: row.schedule_start_time ?? null,
     scheduleEndTime: row.schedule_end_time ?? null,
     hiredOn: row.hired_on,
@@ -280,7 +285,7 @@ export async function getPayrollDashboard(
       `
       )
       .eq("organization_id", org.organizationId)
-      .in("status", ["ABSENT", "ON_LEAVE", "HALF_DAY"])
+      .in("status", ["ABSENT", "ON_LEAVE", "HALF_DAY", "HOLIDAY"])
       .gte("work_date", rangeStart)
       .lte("work_date", rangeEnd)
       .order("work_date", { ascending: false }),

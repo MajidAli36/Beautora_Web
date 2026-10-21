@@ -14,6 +14,7 @@ import {
 } from "@/lib/partners/referral";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import type {
   PartnerCommissionRow,
   PartnerReferredStore,
@@ -368,37 +369,50 @@ export function PartnerDashboardClient({
               One row per first paid subscription credited on your behalf.
             </p>
           </div>
-          <ul className="divide-y divide-[#EAEAEA] rounded-xl border border-[#EAEAEA] bg-white">
-            {commissions.length === 0 ? (
-              <li className="p-4 text-sm text-[#6B7280]">
+          <PaginatedList
+            items={commissions}
+            empty={
+              <p className="rounded-xl border border-[#EAEAEA] bg-white p-4 text-sm text-[#6B7280]">
                 No earnings yet. When SyncOps approves a referred store&apos;s first USDT
                 payment, ${SUBSCRIPTION.asiaAmountUsd}–${SUBSCRIPTION.usdtAmountUsd} appears
                 here.
-              </li>
-            ) : (
-              commissions.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div>
-                    <p className="font-medium text-[#111827]">{c.organization_name}</p>
-                    <p className="text-xs text-[#6B7280]">
-                      First subscription · {new Date(c.created_at).toLocaleString("en-PK")} ·{" "}
-                      {c.status === "paid"
-                        ? "Paid out to you"
-                        : c.status === "earned"
-                          ? "Earned — awaiting payout"
-                          : c.status}
+              </p>
+            }
+            search={{
+              placeholder: "Search organization, status…",
+              getText: (c) =>
+                [c.organization_name, c.status, String(c.amount_pkr)].join(" "),
+              emptyFiltered: (
+                <p className="text-sm text-[#6B7280]">No earnings match your search.</p>
+              ),
+            }}
+          >
+            {(slice) => (
+              <ul className="divide-y divide-[#EAEAEA] rounded-xl border border-[#EAEAEA] bg-white">
+                {slice.map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div>
+                      <p className="font-medium text-[#111827]">{c.organization_name}</p>
+                      <p className="text-xs text-[#6B7280]">
+                        First subscription · {new Date(c.created_at).toLocaleString("en-PK")} ·{" "}
+                        {c.status === "paid"
+                          ? "Paid out to you"
+                          : c.status === "earned"
+                            ? "Earned — awaiting payout"
+                            : c.status}
+                      </p>
+                    </div>
+                    <p className="text-lg font-bold text-[#0F9D8C]">
+                      +{formatMoney(c.amount_pkr)}
                     </p>
-                  </div>
-                  <p className="text-lg font-bold text-[#0F9D8C]">
-                    +{formatMoney(c.amount_pkr)}
-                  </p>
-                </li>
-              ))
+                  </li>
+                ))}
+              </ul>
             )}
-          </ul>
+          </PaginatedList>
         </section>
 
         <p className="pb-6 text-center text-xs text-[#9CA3AF]">

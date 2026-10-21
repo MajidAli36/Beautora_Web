@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 
 function usageTypeLabel(type: string, referenceType: string | null) {
   const ref = String(referenceType ?? "");
@@ -126,102 +127,108 @@ export function InHouseUsageTab({ data }: { data: InHouseUsageReport }) {
           onChange={(e) => setQ(e.target.value)}
           className="mb-3 max-w-sm print:hidden"
         />
-        {!filtered.length ? (
-          <ReportEmpty message="No in-house products found." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Use / client</TableHead>
-                  <TableHead className="text-right">Remaining</TableHead>
-                  <TableHead className="text-right">Used (period)</TableHead>
-                  <TableHead className="text-right">Usage cost</TableHead>
-                  <TableHead className="text-right">Clients left</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/in-house/${p.id}`}
-                        className="text-primary underline-offset-2 hover:underline"
-                      >
-                        {p.name}
-                      </Link>
-                      {p.sku ? (
-                        <div className="text-xs text-muted-foreground">{p.sku}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      {p.usePerClient != null ? `${p.usePerClient} ${p.unit}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {p.stockRemaining} {p.unit}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {p.netUsedInPeriod} {p.unit}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(p.usageCostInPeriod)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {p.clientsLeft != null ? `~${p.clientsLeft}` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          p.status === "ok" ? "secondary" : p.status === "low" ? "outline" : "destructive"
-                        }
-                      >
-                        {p.status}
-                      </Badge>
-                    </TableCell>
+        <PaginatedList
+          items={filtered}
+          empty={<ReportEmpty message="No in-house products found." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Use / client</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
+                    <TableHead className="text-right">Used (period)</TableHead>
+                    <TableHead className="text-right">Usage cost</TableHead>
+                    <TableHead className="text-right">Clients left</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/in-house/${p.id}`}
+                          className="text-primary underline-offset-2 hover:underline"
+                        >
+                          {p.name}
+                        </Link>
+                        {p.sku ? (
+                          <div className="text-xs text-muted-foreground">{p.sku}</div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        {p.usePerClient != null ? `${p.usePerClient} ${p.unit}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {p.stockRemaining} {p.unit}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {p.netUsedInPeriod} {p.unit}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(p.usageCostInPeriod)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {p.clientsLeft != null ? `~${p.clientsLeft}` : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            p.status === "ok" ? "secondary" : p.status === "low" ? "outline" : "destructive"
+                          }
+                        >
+                          {p.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
 
       <ReportSection title="Usage movements (period)" defaultOpen>
-        {!data.transactions.length ? (
-          <ReportEmpty message="No in-house usage in this period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.transactions.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatDateTime(t.createdAt)}
-                    </TableCell>
-                    <TableCell>{t.productName}</TableCell>
-                    <TableCell>{usageTypeLabel(t.type, t.referenceType)}</TableCell>
-                    <TableCell className="text-right">
-                      {t.type === "OUT" ? "-" : "+"}
-                      {t.quantity} {t.unit}
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(t.valueAtCost)}</TableCell>
+        <PaginatedList
+          items={data.transactions}
+          empty={<ReportEmpty message="No in-house usage in this period." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatDateTime(t.createdAt)}
+                      </TableCell>
+                      <TableCell>{t.productName}</TableCell>
+                      <TableCell>{usageTypeLabel(t.type, t.referenceType)}</TableCell>
+                      <TableCell className="text-right">
+                        {t.type === "OUT" ? "-" : "+"}
+                        {t.quantity} {t.unit}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(t.valueAtCost)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
     </div>
   );

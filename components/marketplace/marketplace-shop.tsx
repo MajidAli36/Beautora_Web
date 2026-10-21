@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import {
   Sheet,
   SheetContent,
@@ -256,14 +257,24 @@ export function MarketplaceShop({
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-3 px-4 py-6 sm:grid-cols-3 sm:gap-4 sm:px-6 lg:grid-cols-4">
-        {filtered.length === 0 ? (
-          <p className="col-span-full py-16 text-center text-sm text-[var(--m-muted)]">
-            No products match. Sellers publish after platform approval.
-          </p>
-        ) : (
-          filtered.map((p) => <MarketplaceProductCard key={p.id} product={p} />)
-        )}
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <PaginatedList
+          items={filtered}
+          pageSize={12}
+          empty={
+            <p className="py-16 text-center text-sm text-[var(--m-muted)]">
+              No products match. Sellers publish after platform approval.
+            </p>
+          }
+        >
+          {(slice) => (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+              {slice.map((p) => (
+                <MarketplaceProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          )}
+        </PaginatedList>
       </div>
 
       <Sheet open={cartOpen} onOpenChange={setCartOpen}>

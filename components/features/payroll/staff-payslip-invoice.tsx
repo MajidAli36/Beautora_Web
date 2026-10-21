@@ -6,6 +6,10 @@ import type { StaffPayslipBundle } from "@/lib/actions/staff-payslip";
 import { waiveStaffFine } from "@/lib/actions/staff-fines";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { STAFF_PAYMENT_TYPE_LABELS, type StaffPaymentType } from "@/lib/finances/categories";
+import {
+  hourlyFromMonthly,
+  monthlyFromHourly,
+} from "@/lib/payroll/rate-math";
 import { notify } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +53,39 @@ export function StaffPayslipInvoice({
   const [pending, startTransition] = useTransition();
   const { salary, policy, payroll, fines, payments, paymentTotals } = bundle;
 
+  const hoursPerDay = salary.expectedHoursPerDay || 8;
+  const daysPerWeek = salary.expectedDaysPerWeek || 6;
+  const displayHourly =
+    salary.payType === "HOURLY" && (salary.hourlyRate ?? 0) > 0
+      ? Number(salary.hourlyRate)
+      : salary.payType === "MONTHLY" && (salary.monthlySalary ?? 0) > 0
+        ? hourlyFromMonthly(
+            Number(salary.monthlySalary),
+            hoursPerDay,
+            daysPerWeek
+          )
+        : Number(salary.hourlyRate ?? 0) ||
+          hourlyFromMonthly(
+            Number(salary.monthlySalary ?? 0),
+            hoursPerDay,
+            daysPerWeek
+          );
+  const displayMonthly =
+    salary.payType === "MONTHLY" && (salary.monthlySalary ?? 0) > 0
+      ? Number(salary.monthlySalary)
+      : salary.payType === "HOURLY" && (salary.hourlyRate ?? 0) > 0
+        ? monthlyFromHourly(
+            Number(salary.hourlyRate),
+            hoursPerDay,
+            daysPerWeek
+          )
+        : Number(salary.monthlySalary ?? 0) ||
+          monthlyFromHourly(
+            Number(salary.hourlyRate ?? 0),
+            hoursPerDay,
+            daysPerWeek
+          );
+
   function onWaive(fineId: string) {
     startTransition(async () => {
       const res = await waiveStaffFine(fineId, "Waived by owner/manager");
@@ -85,7 +122,7 @@ export function StaffPayslipInvoice({
           </div>
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Payment type
@@ -100,14 +137,30 @@ export function StaffPayslipInvoice({
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Rate
+                Monthly
               </p>
-              <p className="mt-1 font-semibold">
-                {salary.payType === "HOURLY"
-                  ? `${formatCurrency(salary.hourlyRate ?? 0)} / hr`
-                  : salary.payType === "MONTHLY"
-                    ? formatCurrency(salary.monthlySalary ?? 0)
-                    : "—"}
+              <p className="mt-1 font-semibold tabular-nums">
+                {salary.payType
+                  ? formatCurrency(displayMonthly)
+                  : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {salary.payType === "HOURLY" ? "Equivalent from hourly" : "Base salary"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Hourly
+              </p>
+              <p className="mt-1 font-semibold tabular-nums">
+                {salary.payType
+                  ? `${formatCurrency(displayHourly)} / hr`
+                  : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {salary.payType === "MONTHLY"
+                  ? "Auto from monthly ÷ duty hours"
+                  : "Wage rate"}
               </p>
             </div>
             <div>
@@ -118,7 +171,7 @@ export function StaffPayslipInvoice({
                 {salary.dutyStart ?? "—"} – {salary.dutyEnd ?? "—"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {salary.expectedHoursPerDay}h expected / day
+                {salary.expectedHoursPerDay}h / day · {daysPerWeek}d / week
               </p>
             </div>
             <div>

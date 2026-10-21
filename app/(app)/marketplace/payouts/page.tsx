@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { getMyMarketplaceSeller, getSellerPayoutSummary } from "@/lib/marketplace/actions";
 import { MarketplaceCommissionsList } from "@/components/marketplace/seller-searchable-lists";
+import { MarketplaceSellerLedgerList } from "@/components/marketplace/marketplace-seller-ledger-list";
 import { SellerPayoutRequestForm } from "@/components/marketplace/seller-payout-request-form";
 import { formatCommissionPercent } from "@/lib/marketplace/constants";
 import { getDefaultCommissionRate } from "@/lib/marketplace/commission";
@@ -19,7 +20,7 @@ export default async function MarketplacePayoutsPage() {
     getSellerPayoutSummary(),
     getDefaultCommissionRate(),
     getSellerLedgerBalance(seller.id),
-    listSellerLedger(seller.id, 20),
+    listSellerLedger(seller.id, 100),
     listMyPayoutRequests(),
   ]);
 
@@ -73,21 +74,7 @@ export default async function MarketplacePayoutsPage() {
           <CardTitle className="text-base">Recent ledger</CardTitle>
         </CardHeader>
         <CardContent>
-          {ledger.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No ledger entries yet.</p>
-          ) : (
-            <ul className="divide-y text-sm">
-              {ledger.map((row) => (
-                <li key={row.id} className="flex justify-between gap-3 py-2">
-                  <span>
-                    {row.entry_type}
-                    {row.notes ? ` · ${row.notes}` : ""}
-                  </span>
-                  <span className="font-medium">{formatCurrency(Number(row.amount))}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <MarketplaceSellerLedgerList rows={ledger} />
         </CardContent>
       </Card>
 

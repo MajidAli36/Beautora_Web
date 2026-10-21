@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BRAND } from "@/lib/marketing/brand";
-import { productForMode } from "@/lib/marketing/products";
+import { getWorkspace } from "@/lib/workspaces";
 import { UserMenu } from "@/components/layout/user-menu";
 import { AppModeSwitcherItems } from "@/components/layout/app-mode-switcher";
 
@@ -63,7 +63,8 @@ export function AppSidebar({
   const pathname = usePathname();
   const isMarketplace = appMode === "marketplace";
   const isCustomerApp = appMode === "customer_app";
-  const activeProduct = productForMode(appMode);
+  const activeWorkspace = getWorkspace(appMode);
+  const ActiveWorkspaceIcon = activeWorkspace.icon;
   const navGroups = useMemo(() => {
     if (isMarketplace) return marketplaceNavGroups;
     if (isCustomerApp) return customerAppNavGroups;
@@ -86,24 +87,41 @@ export function AppSidebar({
         <DropdownMenu>
           <DropdownMenuTrigger
             className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-sidebar-accent outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            aria-label={`Workspace switcher. Current: ${activeWorkspace.name}`}
           >
-            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--m-ink)] ring-1 ring-sidebar-border">
+            <div className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--m-ink)] ring-1 ring-sidebar-border">
               <BeautoraLogo size="sm" className="size-7" />
+              <span
+                className="absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-md bg-primary text-primary-foreground ring-2 ring-sidebar"
+                aria-hidden
+              >
+                <ActiveWorkspaceIcon className="size-2.5" strokeWidth={2.5} />
+              </span>
             </div>
             <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-sm font-semibold text-foreground">{organizationName}</p>
               <p className="truncate text-xs text-muted-foreground">
-                {activeProduct.name} · {activeProduct.tagline}
+                <span className="font-medium text-primary">{activeWorkspace.name}</span>
+                {" · "}
+                {activeWorkspace.tagline}
               </p>
             </div>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[min(100vw-2rem,20rem)]">
+          <DropdownMenuContent
+            align="start"
+            className="z-50 w-[min(100vw-2rem,20rem)] min-w-[18rem]"
+          >
             <DropdownMenuItem disabled className="opacity-100">
-              <span className="min-w-0 flex-1 space-y-0.5">
-                <span className="block truncate text-sm font-semibold">{organizationName}</span>
-                <span className="block text-[11px] leading-snug text-muted-foreground whitespace-normal">
-                  Active: {activeProduct.name} — {activeProduct.tagline}
+              <span className="flex w-full items-start gap-2.5">
+                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary ring-1 ring-primary/25">
+                  <ActiveWorkspaceIcon className="size-4" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1 space-y-0.5">
+                  <span className="block truncate text-sm font-semibold">{organizationName}</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground whitespace-normal">
+                    Active: {activeWorkspace.name} — {activeWorkspace.tagline}
+                  </span>
                 </span>
               </span>
             </DropdownMenuItem>
@@ -111,6 +129,7 @@ export function AppSidebar({
               mode={appMode}
               productIntent={productIntent}
               customerAppEnabled={customerAppEnabled}
+              variant="sidebar"
             />
             {showSettingsLink && (
               <DropdownMenuItem>

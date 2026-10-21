@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
 
 export function ProductsTab({ data }: { data: ProductsReport }) {
@@ -87,64 +88,63 @@ export function ProductsTab({ data }: { data: ProductsReport }) {
           </Button>
         }
       >
-        {!data.detail.length ? (
-          <ReportEmpty message="No product sales found for the selected period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Input
-              placeholder="Search product, SKU, category…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="mb-3 max-w-sm print:hidden"
-            />
-            {!filtered.length ? (
-              <ReportEmpty message="No products match your search." />
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">COGS</TableHead>
-                  <TableHead className="text-right">Profit</TableHead>
-                  <TableHead className="text-right">Margin</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((r) => (
-                  <TableRow key={r.productId} className={cn(r.belowCost && "bg-destructive/5")}>
-                    <TableCell>
-                      <div className="font-medium">{r.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {r.sku ?? "No SKU"} · Stock {r.currentStock}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">{r.qtySold}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.cogs)}</TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-medium",
-                        r.profit < 0 ? "text-destructive" : "text-emerald-700"
-                      )}
-                    >
-                      {formatCurrency(r.profit)}
-                    </TableCell>
-                    <TableCell className={cn("text-right", r.marginPercent < 0 && "text-destructive")}>
-                      {r.marginPercent}%
-                    </TableCell>
-                    <TableCell>
-                      {r.belowCost ? <Badge variant="destructive">Sold below cost</Badge> : null}
-                    </TableCell>
+        <Input
+          placeholder="Search product, SKU, category…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="mb-3 max-w-sm print:hidden"
+        />
+        <PaginatedList
+          items={filtered}
+          empty={<ReportEmpty message="No product sales found for the selected period." />}
+        >
+          {(slice) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">COGS</TableHead>
+                    <TableHead className="text-right">Profit</TableHead>
+                    <TableHead className="text-right">Margin</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {slice.map((r) => (
+                    <TableRow key={r.productId} className={cn(r.belowCost && "bg-destructive/5")}>
+                      <TableCell>
+                        <div className="font-medium">{r.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {r.sku ?? "No SKU"} · Stock {r.currentStock}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{r.qtySold}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(r.revenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(r.cogs)}</TableCell>
+                      <TableCell
+                        className={cn(
+                          "text-right font-medium",
+                          r.profit < 0 ? "text-destructive" : "text-emerald-700"
+                        )}
+                      >
+                        {formatCurrency(r.profit)}
+                      </TableCell>
+                      <TableCell className={cn("text-right", r.marginPercent < 0 && "text-destructive")}>
+                        {r.marginPercent}%
+                      </TableCell>
+                      <TableCell>
+                        {r.belowCost ? <Badge variant="destructive">Sold below cost</Badge> : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </PaginatedList>
       </ReportSection>
     </div>
   );

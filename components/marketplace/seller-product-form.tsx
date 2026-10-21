@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketplaceCategoryPicker } from "@/components/marketplace/category-picker";
+import { PricingProfitFields } from "@/components/marketplace/pricing-profit-fields";
 
 type Category = Database["public"]["Tables"]["marketplace_categories"]["Row"];
 
@@ -29,9 +30,8 @@ export function SellerProductForm({ categories }: { categories: Category[] }) {
             <Label htmlFor="title">Title</Label>
             <Input id="title" name="title" required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="price">Price</Label>
-            <Input id="price" name="price" type="number" min={0} step="0.01" required defaultValue={0} />
+          <div className="space-y-2 sm:col-span-2">
+            <PricingProfitFields />
           </div>
           <div className="space-y-2">
             <Label htmlFor="stock">Stock</Label>

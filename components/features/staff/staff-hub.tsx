@@ -8,7 +8,14 @@ import { StaffForm } from "@/components/features/staff/staff-forms";
 import { StaffRowActions } from "@/components/features/staff/staff-row-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +34,9 @@ import {
 } from "@/components/ui/table";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Fingerprint, Plus } from "lucide-react";
+import { StaffHolidayForm } from "@/components/features/attendance/staff-holiday-form";
+import type { AttendanceDayRow } from "@/lib/actions/attendance-days";
+import { CalendarOff, Fingerprint, Plus } from "lucide-react";
 import Link from "next/link";
 
 type StaffRow = {
@@ -52,6 +61,7 @@ type StaffHubProps = {
   canTeam: boolean;
   canInvite: boolean;
   canConfigureRoles?: boolean;
+  holidayDays?: AttendanceDayRow[];
 };
 
 function loginByEmail(teamMembers: TeamMember[]) {
@@ -71,9 +81,13 @@ export function StaffHub({
   canTeam,
   canInvite,
   canConfigureRoles = false,
+  holidayDays = [],
 }: StaffHubProps) {
   const logins = loginByEmail(teamMembers);
   const defaultTab = "roster";
+  const activeStaffOptions = staffList
+    .filter((s) => s.is_active)
+    .map((s) => ({ id: s.id, full_name: s.full_name }));
 
   return (
     <Tabs defaultValue={defaultTab} className="space-y-4">
@@ -87,41 +101,53 @@ export function StaffHub({
 
       <TabsContent value="roster" className="space-y-4">
         <Card>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Salon team</CardTitle>
-              <CardDescription>
-                Employee profiles for thumb attendance, appointments, and payroll. Open a profile to
-                set monthly/hourly pay. Generate wages from{" "}
-                <Link href="/payroll" className="font-medium underline-offset-2 hover:underline">
-                  Payroll
-                </Link>
-                . To appear on the public booking page, use <strong>Show on booking</strong> and set
-                weekly hours under Online booking.
-              </CardDescription>
-            </div>
-            {canManage && (
-              <Dialog>
-                <DialogTrigger
-                  render={
-                    <Button type="button">
-                      <Plus className="mr-1.5 size-4" />
-                      Add staff
-                    </Button>
-                  }
-                />
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add staff member</DialogTitle>
-                    <DialogDescription>
-                      Create a salon profile. Invite the same email under App logins so they can
-                      sign in to the dashboard.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <StaffForm />
-                </DialogContent>
-              </Dialog>
-            )}
+          <CardHeader>
+            <CardTitle>Salon team</CardTitle>
+            <CardDescription>
+              Employee profiles for thumb attendance, appointments, and payroll. Open a profile to
+              set monthly/hourly pay. Generate wages from{" "}
+              <Link href="/payroll" className="font-medium underline-offset-2 hover:underline">
+                Payroll
+              </Link>
+              . To appear on the public booking page, use <strong>Show on booking</strong> and set
+              weekly hours under Online booking.
+            </CardDescription>
+            {canManage ? (
+              <CardAction>
+                <div className="flex flex-row flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 whitespace-nowrap"
+                    render={<a href="#holidays-leave" />}
+                  >
+                    <CalendarOff className="mr-1.5 size-4" />
+                    Add staff leaves
+                  </Button>
+                  <Dialog>
+                    <DialogTrigger
+                      render={
+                        <Button type="button" size="sm" className="h-9 whitespace-nowrap">
+                          <Plus className="mr-1.5 size-4" />
+                          Add staff
+                        </Button>
+                      }
+                    />
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add staff member</DialogTitle>
+                        <DialogDescription>
+                          Create a salon profile. Invite the same email under App logins so they can
+                          sign in to the dashboard.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <StaffForm />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardAction>
+            ) : null}
           </CardHeader>
           <CardContent>
             <PaginatedList
@@ -242,10 +268,38 @@ export function StaffHub({
           </CardContent>
         </Card>
 
+        {canManage ? (
+          <Card id="holidays-leave">
+            <CardHeader>
+              <CardTitle>Holidays & leave</CardTitle>
+              <CardDescription>
+                Assign a paid holiday or unpaid leave for one employee, or apply a national /
+                salon holiday to all active staff. Weekly offs stay on each profile under
+                Salary & duty.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <StaffHolidayForm
+                staffList={activeStaffOptions}
+                recentDays={holidayDays}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-none text-muted-foreground">
           <span className="shrink-0">Related:</span>
           <Link href="/attendance" className="text-primary underline-offset-2 hover:underline">
             Attendance
+          </Link>
+          <span aria-hidden className="text-muted-foreground/70">
+            ·
+          </span>
+          <Link
+            href="/attendance#holidays-leave"
+            className="text-primary underline-offset-2 hover:underline"
+          >
+            Attendance holidays
           </Link>
           <span aria-hidden className="text-muted-foreground/70">
             ·

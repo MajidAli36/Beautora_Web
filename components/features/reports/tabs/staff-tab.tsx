@@ -11,6 +11,7 @@ import { ReportEmpty } from "@/components/features/reports/ui/report-states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginatedList } from "@/components/ui/table-pagination";
 import Link from "next/link";
 
 export function StaffTab({ data }: { data: StaffReport }) {
@@ -81,42 +82,45 @@ export function StaffTab({ data }: { data: StaffReport }) {
               onChange={(e) => setQ(e.target.value)}
               className="mb-3 max-w-sm print:hidden"
             />
-            {!filtered.length ? (
-              <ReportEmpty message="No staff match your search." />
-            ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Staff</TableHead>
-                  <TableHead className="text-right">Appts</TableHead>
-                  <TableHead className="text-right">Done</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Customers</TableHead>
-                  <TableHead className="text-right"> </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((r) => (
-                  <TableRow key={r.staffId ?? r.name}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right">{r.appointments}</TableCell>
-                    <TableCell className="text-right">{r.completed}</TableCell>
-                    <TableCell className="text-right">{r.completionRate.toFixed(0)}%</TableCell>
-                    <TableCell className="text-right">{formatCurrency(r.linkedSalesRevenue)}</TableCell>
-                    <TableCell className="text-right">{r.customersServed}</TableCell>
-                    <TableCell className="text-right">
-                      {r.staffId ? (
-                        <Button type="button" size="sm" variant="outline" render={<Link href={`/staff/${r.staffId}`} />}>
-                          View
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
+            <PaginatedList
+              items={filtered}
+              empty={<ReportEmpty message="No staff match your search." />}
+            >
+              {(slice) => (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Staff</TableHead>
+                      <TableHead className="text-right">Appts</TableHead>
+                      <TableHead className="text-right">Done</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Customers</TableHead>
+                      <TableHead className="text-right"> </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {slice.map((r) => (
+                      <TableRow key={r.staffId ?? r.name}>
+                        <TableCell className="font-medium">{r.name}</TableCell>
+                        <TableCell className="text-right">{r.appointments}</TableCell>
+                        <TableCell className="text-right">{r.completed}</TableCell>
+                        <TableCell className="text-right">{r.completionRate.toFixed(0)}%</TableCell>
+                        <TableCell className="text-right">{formatCurrency(r.linkedSalesRevenue)}</TableCell>
+                        <TableCell className="text-right">{r.customersServed}</TableCell>
+                        <TableCell className="text-right">
+                          {r.staffId ? (
+                            <Button type="button" size="sm" variant="outline" render={<Link href={`/staff/${r.staffId}`} />}>
+                              View
+                            </Button>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </PaginatedList>
           </div>
         )}
       </ReportSection>
