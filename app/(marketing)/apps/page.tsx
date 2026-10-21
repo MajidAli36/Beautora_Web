@@ -13,7 +13,7 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default function AppsPage() {
   return (
-    <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
+    <div className="bg-[var(--m-paper)] m-under-chrome">
       <div className="mx-auto max-w-6xl px-6 pt-8">
         <Breadcrumbs
           items={[

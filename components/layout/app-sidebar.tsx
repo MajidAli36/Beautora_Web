@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, UserRound, Wallet } from "lucide-react";
 import { BeautoraLogo } from "@/components/brand/beautora-logo";
 import { filterNavGroupsForRole, type NavPermissionsConfig } from "@/lib/permissions/nav";
-import { marketplaceNavGroups } from "@/lib/navigation";
+import { customerAppNavGroups, marketplaceNavGroups } from "@/lib/navigation";
 import type { MemberRole } from "@/types";
 import type { AppMode } from "@/lib/marketplace/constants";
 import type { ProductIntent } from "@/lib/auth/account-types";
@@ -45,6 +45,7 @@ type AppSidebarProps = {
   showPlatformBilling?: boolean;
   appMode?: AppMode;
   productIntent?: ProductIntent | null;
+  customerAppEnabled?: boolean;
 };
 
 export function AppSidebar({
@@ -57,20 +58,24 @@ export function AppSidebar({
   showPlatformBilling = false,
   appMode = "saas",
   productIntent = "both",
+  customerAppEnabled = false,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const isMarketplace = appMode === "marketplace";
+  const isCustomerApp = appMode === "customer_app";
   const activeProduct = productForMode(appMode);
   const navGroups = useMemo(() => {
     if (isMarketplace) return marketplaceNavGroups;
+    if (isCustomerApp) return customerAppNavGroups;
     return filterNavGroupsForRole(memberRole, navOverrides);
-  }, [isMarketplace, memberRole, navOverrides]);
+  }, [isMarketplace, isCustomerApp, memberRole, navOverrides]);
   const showSettingsLink =
     !isMarketplace &&
     navGroups.some((g) => g.items.some((item) => item.href === "/settings"));
   const showMarketplaceAccountLink = isMarketplace;
   const myWorkActive = Boolean(
     !isMarketplace &&
+      !isCustomerApp &&
       myStaffHref &&
       (pathname === myStaffHref || pathname.startsWith(`${myStaffHref}/`))
   );
@@ -102,7 +107,11 @@ export function AppSidebar({
                 </span>
               </span>
             </DropdownMenuItem>
-            <AppModeSwitcherItems mode={appMode} productIntent={productIntent} />
+            <AppModeSwitcherItems
+              mode={appMode}
+              productIntent={productIntent}
+              customerAppEnabled={customerAppEnabled}
+            />
             {showSettingsLink && (
               <DropdownMenuItem>
                 <Link href="/settings">Workspace settings</Link>

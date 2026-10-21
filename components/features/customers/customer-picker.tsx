@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { formatCustomerName } from "@/lib/format";
 import { Search, X } from "lucide-react";
@@ -29,10 +29,35 @@ type CustomerPickerProps = {
   emptyLabel?: string;
   /** Max results shown while searching. */
   limit?: number;
+  /**
+   * Optional server search (e.g. POS). Called when query length ≥ 2;
+   * results merge with the seed `customers` list.
+   */
+  searchRemote?: (query: string) => Promise<CustomerOption[]>;
 };
 
 function labelFor(c: CustomerOption) {
   return formatCustomerName(c.first_name, c.last_name) + (c.phone ? ` · ${c.phone}` : "");
+}
+
+function filterLocal(customers: CustomerOption[], query: string, limit: number) {
+  const q = query.trim().toLowerCase();
+  if (!q) return customers.slice(0, limit);
+  const qDigits = q.replace(/\D/g, "");
+  return customers
+    .filter((c) => {
+      const full = formatCustomerName(c.first_name, c.last_name).toLowerCase();
+      const phone = (c.phone ?? "").toLowerCase();
+      const phoneDigits = phone.replace(/\D/g, "");
+      if (full.includes(q) || phone.includes(q)) return true;
+      if (qDigits.length >= 3 && phoneDigits.includes(qDigits)) return true;
+      if (qDigits.length >= 10) {
+        const tail = qDigits.slice(-10);
+        if (phoneDigits.endsWith(tail)) return true;
+      }
+      return false;
+    })
+    .slice(0, limit);
 }
 
 export function CustomerPicker({
@@ -47,6 +72,7 @@ export function CustomerPicker({
   allowEmpty = false,
   emptyLabel = "Walk-in",
   limit = 25,
+  searchRemote,
 }: CustomerPickerProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -62,6 +88,21 @@ export function CustomerPicker({
   const [query, setQuery] = useState(() => (selected ? labelFor(selected) : ""));
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [remoteRows, setRemoteRows] = useState<CustomerOption[]>([]);
+  const [pending, startTransition] = useTransition();
+
+  const runRemoteSearch = useEffectEvent(async (q: string) => {
+    if (!searchRemote || q.trim().length < 2) {
+      setRemoteRows([]);
+      return;
+    }
+    try {
+      const rows = await searchRemote(q.trim());
+      setRemoteRows(rows);
+    } catch {
+      setRemoteRows([]);
+    }
+  });
 
   // Sync display when controlled value changes from outside (e.g. POS appointment link)
   useEffect(() => {
@@ -70,30 +111,34 @@ export function CustomerPicker({
       setQuery("");
       return;
     }
-    const c = customers.find((row) => row.id === value);
+    const c =
+      customers.find((row) => row.id === value) ||
+      remoteRows.find((row) => row.id === value);
     if (c) setQuery(labelFor(c));
-  }, [controlled, value, customers]);
+  }, [controlled, value, customers, remoteRows]);
+
+  useEffect(() => {
+    if (!searchRemote) return;
+    const q = query.trim();
+    if (q.length < 2) {
+      setRemoteRows([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      startTransition(() => {
+        void runRemoteSearch(q);
+      });
+    }, 220);
+    return () => clearTimeout(t);
+  }, [query, searchRemote]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return customers.slice(0, limit);
-    const qDigits = q.replace(/\D/g, "");
-    return customers
-      .filter((c) => {
-        const full = formatCustomerName(c.first_name, c.last_name).toLowerCase();
-        const phone = (c.phone ?? "").toLowerCase();
-        const phoneDigits = phone.replace(/\D/g, "");
-        if (full.includes(q) || phone.includes(q)) return true;
-        if (qDigits.length >= 3 && phoneDigits.includes(qDigits)) return true;
-        // 0301… vs 92301… / last-10 match
-        if (qDigits.length >= 10) {
-          const tail = qDigits.slice(-10);
-          if (phoneDigits.endsWith(tail)) return true;
-        }
-        return false;
-      })
-      .slice(0, limit);
-  }, [customers, query, limit]);
+    const local = filterLocal(customers, query, limit);
+    if (!searchRemote) return local;
+    const byId = new Map<string, CustomerOption>();
+    for (const c of [...remoteRows, ...local]) byId.set(c.id, c);
+    return [...byId.values()].slice(0, limit);
+  }, [customers, query, limit, searchRemote, remoteRows]);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -207,7 +252,13 @@ export function CustomerPicker({
             </li>
           )}
           {filtered.length === 0 ? (
-            <li className="px-2.5 py-2 text-muted-foreground">No customers found</li>
+            <li className="px-2.5 py-2 text-muted-foreground">
+              {pending
+                ? "Searching…"
+                : searchRemote && query.trim().length < 2
+                  ? "Type at least 2 characters"
+                  : "No customers found"}
+            </li>
           ) : (
             filtered.map((c, i) => {
               const rowIndex = allowEmpty ? i + 1 : i;

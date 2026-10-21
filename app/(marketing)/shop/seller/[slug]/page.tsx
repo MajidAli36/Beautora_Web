@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
+import { MarketplaceQuickViewProvider } from "@/components/marketplace/product-quick-view";
 import { getPublicSellerStore } from "@/lib/marketplace/buyer";
 import {
   listPublicMarketplaceProducts,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/marketplace/actions";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { trackMarketplaceEvent } from "@/lib/marketplace/analytics";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -47,11 +49,17 @@ export default async function SellerStorePage({ params }: Props) {
     sellerId: store.seller.id,
   });
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isLoggedIn = Boolean(user);
+
   const all = await listPublicMarketplaceProducts();
   const cards: PublicProductCard[] = all.filter((p) => p.seller_id === store.seller.id);
 
   return (
-    <div className="pt-[var(--m-chrome)]">
+    <div className="m-under-chrome">
       <section className="relative min-h-[42vh] overflow-hidden bg-[var(--m-ink)] text-white">
         {store.seller.cover_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -64,7 +72,7 @@ export default async function SellerStorePage({ params }: Props) {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(15,157,140,0.35),transparent_55%)]" />
         )}
         <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(12,31,28,0.85),rgba(12,31,28,0.35))]" />
-        <div className="relative mx-auto flex min-h-[42vh] max-w-6xl flex-col justify-end px-6 pb-12 pt-[calc(var(--m-chrome)+1.5rem)]">
+        <div className="relative mx-auto flex min-h-[42vh] max-w-6xl flex-col justify-end px-6 pb-12 pt-12">
           <Breadcrumbs
             items={[
               { name: "Home", path: "/" },
@@ -120,11 +128,13 @@ export default async function SellerStorePage({ params }: Props) {
             No published products yet.
           </p>
         ) : (
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-            {cards.map((p) => (
-              <MarketplaceProductCard key={p.id} product={p} />
-            ))}
-          </div>
+          <MarketplaceQuickViewProvider isLoggedIn={isLoggedIn}>
+            <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+              {cards.map((p) => (
+                <MarketplaceProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </MarketplaceQuickViewProvider>
         )}
       </section>
     </div>

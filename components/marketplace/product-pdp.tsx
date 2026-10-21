@@ -342,7 +342,7 @@ export function MarketplaceProductPdp({
           </div>
           <Button
             type="button"
-            className="h-11 gap-2 px-6"
+            className="h-11 gap-2 border-0 bg-[var(--m-accent)] px-6 text-[var(--m-ink)] hover:bg-[#b8955a] hover:text-[var(--m-ink)] active:bg-[#a8844f] disabled:opacity-50"
             disabled={stock < 1 || pending}
             onClick={addToCart}
           >

@@ -52,9 +52,9 @@ export default async function StoresInCityPage({ params }: CityPageProps) {
   const { cityLabel, stores } = result;
 
   return (
-    <div className="pt-[var(--m-chrome)]">
+    <div className="m-under-chrome">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
-        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl px-6 pt-6 pb-14 sm:pt-8 sm:pb-20">
           <Link
             href="/stores"
             className="text-sm font-medium text-[var(--m-muted)] transition-colors hover:text-[var(--m-ink)]"

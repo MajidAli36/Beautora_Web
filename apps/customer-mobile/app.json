@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Beautora Customer",
+    "slug": "beautora-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "beautora-customer",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.beautora.customer"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F766E"
+      },
+      "package": "app.beautora.customer"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

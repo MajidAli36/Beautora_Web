@@ -19,8 +19,8 @@ export function MarketingDoc({
 }: MarketingDocProps) {
   return (
     <div className="bg-[var(--m-paper)] text-[var(--m-ink)]">
-      <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)] pt-[var(--m-chrome)]">
-        <div className="mx-auto max-w-3xl px-6 py-14 sm:py-16">
+      <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)] m-under-chrome">
+        <div className="mx-auto max-w-3xl px-6 pt-6 pb-14 sm:pt-8 sm:pb-16">
           {breadcrumbs?.length ? (
             <div className="mb-6">
               <Breadcrumbs items={breadcrumbs} />

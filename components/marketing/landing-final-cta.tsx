@@ -1,34 +1,26 @@
 import Link from "next/link";
 import { BeautoraLogo } from "@/components/brand/beautora-logo";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { SYNCOPS } from "@/lib/print/syncops";
 
 export function LandingFinalCta() {
   return (
-    <section className="bg-[var(--m-mist)] py-28 sm:py-32">
-      <div className="mx-auto max-w-6xl px-6 text-center">
-        <div className="mb-6 flex justify-center">
-          <BeautoraLogo size="lg" />
+    <section className="m-section bg-[var(--m-ink)] text-white">
+      <div className="m-container text-center">
+        <div className="mb-4 flex justify-center">
+          <BeautoraLogo size="md" />
         </div>
-        <h2 className="font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl lg:text-6xl">
+        <h2 className="font-display text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight">
           Ready to run your salon on {SYNCOPS.name}?
         </h2>
-        <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-[var(--m-muted)]">
-          Start with the full platform for {SUBSCRIPTION.trialDays} days. Then $
-          {SUBSCRIPTION.asiaAmountUsd}/month in Asia or ${SUBSCRIPTION.usdtAmountUsd}/month
-          elsewhere — both via USDT (BEP-20).
+        <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-white/70">
+          Start with the full platform on a free trial. Plans and regional USDT rates live on
+          Pricing — one place, no surprises.
         </p>
-        <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-          <Link
-            href="/signup"
-            className="inline-flex h-12 items-center justify-center bg-[var(--m-ink)] px-8 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-all duration-150 hover:bg-[var(--m-ink-soft)]"
-          >
-            Start 30 days free
+        <div className="mt-6 flex flex-col items-stretch justify-center gap-2.5 sm:flex-row sm:items-center">
+          <Link href="/signup" className="m-btn m-btn-light">
+            Start free
           </Link>
-          <Link
-            href="/pricing"
-            className="inline-flex h-12 items-center justify-center border border-[var(--m-ink)] px-8 text-sm font-medium tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
-          >
+          <Link href="/pricing" className="m-btn m-btn-ghost">
             View pricing
           </Link>
         </div>

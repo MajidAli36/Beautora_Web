@@ -268,7 +268,7 @@ export function AppointmentsHub({
           status === "APPROVED"
             ? "CONFIRMED"
             : status === "REFUNDED" &&
-                a.source === "ONLINE" &&
+                (a.source === "ONLINE" || a.source === "CUSTOMER_APP") &&
                 advanceSettings &&
                 (advanceSettings.booking_advance_amount > 0 ||
                   advanceSettings.booking_advance_percent > 0)
@@ -283,7 +283,9 @@ export function AppointmentsHub({
       const next = patch(prev);
       return next.filter((row) => {
         const pending = getPendingDepositTotal(row.deposits ?? []);
-        return pending > 0 || (row.source === "ONLINE" && row.status === "SCHEDULED");
+        const fromAppOrOnline =
+          row.source === "ONLINE" || row.source === "CUSTOMER_APP";
+        return pending > 0 || (fromAppOrOnline && row.status === "SCHEDULED");
       });
     });
     if (status === "APPROVED") setPendingCount((c) => Math.max(0, c - 1));

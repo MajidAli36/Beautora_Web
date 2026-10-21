@@ -12,6 +12,7 @@ import {
 } from "@/lib/marketplace/cart";
 import { formatMarketplaceMoney } from "@/lib/marketplace/pricing";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
+import { MarketplaceQuickViewProvider } from "@/components/marketplace/product-quick-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,7 +76,9 @@ export function MarketplaceShop({
   useEffect(() => {
     try {
       const raw = localStorage.getItem(MARKETPLACE_CART_KEY);
-      if (raw) setCart(JSON.parse(raw) as MarketplaceCartItem[]);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as MarketplaceCartItem[];
+      queueMicrotask(() => setCart(parsed));
     } catch {
       /* ignore */
     }
@@ -167,6 +170,7 @@ export function MarketplaceShop({
   }
 
   return (
+    <MarketplaceQuickViewProvider isLoggedIn={isLoggedIn}>
     <div className="relative min-h-[70vh]">
       <div className="sticky top-[var(--m-chrome)] z-20 border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
@@ -181,7 +185,7 @@ export function MarketplaceShop({
           </div>
           <Button
             type="button"
-            className="h-11 gap-2"
+            className="h-11 gap-2 border-0 bg-[var(--m-accent)] text-[var(--m-ink)] hover:bg-[#b8955a] hover:text-[var(--m-ink)] active:bg-[#a8844f]"
             onClick={() => router.push("/cart")}
           >
             <ShoppingBag className="size-4" />
@@ -381,5 +385,6 @@ export function MarketplaceShop({
         </SheetContent>
       </Sheet>
     </div>
+    </MarketplaceQuickViewProvider>
   );
 }

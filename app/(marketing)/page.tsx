@@ -47,15 +47,16 @@ export default async function HomePage() {
       <TrustBar storeCount={stores.length} />
       <ProblemSolutionSection />
       <ProductShowcaseSection />
-      <section className="border-y border-[var(--m-line)] bg-[var(--m-mist)] py-14">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="font-display text-3xl font-semibold text-[var(--m-ink)]">
-            Explore Beautora by need
+      <section className="border-y border-[var(--m-line)] bg-[var(--m-paper)] py-10 sm:py-12">
+        <div className="m-container">
+          <p className="m-eyebrow">Explore</p>
+          <h2 className="mt-2 font-display text-[clamp(1.5rem,2.8vw,2rem)] font-semibold text-[var(--m-ink)]">
+            Beautora by need
           </h2>
-          <p className="mt-3 max-w-2xl text-[var(--m-muted)]">
-            Deep-dive pages for search intent — booking, POS, CRM, staff, inventory, and more.
+          <p className="mt-2 max-w-2xl text-sm text-[var(--m-muted)] sm:text-base">
+            Deep-dive pages for booking, POS, CRM, AI tools, and more.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-5 flex flex-wrap gap-2">
             {[
               ["/salon-management-software", "Salon management"],
               ["/salon-booking-software", "Booking"],
@@ -69,7 +70,7 @@ export default async function HomePage() {
               <Link
                 key={href}
                 href={href}
-                className="border border-[var(--m-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--m-ink)] transition-colors hover:border-[var(--m-ink)]"
+                className="border border-[var(--m-line)] bg-[var(--m-card)] px-4 py-2.5 text-sm font-medium text-[var(--m-body)] transition-colors hover:border-[var(--m-ink)] hover:text-[var(--m-ink)]"
               >
                 {label}
               </Link>

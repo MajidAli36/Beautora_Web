@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { scrollMarketingToTop } from "@/components/marketing/marketing-scroll-manager";
 import { BeautoraWordmark } from "@/components/brand/beautora-logo";
-import { SiteTopBar } from "@/components/marketing/site-top-bar";
 import { PartnerAwareSignupLink } from "@/components/partners/partner-aware-signup-link";
 import { cn } from "@/lib/utils";
 
@@ -16,12 +15,29 @@ const PRIMARY_NAV = [
   { label: "Features", href: "/features" },
   { label: "Pricing", href: "/pricing" },
   { label: "Stores", href: "/stores" },
-  { label: "Discover", href: "/discover" },
   { label: "Shop", href: "/shop" },
-  { label: "Videos", href: "/videos" },
 ] as const;
 
+/** Mid-width bar — key links only so Login / Start free never collide. */
+const COMPACT_NAV = [
+  { label: "Features", href: "/features" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Stores", href: "/stores" },
+  { label: "Shop", href: "/shop" },
+] as const;
+
+function navItemClass(active: boolean) {
+  return cn(
+    "rounded-sm px-2 py-2 text-[13px] font-medium tracking-wide whitespace-nowrap transition-colors lg:px-2.5",
+    active
+      ? "text-[var(--m-ink)] underline decoration-[var(--m-accent)] decoration-2 underline-offset-[10px]"
+      : "text-[var(--m-ink-soft)] hover:text-[var(--m-ink)]"
+  );
+}
+
 const MORE_NAV = [
+  { label: "Discover", href: "/discover" },
+  { label: "Videos", href: "/videos" },
   { label: "Booking", href: "/salon-booking-software" },
   { label: "POS", href: "/salon-pos" },
   { label: "CRM", href: "/salon-crm" },
@@ -38,6 +54,8 @@ const MOBILE_SECTIONS = [
     group: "Product",
     items: [
       ...PRIMARY_NAV,
+      { label: "Discover", href: "/discover" },
+      { label: "Videos", href: "/videos" },
       { label: "Booking", href: "/salon-booking-software" },
       { label: "POS", href: "/salon-pos" },
       { label: "CRM", href: "/salon-crm" },
@@ -63,6 +81,8 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileNavId = useId();
 
   useEffect(() => {
     setOpen(false);
@@ -76,7 +96,10 @@ export function SiteHeader() {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setMoreOpen(false);
-        setOpen(false);
+        if (open) {
+          setOpen(false);
+          menuButtonRef.current?.focus();
+        }
       }
     }
     document.addEventListener("pointerdown", onPointerDown);
@@ -85,7 +108,7 @@ export function SiteHeader() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -117,14 +140,17 @@ export function SiteHeader() {
   }
 
   return (
-    <div className="fixed inset-x-0 top-0 z-50">
-      <SiteTopBar />
-      <header className="border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 shadow-[0_8px_24px_-18px_rgba(6,33,29,0.45)] backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:h-16 lg:gap-4">
+    <header className="sticky top-0 z-50 h-14 border-b border-[var(--m-line)] bg-[var(--m-paper)] shadow-[0_8px_24px_-18px_rgba(7,59,50,0.4)] lg:h-16">
+        {/*
+          In-flow sticky header (not fixed): occupies document height so the hero
+          starts below it and never paints behind the nav.
+          3-column grid: logo | nav | actions.
+        */}
+        <div className="relative mx-auto grid h-full w-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-3 sm:px-6">
           <Link
             href="/"
             onClick={goHome}
-            className="min-w-0 shrink transition-opacity hover:opacity-90"
+            className="min-w-0 justify-self-start rounded-sm transition-opacity hover:opacity-90"
             aria-label="Beautora home"
           >
             <BeautoraWordmark
@@ -135,25 +161,35 @@ export function SiteHeader() {
             />
           </Link>
 
+          {/* Compact main links — lg to 2xl */}
           <nav
-            className="hidden min-w-0 flex-1 items-center justify-center xl:flex"
+            className="hidden min-w-0 items-center justify-center overflow-hidden lg:flex 2xl:hidden"
             aria-label="Primary"
           >
-            <div className="inline-flex items-center gap-1 rounded-full bg-[var(--m-mist)]/80 px-1.5 py-1">
+            <div className="flex items-center gap-0.5">
+              {COMPACT_NAV.map((item) => {
+                const active =
+                  pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <Link key={item.href} href={item.href} className={navItemClass(active)}>
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+
+          {/* Full nav + More — 2xl+ */}
+          <nav
+            className="hidden items-center justify-center 2xl:flex"
+            aria-label="Primary"
+          >
+            <div className="flex items-center gap-0.5">
               {PRIMARY_NAV.map((item) => {
                 const active =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-colors",
-                      active
-                        ? "bg-white text-[var(--m-ink)] shadow-sm"
-                        : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
-                    )}
-                  >
+                  <Link key={item.href} href={item.href} className={navItemClass(active)}>
                     {item.label}
                   </Link>
                 );
@@ -166,10 +202,10 @@ export function SiteHeader() {
                   aria-haspopup="menu"
                   onClick={() => setMoreOpen((v) => !v)}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-colors",
+                    "inline-flex items-center gap-1 rounded-sm px-2.5 py-2 text-[13px] font-medium tracking-wide whitespace-nowrap transition-colors",
                     moreOpen
-                      ? "bg-white text-[var(--m-ink)] shadow-sm"
-                      : "text-[var(--m-ink-soft)] hover:bg-white/70 hover:text-[var(--m-ink)]"
+                      ? "text-[var(--m-ink)]"
+                      : "text-[var(--m-ink-soft)] hover:text-[var(--m-ink)]"
                   )}
                 >
                   More
@@ -183,7 +219,7 @@ export function SiteHeader() {
                 {moreOpen ? (
                   <div
                     role="menu"
-                    className="absolute top-[calc(100%+0.5rem)] left-1/2 z-50 w-56 -translate-x-1/2 overflow-hidden rounded-xl border border-[var(--m-line)] bg-[var(--m-paper)] py-1.5 shadow-[0_16px_40px_-20px_rgba(6,33,29,0.55)]"
+                    className="absolute top-[calc(100%+0.5rem)] left-1/2 z-50 w-56 -translate-x-1/2 overflow-hidden border border-[var(--m-line)] bg-[var(--m-card)] py-1.5 shadow-[var(--m-shadow)]"
                   >
                     {MORE_NAV.map((item) => (
                       <Link
@@ -191,7 +227,7 @@ export function SiteHeader() {
                         href={item.href}
                         role="menuitem"
                         onClick={() => setMoreOpen(false)}
-                        className="flex items-center justify-between px-3.5 py-2.5 text-sm text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
+                        className="flex items-center justify-between px-3.5 py-2.5 text-sm text-[var(--m-body)] transition-colors hover:bg-[var(--m-mist)] hover:text-[var(--m-ink)]"
                       >
                         <span>{item.label}</span>
                         {"badge" in item && item.badge ? (
@@ -207,36 +243,26 @@ export function SiteHeader() {
             </div>
           </nav>
 
-          {/* Desktop auth */}
-          <div className="hidden shrink-0 items-center gap-3 xl:flex">
-            <Link
-              href="/login"
-              className="px-2 text-sm font-medium text-[var(--m-muted)] transition-opacity hover:opacity-75"
-            >
-              Login
-            </Link>
-            <PartnerAwareSignupLink className="inline-flex h-10 items-center rounded-full bg-[var(--m-ink)] px-5 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)]">
-              Start free
-            </PartnerAwareSignupLink>
-          </div>
+          {/* Spacer when both desktop navs are hidden (below lg) */}
+          <div className="lg:hidden" aria-hidden />
 
-          {/* Mobile / tablet: Login + Start free + menu — always visible */}
-          <div className="flex shrink-0 items-center gap-2 xl:hidden">
+          <div className="flex items-center justify-self-end gap-2 sm:gap-3">
             <Link
               href="/login"
-              className="inline-flex h-9 items-center justify-center rounded-full px-2.5 text-sm font-semibold text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)] sm:px-3"
+              className="rounded-sm px-2 text-sm font-medium text-[var(--m-muted)] transition-colors hover:text-[var(--m-ink)]"
             >
               Login
             </Link>
-            <PartnerAwareSignupLink className="inline-flex h-9 max-w-[5.75rem] items-center justify-center truncate rounded-full bg-[var(--m-ink)] px-2.5 text-xs font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)] sm:max-w-none sm:px-3.5 sm:text-sm">
+            <PartnerAwareSignupLink className="m-btn m-btn-primary h-9 px-3.5 text-sm sm:h-10 sm:px-5">
               Start free
             </PartnerAwareSignupLink>
             <button
+              ref={menuButtonRef}
               type="button"
-              className="relative z-[1] inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--m-mist)] text-[var(--m-ink)] ring-1 ring-[var(--m-line)]"
+              className="inline-flex size-10 shrink-0 items-center justify-center rounded-sm bg-[var(--m-mist)] text-[var(--m-ink)] ring-1 ring-[var(--m-line)] 2xl:hidden"
               onClick={() => setOpen(!open)}
               aria-expanded={open}
-              aria-controls="mobile-nav"
+              aria-controls={mobileNavId}
               aria-label={open ? "Close menu" : "Open menu"}
             >
               {open ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -246,8 +272,11 @@ export function SiteHeader() {
 
         {open ? (
           <div
-            id="mobile-nav"
-            className="max-h-[min(78dvh,36rem)] overflow-y-auto overscroll-contain border-t border-[var(--m-line)] bg-[var(--m-paper)] px-4 py-4 sm:px-6 xl:hidden"
+            id={mobileNavId}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Site navigation"
+            className="absolute inset-x-0 top-full max-h-[min(78dvh,36rem)] overflow-y-auto overscroll-contain border-b border-t border-[var(--m-line)] bg-[var(--m-paper)] px-4 py-4 shadow-[var(--m-shadow)] sm:px-6 2xl:hidden"
           >
             <nav className="mx-auto flex max-w-7xl flex-col gap-5" aria-label="Mobile">
               {MOBILE_SECTIONS.map((section) => (
@@ -261,7 +290,7 @@ export function SiteHeader() {
                         key={item.href}
                         href={item.href}
                         onClick={() => setOpen(false)}
-                        className="flex min-h-11 items-center justify-between rounded-lg px-3 text-base font-medium text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
+                        className="flex min-h-11 items-center justify-between rounded-sm px-3 text-base font-medium text-[var(--m-ink)] transition-colors hover:bg-[var(--m-mist)]"
                       >
                         <span>{item.label}</span>
                         {"badge" in item && item.badge ? (
@@ -277,7 +306,6 @@ export function SiteHeader() {
             </nav>
           </div>
         ) : null}
-      </header>
-    </div>
+    </header>
   );
 }

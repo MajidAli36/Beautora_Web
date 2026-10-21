@@ -91,9 +91,13 @@ export function StaffHub({
             <div>
               <CardTitle>Salon team</CardTitle>
               <CardDescription>
-                Employee profiles for thumb attendance, appointments, and payroll. To appear on the
-                public booking page, use <strong>Show on booking</strong> and set weekly hours under
-                Online booking.
+                Employee profiles for thumb attendance, appointments, and payroll. Open a profile to
+                set monthly/hourly pay. Generate wages from{" "}
+                <Link href="/payroll" className="font-medium underline-offset-2 hover:underline">
+                  Payroll
+                </Link>
+                . To appear on the public booking page, use <strong>Show on booking</strong> and set
+                weekly hours under Online booking.
               </CardDescription>
             </div>
             {canManage && (
@@ -238,19 +242,26 @@ export function StaffHub({
           </CardContent>
         </Card>
 
-        <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-          <span>Related:</span>
-          <Button variant="link" className="h-auto p-0" render={<Link href="/attendance" />}>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-none text-muted-foreground">
+          <span className="shrink-0">Related:</span>
+          <Link href="/attendance" className="text-primary underline-offset-2 hover:underline">
             Attendance
-          </Button>
-          <span>·</span>
-          <Button variant="link" className="h-auto p-0" render={<Link href="/online-booking" />}>
+          </Link>
+          <span aria-hidden className="text-muted-foreground/70">
+            ·
+          </span>
+          <Link
+            href="/online-booking"
+            className="text-primary underline-offset-2 hover:underline"
+          >
             Online booking schedules
-          </Button>
-          <span>·</span>
-          <Button variant="link" className="h-auto p-0" render={<Link href="/finances" />}>
+          </Link>
+          <span aria-hidden className="text-muted-foreground/70">
+            ·
+          </span>
+          <Link href="/finances" className="text-primary underline-offset-2 hover:underline">
             Staff payments
-          </Button>
+          </Link>
         </div>
       </TabsContent>
 

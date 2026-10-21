@@ -3,7 +3,19 @@
 import { requireOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import { recordManualAttendance } from "@/lib/actions/staff";
-import { endOfLocalDay, getLocalDateString, isoToLocalDateString, startOfLocalDay } from "@/lib/dates/local";
+import {
+  endOfLocalDay,
+  getLocalDateString,
+  isoToLocalDateString,
+  startOfLocalDay,
+  addLocalDays,
+} from "@/lib/dates/local";
+import { fetchAllPages } from "@/lib/supabase/paginate";
+
+/** Hard cap so unbounded org-wide history cannot blow memory / PostgREST. */
+const MAX_ATTENDANCE_RANGE_DAYS = 92;
+const ATTENDANCE_SELECT =
+  "id, staff_id, check_in_at, check_out_at, method, staff:staff!inner(id, full_name, deleted_at)";
 
 export type AttendanceRecord = {
   id: string;
@@ -36,7 +48,9 @@ export type AttendanceReport = {
 
 function parseDateRange(from?: string, to?: string) {
   const toLabel = to ?? getLocalDateString();
-  const fromLabel = from ?? toLabel;
+  let fromLabel = from ?? toLabel;
+  const maxStart = addLocalDays(toLabel, -(MAX_ATTENDANCE_RANGE_DAYS - 1));
+  if (fromLabel < maxStart) fromLabel = maxStart;
   return {
     start: startOfLocalDay(fromLabel),
     end: endOfLocalDay(toLabel),
@@ -49,6 +63,15 @@ function sessionDurationMinutes(checkIn: string, checkOut: string | null) {
   return Math.max(0, Math.round(ms / 60000));
 }
 
+type AttendanceRaw = {
+  id: string;
+  staff_id: string;
+  check_in_at: string;
+  check_out_at: string | null;
+  method: string;
+  staff: { id: string; full_name: string; deleted_at: string | null } | null;
+};
+
 export async function getAttendanceReport(
   from?: string,
   to?: string,
@@ -58,34 +81,34 @@ export async function getAttendanceReport(
   const supabase = await createClient();
   const { start, end } = parseDateRange(from, to);
 
-  let query = supabase
-    .from("staff_attendance")
-    .select("*, staff:staff(id, full_name)")
-    .eq("organization_id", org.organizationId)
-    .gte("check_in_at", start.toISOString())
-    .lte("check_in_at", end.toISOString())
-    .order("check_in_at", { ascending: false });
+  const raw = await fetchAllPages<AttendanceRaw>((fromIdx, toIdx) => {
+    let query = supabase
+      .from("staff_attendance")
+      .select(ATTENDANCE_SELECT)
+      .eq("organization_id", org.organizationId)
+      .is("staff.deleted_at", null)
+      .gte("check_in_at", start.toISOString())
+      .lte("check_in_at", end.toISOString())
+      .order("check_in_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(fromIdx, toIdx);
 
-  if (staffId) query = query.eq("staff_id", staffId);
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  const raw = (data ?? []) as unknown as {
-    id: string;
-    staff_id: string;
-    check_in_at: string;
-    check_out_at: string | null;
-    method: string;
-    staff: { id: string; full_name: string } | null;
-  }[];
+    if (staffId) query = query.eq("staff_id", staffId);
+    // Nested staff!inner select widens the builder type past PromiseLike<T[]>.
+    return query as unknown as PromiseLike<{
+      data: AttendanceRaw[] | null;
+      error: { message: string } | null;
+    }>;
+  });
 
   const records: AttendanceRecord[] = raw.map((r) => ({
     id: r.id,
     check_in_at: r.check_in_at,
     check_out_at: r.check_out_at,
     method: r.method,
-    staff: r.staff,
+    staff: r.staff
+      ? { id: r.staff.id, full_name: r.staff.full_name }
+      : null,
     durationMinutes: sessionDurationMinutes(r.check_in_at, r.check_out_at),
   }));
 
@@ -111,8 +134,8 @@ export async function getAttendanceReport(
     if (mins != null) entry.totalMinutes += mins;
   }
 
-  const summaries: StaffAttendanceSummary[] = [...byStaff.entries()].map(([staffId, s]) => ({
-    staffId,
+  const summaries: StaffAttendanceSummary[] = [...byStaff.entries()].map(([id, s]) => ({
+    staffId: id,
     staffName: s.name,
     sessions: s.sessions,
     workingDays: s.days.size,
@@ -150,25 +173,46 @@ export async function getAttendanceOverview(): Promise<AttendanceOverview> {
   const org = await requireOrganization();
   const supabase = await createClient();
 
-  const [{ data: staff }, { data: openSessions }] = await Promise.all([
+  const [{ data: staff }, openSessions] = await Promise.all([
     supabase
       .from("staff")
       .select("id, full_name, thumb_id, is_active")
       .eq("organization_id", org.organizationId)
-      .eq("is_active", true),
-    supabase
-      .from("staff_attendance")
-      .select("staff_id, method, check_in_at, staff:staff(id, full_name)")
-      .eq("organization_id", org.organizationId)
-      .is("check_out_at", null)
-      .order("check_in_at", { ascending: false }),
+      .eq("is_active", true)
+      .is("deleted_at", null),
+    fetchAllPages<{
+      staff_id: string;
+      method: string;
+      check_in_at: string;
+      staff: { id: string; full_name: string; deleted_at: string | null } | null;
+    }>((from, to) =>
+      supabase
+        .from("staff_attendance")
+        .select(
+          "staff_id, method, check_in_at, staff:staff!inner(id, full_name, deleted_at)"
+        )
+        .eq("organization_id", org.organizationId)
+        .is("check_out_at", null)
+        .is("staff.deleted_at", null)
+        .order("check_in_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to) as unknown as PromiseLike<{
+        data: {
+          staff_id: string;
+          method: string;
+          check_in_at: string;
+          staff: { id: string; full_name: string; deleted_at: string | null } | null;
+        }[] | null;
+        error: { message: string } | null;
+      }>
+    ),
   ]);
 
   const activeStaff = staff ?? [];
   const enrolledCount = activeStaff.filter((s) => s.thumb_id).length;
 
-  const onDuty = (openSessions ?? []).map((row) => {
-    const staffRow = row.staff as unknown as { id: string; full_name: string } | null;
+  const onDuty = openSessions.map((row) => {
+    const staffRow = row.staff;
     return {
       staffId: staffRow?.id ?? row.staff_id,
       staffName: staffRow?.full_name ?? "Unknown",

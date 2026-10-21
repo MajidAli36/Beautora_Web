@@ -87,7 +87,7 @@ export function HeroProductWidget() {
 
   return (
     <aside
-      className="m-fade-up m-fade-up-delay-2 relative mx-auto w-full max-w-md lg:mx-0 lg:justify-self-end"
+      className="m-fade-up m-fade-up-delay-2 relative mx-auto w-full min-w-0 max-w-md shrink-0 lg:mx-0"
       aria-label={`${SYNCOPS.name} product preview`}
       aria-live="polite"
       onMouseEnter={() => setPaused(true)}
@@ -99,49 +99,63 @@ export function HeroProductWidget() {
         }
       }}
     >
-      <div className="border border-white/15 bg-[var(--m-paper)]/95 p-5 text-[var(--m-ink)] shadow-[0_28px_60px_-28px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-6">
+      <div className="overflow-hidden border border-white/20 bg-[var(--m-card)] text-[var(--m-body)] shadow-[var(--m-shadow)] ring-1 ring-black/5">
+        <div className="flex items-center gap-2 border-b border-[var(--m-line)] bg-[var(--m-mist)] px-3.5 py-2">
+          <span className="size-1.5 rounded-full bg-[var(--m-ink)]/20" aria-hidden />
+          <span className="size-1.5 rounded-full bg-[var(--m-ink)]/20" aria-hidden />
+          <span className="size-1.5 rounded-full bg-[var(--m-ink)]/20" aria-hidden />
+          <span className="ml-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--m-muted)]">
+            Beautora workspace
+          </span>
+        </div>
+        <div className="p-4 sm:p-5">
         <div
           className={cn(
             "transition-opacity duration-200 ease-out motion-reduce:transition-none",
             fade ? "opacity-100" : "opacity-0"
           )}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-[var(--m-line)] pb-4">
+          <div className="flex items-start justify-between gap-3 border-b border-[var(--m-line)] pb-3">
             <div>
               <div className="flex items-center gap-2">
                 <BeautoraLogo size="xs" />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--m-ink-soft)]">
                   {SYNCOPS.name}
                 </p>
               </div>
-              <p className="mt-1 font-display text-xl font-semibold tracking-tight">
+              <p className="mt-0.5 font-display text-lg font-semibold tracking-tight text-[var(--m-ink)]">
                 {slide.title}
               </p>
             </div>
-            <span className="shrink-0 border border-[var(--m-line)] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--m-muted)]">
+            <span className="shrink-0 border border-[var(--m-line)] bg-[var(--m-mist)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--m-muted)]">
               {slide.badge}
             </span>
           </div>
 
-          <ul className="mt-1 divide-y divide-[var(--m-line)]">
+          <ul className="mt-0.5 divide-y divide-[var(--m-line)]">
             {slide.rows.map((row) => (
               <li
                 key={`${slide.id}-${row.left}-${row.title}`}
-                className="flex items-center gap-3 py-3.5 text-sm"
+                className="grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-x-2.5 py-2.5 text-sm"
               >
-                <span className="w-12 shrink-0 tabular-nums text-[var(--m-muted)]">
+                <span className="whitespace-nowrap tabular-nums text-[var(--m-muted)]">
                   {row.left}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-[var(--m-ink)]">{row.title}</span>
-                  <span className="block text-xs text-[var(--m-muted)]">{row.sub}</span>
+                <span className="min-w-0 overflow-hidden">
+                  <span className="block truncate font-medium text-[var(--m-ink)]">
+                    {row.title}
+                  </span>
+                  <span className="block truncate text-xs text-[var(--m-muted)]">
+                    {row.sub}
+                  </span>
                 </span>
                 <span
-                  className={
+                  className={cn(
+                    "justify-self-end whitespace-nowrap text-right text-[11px] font-medium",
                     row.tone === "wait"
-                      ? "shrink-0 text-[11px] font-medium text-amber-800"
-                      : "shrink-0 text-[11px] font-medium text-[var(--m-accent)]"
-                  }
+                      ? "text-[var(--m-warn)]"
+                      : "text-[var(--m-ink-soft)]"
+                  )}
                 >
                   {row.right}
                 </span>
@@ -149,12 +163,12 @@ export function HeroProductWidget() {
             ))}
           </ul>
 
-          <p className="mt-3 border-t border-[var(--m-line)] pt-3 text-[11px] text-[var(--m-muted)]">
+          <p className="mt-2.5 border-t border-[var(--m-line)] pt-2.5 text-[11px] text-[var(--m-muted)]">
             {slide.footer}
           </p>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Preview slides">
             {SLIDES.map((s, i) => (
               <button
@@ -182,6 +196,7 @@ export function HeroProductWidget() {
           <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--m-muted)]">
             {paused ? "Paused" : "Auto"}
           </p>
+        </div>
         </div>
       </div>
     </aside>

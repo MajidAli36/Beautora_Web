@@ -4,7 +4,8 @@
 export const MARKETPLACE_COMMISSION_RATE = 0;
 
 export const APP_MODE_COOKIE = "beautora_app_mode";
-export type AppMode = "saas" | "marketplace";
+/** saas = Salon POS · marketplace · customer_app = App dashboard (after Super Admin enables) */
+export type AppMode = "saas" | "marketplace" | "customer_app";
 
 export const MARKETPLACE_ORDER_STATUSES = [
   "placed",

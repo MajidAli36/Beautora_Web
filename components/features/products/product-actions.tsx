@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { adjustInventory, deleteProduct, deleteProductCategory } from "@/lib/actions/products";
@@ -60,6 +60,7 @@ export function DeleteProductCategoryButton({ id, name }: { id: string; name?: s
 
 export function InventoryAdjustForm({ products }: { products: { id: string; name: string; stock_quantity: number }[] }) {
   const router = useRouter();
+  const [adjType, setAdjType] = useState<"IN" | "OUT" | "ADJUSTMENT">("IN");
   const [state, formAction, pending] = useActionState(adjustInventory, {} as ActionResult);
   useActionToast(state, {
     successMessage: state?.message || "Inventory updated — quantity saved.",
@@ -68,6 +69,19 @@ export function InventoryAdjustForm({ products }: { products: { id: string; name
     },
   });
   if (products.length === 0) return null;
+
+  const qtyLabel =
+    adjType === "ADJUSTMENT"
+      ? "New on-hand quantity"
+      : adjType === "OUT"
+        ? "Quantity to remove"
+        : "Quantity to add";
+  const qtyHint =
+    adjType === "ADJUSTMENT"
+      ? "Replaces current stock with this number (not add). Use 0 to clear."
+      : adjType === "OUT"
+        ? "Subtracts from current on-hand."
+        : "Adds on top of current on-hand.";
 
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3">
@@ -80,15 +94,21 @@ export function InventoryAdjustForm({ products }: { products: { id: string; name
         </select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="type">Type</Label>
-        <select id="type" name="type" className="flex h-8 rounded-lg border border-input bg-background px-2.5 text-sm">
+        <Label htmlFor="type">Update type</Label>
+        <select
+          id="type"
+          name="type"
+          value={adjType}
+          onChange={(e) => setAdjType(e.target.value as "IN" | "OUT" | "ADJUSTMENT")}
+          className="flex h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+        >
           <option value="IN">Stock in (add)</option>
           <option value="OUT">Stock out (remove)</option>
           <option value="ADJUSTMENT">Set on-hand quantity</option>
         </select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="qty">Quantity</Label>
+        <Label htmlFor="qty">{qtyLabel}</Label>
         <Input
           id="qty"
           name="quantity"
@@ -99,15 +119,13 @@ export function InventoryAdjustForm({ products }: { products: { id: string; name
           defaultValue={1}
           className="w-28"
         />
-        <p className="text-[11px] text-muted-foreground">
-          “Set on-hand” replaces stock with this number (not add). Use 0 to clear stock.
-        </p>
+        <p className="text-[11px] text-muted-foreground">{qtyHint}</p>
       </div>
       <div className="space-y-2 min-w-[160px] flex-1">
         <Label htmlFor="inv_notes">Notes</Label>
         <Input id="inv_notes" name="notes" placeholder="Optional" />
       </div>
-      <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Record"}</Button>
+      <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Update quantity"}</Button>
     </form>
   );
 }

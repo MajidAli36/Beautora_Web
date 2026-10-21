@@ -103,10 +103,10 @@ export async function getReportsForRange(
   const topServices = allItems.filter((i) => i.itemType === "SERVICE").slice(0, 10);
   const topProducts = allItems.filter((i) => i.itemType === "PRODUCT").slice(0, 10);
 
-  const inventory = await getInventoryMoneySnapshot(org.organizationId, fromLabel, toLabel);
-  const [productSaleRows, revenueSplit] = await Promise.all([
-    getProductSalesBreakdown(org.organizationId, fromLabel, toLabel),
-    getRevenueSplit(org.organizationId, fromLabel, toLabel),
+  const [inventory, productSaleRows, revenueSplit] = await Promise.all([
+    getInventoryMoneySnapshot(org.organizationId, fromLabel, toLabel, saleIds),
+    getProductSalesBreakdown(org.organizationId, fromLabel, toLabel, saleIds),
+    getRevenueSplit(org.organizationId, fromLabel, toLabel, saleIds),
   ]);
 
   return {

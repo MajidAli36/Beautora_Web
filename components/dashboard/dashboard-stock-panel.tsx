@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Info, Package, ShoppingBag } from "lucide-react";
+import { Info, Package, ShoppingBag, FlaskConical } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,8 @@ export type DashboardStockToday = {
   inventoryValueAtCost: number;
   inventoryValueAtRetail: number;
   inventoryUnitsOnHand: number;
+  inHouseValueAtCost?: number;
+  inHouseUnitsOnHand?: number;
   serviceRevenue: number;
   lowStockCount: number;
   productsSold: { name: string; qty: number; revenue: number; profit: number }[];
@@ -28,7 +30,11 @@ type DashboardStockPanelProps = {
 };
 
 export function DashboardStockPanel({ stock }: DashboardStockPanelProps) {
+  const inHouseValue = stock.inHouseValueAtCost ?? 0;
+  const inHouseUnits = stock.inHouseUnitsOnHand ?? 0;
   const hasSales = stock.unitsSold > 0;
+  const hasRetailStock = stock.inventoryUnitsOnHand > 0;
+  const hasInHouse = inHouseUnits > 0 || inHouseValue > 0;
   const markupPotential = stock.inventoryValueAtRetail - stock.inventoryValueAtCost;
 
   return (
@@ -37,16 +43,19 @@ export function DashboardStockPanel({ stock }: DashboardStockPanelProps) {
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Stock &amp; inventory today</h3>
           <p className="text-xs text-muted-foreground">
-            Product sales at POS and what remains on the shelf
+            Left = retail products sold at POS. Right = shelf stock. In-house (back-bar) is separate —
+            it is not “sold” here; usage shows under Reports → In-house.
           </p>
         </div>
-        {/* pr clears the FAB on mobile so Inventory stays tappable */}
-        <div className="flex gap-2 pr-14 sm:pr-0">
+        <div className="flex flex-wrap gap-2 pr-14 sm:pr-0">
           <Button type="button" size="sm" variant="outline" className="h-9 flex-1 sm:flex-none" render={<Link href="/finances" />}>
             Finances
           </Button>
           <Button type="button" size="sm" variant="outline" className="h-9 flex-1 sm:flex-none" render={<Link href="/products" />}>
-            Inventory
+            Retail stock
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-9 flex-1 sm:flex-none" render={<Link href="/in-house" />}>
+            In-house
           </Button>
         </div>
       </div>
@@ -61,7 +70,7 @@ export function DashboardStockPanel({ stock }: DashboardStockPanelProps) {
             <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
               <ShoppingBag className="size-4 text-primary" />
             </div>
-            <span className="text-sm font-medium">Stock sold today</span>
+            <span className="text-sm font-medium">Retail stock sold today</span>
           </div>
 
           {hasSales ? (
@@ -112,11 +121,12 @@ export function DashboardStockPanel({ stock }: DashboardStockPanelProps) {
             <div>
               <p className="text-2xl font-bold text-muted-foreground">{formatCurrency(0)}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                No products sold yet today. Add items from{" "}
+                No <strong className="text-foreground">retail</strong> products sold at POS yet
+                today. Selling shampoo / retail items on{" "}
                 <Link href="/pos" className="font-medium text-primary hover:underline">
                   POS
                 </Link>{" "}
-                to track stock revenue here.
+                fills this. In-house cream/wax usage does not appear here.
               </p>
               {stock.serviceRevenue > 0 && (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -127,52 +137,105 @@ export function DashboardStockPanel({ stock }: DashboardStockPanelProps) {
           )}
         </div>
 
-        <div className="p-4 sm:p-5">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-full bg-success/10">
-              <Package className="size-4 text-success" />
+        <div className="p-4 sm:p-5 space-y-5">
+          <div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-full bg-success/10">
+                <Package className="size-4 text-success" />
+              </div>
+              <span className="text-sm font-medium">Retail on hand</span>
+              {stock.lowStockCount > 0 && (
+                <Badge variant="secondary" className="bg-warning/10 text-warning">
+                  {stock.lowStockCount} low
+                </Badge>
+              )}
             </div>
-            <span className="text-sm font-medium">Stock on hand</span>
-            {stock.lowStockCount > 0 && (
-              <Badge variant="secondary" className="bg-warning/10 text-warning">
-                {stock.lowStockCount} low
-              </Badge>
+            {hasRetailStock ? (
+              <>
+                <p className="text-2xl font-bold sm:text-3xl">
+                  {formatCurrency(stock.inventoryValueAtCost)}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {stock.inventoryUnitsOnHand} units at cost · retail value{" "}
+                  {formatCurrency(stock.inventoryValueAtRetail)}
+                </p>
+                <div className="mt-4 flex items-start gap-2 rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-foreground">Retail markup potential</span>
+                      <Tooltip>
+                        <TooltipTrigger
+                          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label="About retail markup potential"
+                        >
+                          <Info className="size-3.5" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-xs">
+                          Retail value of sellable stock minus cost. In-house back-bar is excluded so
+                          it does not pull this number down.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="mt-1">
+                      <span className="delta-pill delta-pill-info">
+                        {formatCurrency(markupPotential)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No retail products on hand. Add items under{" "}
+                <Link href="/products" className="font-medium text-primary hover:underline">
+                  Products
+                </Link>
+                .
+              </p>
             )}
           </div>
-          <p className="text-2xl font-bold sm:text-3xl">
-            {formatCurrency(stock.inventoryValueAtCost)}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {stock.inventoryUnitsOnHand} units at cost · retail value{" "}
-            {formatCurrency(stock.inventoryValueAtRetail)}
-          </p>
-          {stock.inventoryUnitsOnHand > 0 && (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-foreground">Retail markup potential</span>
-                  <Tooltip>
-                    <TooltipTrigger
-                      className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label="About retail markup potential"
-                    >
-                      <Info className="size-3.5" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs text-xs">
-                      Retail value of on-hand stock minus cost basis. This is markup headroom if
-                      everything sold at list price — not a loss or P&amp;L figure. Negative values
-                      can appear when retail is set below cost.
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <p className="mt-1">
-                  <span className="delta-pill delta-pill-info">
-                    {formatCurrency(markupPotential)}
-                  </span>
-                </p>
+
+          <div className="border-t border-border pt-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-full bg-teal-500/10">
+                <FlaskConical className="size-4 text-teal-700 dark:text-teal-400" />
               </div>
+              <span className="text-sm font-medium">In-house (back-bar)</span>
             </div>
-          )}
+            {hasInHouse ? (
+              <>
+                <p className="text-xl font-bold sm:text-2xl">
+                  {formatCurrency(inHouseValue)}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {inHouseUnits} units at cost · stock value = qty × cost per unit
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Clients-left / usage cost show on each product under{" "}
+                  <Link href="/in-house" className="font-medium text-primary hover:underline">
+                    In-house
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/reports?tab=in_house"
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Reports → In-house
+                  </Link>
+                  . Auto-deduct only after you link a service.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No in-house stock value yet. On{" "}
+                <Link href="/in-house" className="font-medium text-primary hover:underline">
+                  In-house
+                </Link>
+                , set quantity and cost (or Edit → Update quantity). If qty or cost is 0, this stays{" "}
+                {formatCurrency(0)}.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

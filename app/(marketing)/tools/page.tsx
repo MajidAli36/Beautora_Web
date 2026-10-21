@@ -28,9 +28,9 @@ const TOOLS = [
 
 export default function ToolsIndexPage() {
   return (
-    <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
+    <div className="bg-[var(--m-paper)] m-under-chrome">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
-        <div className="mx-auto max-w-6xl px-6 py-14">
+        <div className="mx-auto max-w-6xl px-6 pt-6 pb-14 sm:pt-8 sm:pb-16">
           <Breadcrumbs items={[{ name: "Home", path: "/" }, { name: "Tools", path: "/tools" }]} />
           <h1 className="mt-8 font-display text-4xl font-semibold text-[var(--m-ink)] sm:text-5xl">
             Free salon calculators

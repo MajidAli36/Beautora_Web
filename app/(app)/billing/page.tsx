@@ -22,6 +22,13 @@ import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
+function formatSnapshotDate(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-PK");
+}
+
 function phaseBadge(phase: string) {
   if (phase === "lifetime") return <Badge className="bg-violet-700">Lifetime access</Badge>;
   if (phase === "trial") return <Badge variant="secondary">Free trial</Badge>;
@@ -101,7 +108,7 @@ export default async function BillingPage() {
                 {snapshot.daysLeftInTrial} day{snapshot.daysLeftInTrial === 1 ? "" : "s"}
               </strong>
               {snapshot.trialEndsAt
-                ? ` (${snapshot.trialEndsAt.toLocaleDateString("en-PK")})`
+                ? ` (${formatSnapshotDate(snapshot.trialEndsAt)})`
                 : ""}
               . After that you get a{" "}
               <strong>{SUBSCRIPTION.graceDays}-day caution</strong> (hourly reminders) before
@@ -111,7 +118,7 @@ export default async function BillingPage() {
           {snapshot.phase === "active" && snapshot.subscriptionEndsAt && (
             <p>
               Paid through{" "}
-              <strong>{snapshot.subscriptionEndsAt.toLocaleDateString("en-PK")}</strong>.
+              <strong>{formatSnapshotDate(snapshot.subscriptionEndsAt)}</strong>.
             </p>
           )}
           {snapshot.phase === "grace" && (

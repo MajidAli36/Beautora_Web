@@ -126,6 +126,20 @@ export function PlatformAdminPanel({
       <section className="rounded-lg border px-4 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
+            <h2 className="text-lg font-semibold">Customer apps</h2>
+            <p className="text-sm text-muted-foreground">
+              Enable branded mobile + web apps per salon, approve publish, suspend API access.
+            </p>
+          </div>
+          <Button render={<Link href="/platform/customer-apps" />}>
+            Open customer apps
+          </Button>
+        </div>
+      </section>
+
+      <section className="rounded-lg border px-4 py-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
             <h2 className="text-lg font-semibold">Users</h2>
             <p className="text-sm text-muted-foreground">
               Separate directory — filter by salon owner, staff, store, city,

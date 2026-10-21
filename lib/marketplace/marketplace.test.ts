@@ -11,6 +11,7 @@ import {
 } from "./cart";
 import { effectiveProductPrice, formatMarketplaceMoney } from "./pricing";
 import { formatCommissionPercent, MARKETPLACE_COMMISSION_RATE } from "./constants";
+import { sellerAvailableAfterDelivery } from "./ledger";
 import { CodPaymentProvider } from "./payments";
 
 describe("effectiveProductPrice", () => {
@@ -92,6 +93,15 @@ describe("commission constants", () => {
     assert.equal(MARKETPLACE_COMMISSION_RATE, 0);
     assert.equal(formatCommissionPercent(0), "0");
     assert.equal(formatCommissionPercent(0.1), "10");
+  });
+});
+
+describe("delivery ledger available balance", () => {
+  it("credits gross then debits commission once (not net-then-debit)", () => {
+    assert.equal(sellerAvailableAfterDelivery(1000, 100), 900);
+    assert.equal(sellerAvailableAfterDelivery(1000, 0), 1000);
+    // Regression: old bug was credit(900) + debit(100) → available 800
+    assert.notEqual(sellerAvailableAfterDelivery(1000, 100), 800);
   });
 });
 

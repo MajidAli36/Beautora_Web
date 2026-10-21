@@ -43,19 +43,19 @@ export function StoresSection({
       id="stores"
       className={cn(
         "scroll-mt-28 bg-[var(--m-paper)]",
-        hideIntro ? "pb-28 pt-12 sm:pb-32 sm:pt-14" : "py-28 sm:py-32"
+        hideIntro ? "pb-12 pt-8 sm:pb-14 sm:pt-10" : "m-section"
       )}
     >
-      <div className="mx-auto max-w-6xl px-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {!hideIntro && (
           <div className="max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
               Real salons on Beautora
             </p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
+            <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-4xl">
               Real salons. Running on Beautora.
             </h2>
-            <p className="mt-4 text-lg leading-relaxed text-[var(--m-muted)]">
+            <p className="mt-3 text-base leading-relaxed text-[var(--m-muted)]">
               {count > 0
                 ? "See how salons are using Beautora to manage their daily operations."
                 : "Salons appear here as soon as they join Beautora. No demo listings."}
@@ -66,8 +66,8 @@ export function StoresSection({
         {items.length === 0 ? (
           <p
             className={cn(
-              "border-y border-[var(--m-line)] py-10 text-[var(--m-muted)]",
-              hideIntro ? "mt-0" : "mt-14"
+              "border-y border-[var(--m-line)] py-8 text-[var(--m-muted)]",
+              hideIntro ? "mt-0" : "mt-8"
             )}
           >
             No stores yet.{" "}
@@ -79,8 +79,8 @@ export function StoresSection({
         ) : (
           <ul
             className={cn(
-              "grid gap-10 sm:grid-cols-2 lg:grid-cols-3",
-              hideIntro ? "mt-0" : "mt-14"
+              "grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8",
+              hideIntro ? "mt-0" : "mt-8"
             )}
           >
             {items.map((store) => (
@@ -115,11 +115,11 @@ export function StoresSection({
         )}
 
         {showViewAll && hasMore && !expanded ? (
-          <div className="mt-12 flex justify-center">
+          <div className="mt-8 flex justify-center">
             <button
               type="button"
               onClick={() => setExpanded(true)}
-              className="inline-flex h-12 min-w-[10rem] items-center justify-center border border-[var(--m-ink)] px-8 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
+              className="m-btn m-btn-secondary min-w-[9rem]"
             >
               Load all
             </button>
@@ -127,11 +127,8 @@ export function StoresSection({
         ) : null}
 
         {showViewAll && expanded && count > limit ? (
-          <div className="mt-12 flex justify-center">
-            <Link
-              href="/stores"
-              className="inline-flex h-11 items-center border border-[var(--m-ink)] px-6 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
-            >
+          <div className="mt-8 flex justify-center">
+            <Link href="/stores" className="m-btn m-btn-secondary">
               Browse store directory
             </Link>
           </div>

@@ -47,25 +47,8 @@ const MODULES = [
         body: "Sales, deposits, and money movement visibility for owners and managers.",
       },
       {
-        title: "Billing & settings",
-        body: "Store subscription, roles, and day-to-day configuration under one roof.",
-      },
-    ],
-  },
-  {
-    group: "Marketplace",
-    items: [
-      {
-        title: "Online product shop",
-        body: "List products and take COD orders on Beautora Marketplace — separate from salon POS stock.",
-      },
-      {
-        title: "Seller tools",
-        body: "Manage marketplace listings, orders, and shop inventory without mixing money into salon finances.",
-      },
-      {
-        title: "Public /shop",
-        body: "Customers browse and order products online while your floor stays on Salon Management.",
+        title: "Marketplace",
+        body: "List products and take COD orders online — separate from salon POS stock and money.",
       },
     ],
   },
@@ -73,34 +56,32 @@ const MODULES = [
 
 export function PlatformFeatures() {
   return (
-    <section id="platform" className="scroll-mt-28 bg-[var(--m-paper)] py-28 sm:py-32">
-      <div className="mx-auto max-w-6xl px-6">
+    <section id="platform" className="m-section scroll-mt-28 bg-[var(--m-paper)]">
+      <div className="m-container">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
-            The platform
-          </p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
-            Salon Management, POS & Marketplace — one workspace.
+          <p className="m-eyebrow">The platform</p>
+          <h2 className="mt-3 font-display text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-[var(--m-ink)]">
+            Salon management, POS & marketplace — one workspace.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-[var(--m-muted)]">
-            Beautora covers the floor and online retail: guests arrive, chairs fill, payments clear,
-            products sell on Marketplace, and owners see what happened — without juggling apps.
+            Guests arrive, chairs fill, payments clear, products sell online, and owners see what
+            happened — without juggling apps.
           </p>
         </div>
 
-        <div className="mt-16 space-y-16">
+        <div className="mt-8 space-y-8 sm:mt-10 sm:space-y-10">
           {MODULES.map((module) => (
             <div key={module.group}>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-ink-soft)]">
                 {module.group}
               </h3>
-              <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+              <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
                 {module.items.map((item) => (
                   <li
                     key={item.title}
-                    className="group border border-[var(--m-line)] bg-white p-6 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--m-accent)]/40 motion-reduce:transform-none"
+                    className="group border border-[var(--m-line)] bg-[var(--m-card)] p-6 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--m-ink)]/25 motion-reduce:transform-none"
                   >
-                    <h4 className="font-display text-2xl font-medium text-[var(--m-ink)] transition-colors duration-150 group-hover:text-[var(--m-accent)]">
+                    <h4 className="font-display text-xl font-medium text-[var(--m-ink)] sm:text-2xl">
                       {item.title}
                     </h4>
                     <p className="mt-3 text-base leading-relaxed text-[var(--m-muted)]">
@@ -113,17 +94,11 @@ export function PlatformFeatures() {
           ))}
         </div>
 
-        <div className="mt-14 flex flex-wrap gap-3">
-          <Link
-            href="/signup"
-            className="inline-flex h-12 items-center bg-[var(--m-ink)] px-7 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-all duration-150 hover:bg-[var(--m-ink-soft)]"
-          >
-            Start 30 days free
+        <div className="mt-8 flex flex-wrap gap-2.5">
+          <Link href="/signup" className="m-btn m-btn-primary">
+            Start free
           </Link>
-          <Link
-            href="/pricing"
-            className="inline-flex h-12 items-center border border-[var(--m-ink)] px-7 text-sm font-medium tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
-          >
+          <Link href="/pricing" className="m-btn m-btn-secondary">
             View pricing
           </Link>
         </div>

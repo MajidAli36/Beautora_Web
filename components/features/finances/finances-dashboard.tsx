@@ -153,7 +153,12 @@ export function FinancesDashboard({
               variant="in"
               detail="Cash/card sales + advances"
             />
-            <FlowItem label="Money out" value={summary.totalOutflow} variant="out" detail="Expenses + staff + refunds (cash)" />
+            <FlowItem
+              label="Money out"
+              value={summary.totalOutflow}
+              variant="out"
+              detail="Operating expenses + payroll + refunds"
+            />
             <FlowItem label="Net cash flow" value={summary.netCashFlow} variant={summary.netCashFlow >= 0 ? "profit" : "loss"} />
             <FlowItem label="Net profit" value={summary.netProfit} variant={summary.netProfit >= 0 ? "profit" : "loss"} detail="Sales − costs − retail COGS − in-house usage" />
           </div>
@@ -172,21 +177,27 @@ export function FinancesDashboard({
           subtitle="Customer deposits"
         />
         <SummaryCard
-          title="Expenses"
+          title="Operating expenses"
           value={formatCurrency(summary.totalExpenses)}
-          subtitle={`${summary.expenseCount} entries`}
+          subtitle={`${summary.expenseCount} non-payroll entries`}
           variant="expense"
         />
         <SummaryCard
-          title="Staff paid"
-          value={formatCurrency(summary.staffPayments)}
-          subtitle={`${summary.staffPaymentCount} payments`}
+          title="Payroll expense"
+          value={formatCurrency(summary.payrollExpenseTotal)}
+          subtitle={`Salary ${formatCurrency(summary.staffPaymentsByType.salary)} · Bonus ${formatCurrency(summary.staffPaymentsByType.bonus)} · Advance ${formatCurrency(summary.staffPaymentsByType.advance)}`}
+          variant="expense"
+        />
+        <SummaryCard
+          title="All expenses"
+          value={formatCurrency(summary.expensesIncludingPayroll)}
+          subtitle="Operating + payroll (salary, bonus, advance, partial)"
           variant="expense"
         />
         <SummaryCard
           title="Net profit"
           value={formatCurrency(summary.netProfit)}
-          subtitle="Sales − expenses − staff − retail COGS − in-house usage"
+          subtitle="Sales − operating expenses − payroll − COGS − in-house usage"
           variant={summary.netProfit >= 0 ? "profit" : "loss"}
         />
         <SummaryCard
@@ -302,6 +313,10 @@ export function FinancesDashboard({
         <Card>
           <CardHeader>
             <CardTitle>Expenses by category</CardTitle>
+            <CardDescription>
+              Payroll includes salary, bonus, advance, and partial staff payments (no
+              double-count with operating expenses).
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {summary.expensesByCategory.length === 0 ? (
@@ -314,6 +329,10 @@ export function FinancesDashboard({
                     <span className="font-medium">{formatCurrency(row.amount)}</span>
                   </li>
                 ))}
+                <li className="flex justify-between border-t pt-2 text-sm font-semibold">
+                  <span>All expenses</span>
+                  <span>{formatCurrency(summary.expensesIncludingPayroll)}</span>
+                </li>
               </ul>
             )}
           </CardContent>
@@ -435,27 +454,44 @@ function SummaryCard({
 }
 
 function ExpenseRowItem({ expense }: { expense: ExpenseRow }) {
+  const linkedPayroll = Boolean(expense.staff_payment_id);
   return (
     <TableRow>
       <TableCell>{expense.expense_date}</TableCell>
-      <TableCell>{EXPENSE_CATEGORY_LABELS[expense.category]}</TableCell>
+      <TableCell>
+        {EXPENSE_CATEGORY_LABELS[expense.category]}
+        {linkedPayroll ? (
+          <span className="ml-1 text-[10px] font-medium uppercase text-muted-foreground">
+            auto
+          </span>
+        ) : null}
+      </TableCell>
       <TableCell className="text-muted-foreground">{expense.description ?? "—"}</TableCell>
       <TableCell>{expense.payment_method}</TableCell>
       <TableCell className="text-right font-medium">{formatCurrency(expense.amount)}</TableCell>
       <TableCell>
-        <ConfirmAction
-          title="Delete expense?"
-          description={`Delete this ${EXPENSE_CATEGORY_LABELS[expense.category]} expense of ${formatCurrency(expense.amount)}? This affects finances totals.`}
-          confirmLabel="Delete"
-          pendingLabel="Deleting…"
-          variant="ghost"
-          size="icon-sm"
-          className="text-destructive"
-          onConfirm={async () => deleteExpense(expense.id)}
-          successMessage="Expense deleted."
-        >
-          <Trash2 className="size-3.5" />
-        </ConfirmAction>
+        {linkedPayroll ? (
+          <span
+            className="text-[10px] text-muted-foreground"
+            title="Synced from staff payment — delete from Staff payments instead"
+          >
+            —
+          </span>
+        ) : (
+          <ConfirmAction
+            title="Delete expense?"
+            description={`Delete this ${EXPENSE_CATEGORY_LABELS[expense.category]} expense of ${formatCurrency(expense.amount)}? This affects finances totals.`}
+            confirmLabel="Delete"
+            pendingLabel="Deleting…"
+            variant="ghost"
+            size="icon-sm"
+            className="text-destructive"
+            onConfirm={async () => deleteExpense(expense.id)}
+            successMessage="Expense deleted."
+          >
+            <Trash2 className="size-3.5" />
+          </ConfirmAction>
+        )}
       </TableCell>
     </TableRow>
   );

@@ -75,7 +75,7 @@ export function EditProductButton({
             <DialogTitle>Edit {catalog === "inhouse" ? "in-house product" : "product"}</DialogTitle>
             <DialogDescription>
               {catalog === "inhouse"
-                ? "Same setup as Add: bottles / open stock / pieces. On-hand quantity can be set here or via Restock."
+                ? "Same setup as Add. Quantity stays as-is unless you choose Set / Add inside Update quantity."
                 : "Update catalog details and pricing. Use Inventory to change stock quantity."}
             </DialogDescription>
           </DialogHeader>
@@ -233,6 +233,8 @@ function EditProductForm({
   );
 }
 
+type QtyMode = "keep" | "set" | "add" | "add_bottles";
+
 /** Mirrors InHouseProductForm fields so Add and Edit stay in sync. */
 function EditInHouseFields({
   product,
@@ -278,6 +280,10 @@ function EditInHouseFields({
   const [useCustom, setUseCustom] = useState(() =>
     USE_PRESETS.includes(useStored as (typeof USE_PRESETS)[number]) ? "" : String(useStored || "")
   );
+  const [qtyMode, setQtyMode] = useState<QtyMode>("keep");
+  const [setQty, setSetQty] = useState(String(Number(product.stock_quantity) || 0));
+  const [addQty, setAddQty] = useState("");
+  const [addBottles, setAddBottles] = useState("");
 
   const measure =
     trackMode === "pieces"
@@ -298,11 +304,29 @@ function EditInHouseFields({
         ? Number(paidEach) || 0
         : Number(costPerUnit) || 0;
 
-  const stockValue = unitCost * stock;
+  const projectedStock = (() => {
+    if (qtyMode === "set") {
+      const n = Number(setQty);
+      return Number.isFinite(n) && n >= 0 ? n : stock;
+    }
+    if (qtyMode === "add") {
+      const n = Number(addQty);
+      return Number.isFinite(n) && n >= 0 ? stock + n : stock;
+    }
+    if (qtyMode === "add_bottles" && perItem > 0) {
+      const n = Number(addBottles);
+      return Number.isFinite(n) && n >= 0 ? stock + n * perItem : stock;
+    }
+    return stock;
+  })();
+
+  const stockValue = unitCost * projectedStock;
   const perBottle = trackMode === "bottles" ? clientsPerPack(perItem, useQty) : null;
-  const totalClients = clientsLeft(stock, useQty);
+  const totalClients = clientsLeft(projectedStock, useQty);
   const approxBottles =
-    trackMode === "bottles" && perItem > 0 ? Math.floor(stock / perItem + 1e-9) : null;
+    trackMode === "bottles" && perItem > 0
+      ? Math.floor(projectedStock / perItem + 1e-9)
+      : null;
 
   const costMode =
     trackMode === "bottles" && perItem > 0
@@ -320,7 +344,18 @@ function EditInHouseFields({
     trackMode === "bottles" && perItem > 0 ? String(perItem) : "";
 
   const lockedKind = product.product_kind === "BOTH" ? "BOTH" : "IN_HOUSE";
-  const canSubmit = Boolean(measure) && useQty > 0 && (trackMode !== "bottles" || perItem > 0);
+  const effectiveQtyMode: QtyMode =
+    qtyMode === "add_bottles" && trackMode !== "bottles" ? "keep" : qtyMode;
+  const qtyOk =
+    effectiveQtyMode === "keep" ||
+    (effectiveQtyMode === "set" && Number.isFinite(Number(setQty)) && Number(setQty) >= 0) ||
+    (effectiveQtyMode === "add" && Number.isFinite(Number(addQty)) && Number(addQty) >= 0) ||
+    (effectiveQtyMode === "add_bottles" &&
+      perItem > 0 &&
+      Number.isFinite(Number(addBottles)) &&
+      Number(addBottles) >= 0);
+  const canSubmit =
+    Boolean(measure) && useQty > 0 && (trackMode !== "bottles" || perItem > 0) && qtyOk;
 
   return (
     <form action={formAction} className="grid gap-4 sm:grid-cols-2">
@@ -331,12 +366,13 @@ function EditInHouseFields({
       <input type="hidden" name="default_usage_qty" value={useQty > 0 ? String(useQty) : ""} />
       <input type="hidden" name="cost_price" value={costHidden} />
       <input type="hidden" name="cost_mode" value={costMode} />
+      <input type="hidden" name="stock_qty_mode" value={effectiveQtyMode} />
 
       <div className="space-y-2 sm:col-span-2 rounded-lg border border-teal-200/70 bg-teal-50/60 p-3 text-sm dark:border-teal-900/40 dark:bg-teal-950/20">
         <p className="font-medium text-foreground">Same as Add</p>
         <p className="text-muted-foreground">
-          Bottles: set size in each bottle + cost of one bottle. Open stock: cost per {measure || "ml"}{" "}
-          only. Set on-hand quantity below to update remaining stock.
+          Bottles: size in each bottle + cost of one bottle. Open stock: cost per {measure || "ml"}{" "}
+          only. Quantity stays unchanged unless you pick an option under Update quantity.
         </p>
       </div>
 
@@ -545,30 +581,135 @@ function EditInHouseFields({
         </p>
       </div>
 
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor={`edit_p_stock_${product.id}`}>
-          On-hand quantity ({measure || "units"}) *
-        </Label>
-        <Input
-          id={`edit_p_stock_${product.id}`}
-          name="stock_quantity"
-          type="number"
-          min={0}
-          step="0.001"
-          required
-          defaultValue={String(stock)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Saves as the new on-hand amount (same as Restock → Set on-hand). Use Restock to add
-          without replacing.
-        </p>
+      <div className="space-y-3 sm:col-span-2 rounded-lg border border-input bg-muted/20 p-3">
+        <div className="space-y-1">
+          <Label>Update quantity</Label>
+          <p className="text-xs text-muted-foreground">
+            Now on hand:{" "}
+            <strong className="text-foreground">
+              {stock} {measure || "units"}
+            </strong>
+            {trackMode === "bottles" && perItem > 0 ? (
+              <>
+                {" "}
+                (~{Math.floor(stock / perItem + 1e-9)} full bottle
+                {Math.floor(stock / perItem + 1e-9) === 1 ? "" : "s"} × {perItem} {measure})
+              </>
+            ) : null}
+            . Default keeps this amount — only change stock when you pick an option below.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              { id: "keep" as const, label: "Keep current" },
+              { id: "set" as const, label: "Set to…" },
+              { id: "add" as const, label: `Add ${measure || "units"}` },
+              ...(trackMode === "bottles"
+                ? [{ id: "add_bottles" as const, label: "Add bottles" }]
+                : []),
+            ] as { id: QtyMode; label: string }[]
+          ).map((opt) => (
+            <Button
+              key={opt.id}
+              type="button"
+              size="sm"
+              variant={effectiveQtyMode === opt.id ? "default" : "outline"}
+              onClick={() => setQtyMode(opt.id)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+
+        {effectiveQtyMode === "set" ? (
+          <div className="space-y-2 max-w-xs">
+            <Label htmlFor={`edit_p_stock_set_${product.id}`}>
+              New on-hand ({measure || "units"})
+            </Label>
+            <Input
+              id={`edit_p_stock_set_${product.id}`}
+              name="stock_quantity"
+              type="number"
+              min={0}
+              step="0.001"
+              required
+              value={setQty}
+              onChange={(e) => setSetQty(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Replaces stock with this number (same as Restock → Set on-hand). Use 0 to clear.
+            </p>
+          </div>
+        ) : null}
+
+        {effectiveQtyMode === "add" ? (
+          <div className="space-y-2 max-w-xs">
+            <Label htmlFor={`edit_p_stock_add_${product.id}`}>
+              Add amount ({measure || "units"})
+            </Label>
+            <Input
+              id={`edit_p_stock_add_${product.id}`}
+              name="stock_add_qty"
+              type="number"
+              min={0}
+              step="0.001"
+              required
+              value={addQty}
+              onChange={(e) => setAddQty(e.target.value)}
+              placeholder="e.g. 50"
+            />
+            <p className="text-xs text-muted-foreground">
+              Adds on top of current stock (same as Restock → Stock in).
+            </p>
+          </div>
+        ) : null}
+
+        {effectiveQtyMode === "add_bottles" ? (
+          <div className="space-y-2 max-w-xs">
+            <Label htmlFor={`edit_p_stock_bottles_${product.id}`}>How many bottles to add</Label>
+            <Input
+              id={`edit_p_stock_bottles_${product.id}`}
+              name="stock_add_bottles"
+              type="number"
+              min={0}
+              step="1"
+              required
+              value={addBottles}
+              onChange={(e) => setAddBottles(e.target.value)}
+              placeholder="e.g. 2"
+            />
+            <p className="text-xs text-muted-foreground">
+              Each bottle = {perItem || "?"} {measure}. Adding{" "}
+              {Number(addBottles) > 0 && perItem > 0
+                ? `${Number(addBottles) * perItem} ${measure}`
+                : `bottles × ${perItem || "?"} ${measure}`}
+              .
+            </p>
+          </div>
+        ) : null}
+
+        {effectiveQtyMode !== "keep" ? (
+          <p className="text-xs text-muted-foreground">
+            After save:{" "}
+            <strong className="text-foreground">
+              {projectedStock} {measure || "units"}
+            </strong>
+            {approxBottles != null ? (
+              <>
+                {" "}
+                (~{approxBottles} full bottle{approxBottles === 1 ? "" : "s"})
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
 
       <div className="sm:col-span-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm space-y-1">
         <p>
-          Current stock before save:{" "}
+          {effectiveQtyMode === "keep" ? "On-hand stock" : "Stock after save"}:{" "}
           <strong>
-            {stock} {measure || "units"}
+            {projectedStock} {measure || "units"}
           </strong>
           {approxBottles != null ? (
             <>
@@ -580,7 +721,7 @@ function EditInHouseFields({
         <p>
           Cost per {measure || "unit"}: <strong>{formatCurrency(unitCost)}</strong>
           {" · "}
-          Stock value (at current qty): <strong>{formatCurrency(stockValue)}</strong>
+          Stock value: <strong>{formatCurrency(stockValue)}</strong>
         </p>
         {perBottle != null && perBottle > 0 ? (
           <p>

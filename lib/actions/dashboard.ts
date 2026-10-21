@@ -7,10 +7,13 @@ import {
   addLocalDays,
   startOfLocalDay,
   endOfLocalDay,
-  isoToLocalDateString,
 } from "@/lib/dates/local";
 import { roundMoney } from "@/lib/sales/calculate";
-import { getInventorySummary } from "@/lib/inventory/valuation";
+import {
+  SAFE_SALE_ID_CHUNK,
+  chunkIds,
+  fetchAllPages,
+} from "@/lib/supabase/paginate";
 
 export type DashboardAppointment = {
   id: string;
@@ -46,9 +49,13 @@ export type DashboardData = {
     costOfGoodsSold: number;
     grossProfit: number;
     marginPercent: number;
+    /** Sellable (RETAIL/BOTH) on-hand at cost — used for shelf / markup. */
     inventoryValueAtCost: number;
     inventoryValueAtRetail: number;
     inventoryUnitsOnHand: number;
+    /** Back-bar IN_HOUSE only (not POS product sales). */
+    inHouseValueAtCost: number;
+    inHouseUnitsOnHand: number;
     serviceRevenue: number;
     lowStockCount: number;
     productsSold: { name: string; qty: number; revenue: number; profit: number }[];
@@ -116,23 +123,30 @@ export async function getDashboardData(): Promise<DashboardData> {
     customerCountRes,
     newCustomersRes,
     productsRes,
-    chartSalesRes,
-    retentionSalesRes,
-    recentAppointmentsRes,
+    revenueByDayRpc,
+    retentionRpc,
+    appointmentsByDayRpc,
+    inventoryValRpc,
     todayDepositsRes,
     todayExpensesRes,
     todayStaffPayRes,
     topServicesRpc,
   ] = await Promise.all([
-    // One range covers yesterday + today; split in JS (saves a sales RTT).
-    supabase
-      .from("sales")
-      .select("id, total, completed_at")
-      .eq("organization_id", orgId)
-      .in("status", ["COMPLETED", "AMENDED"])
-      .is("deleted_at", null)
-      .gte("completed_at", yesterdayStart.toISOString())
-      .lte("completed_at", todayEnd.toISOString()),
+    // Yesterday + today — paginated so busy days aren't truncated at max_rows.
+    fetchAllPages<{ id: string; total: number; completed_at: string | null }>(
+      (from, to) =>
+        supabase
+          .from("sales")
+          .select("id, total, completed_at")
+          .eq("organization_id", orgId)
+          .in("status", ["COMPLETED", "AMENDED"])
+          .is("deleted_at", null)
+          .gte("completed_at", yesterdayStart.toISOString())
+          .lte("completed_at", todayEnd.toISOString())
+          .order("completed_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+    ).then((data) => ({ data })),
     supabase
       .from("appointments")
       .select(
@@ -160,6 +174,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       .eq("organization_id", orgId)
       .is("deleted_at", null)
       .gte("created_at", weekAgo.toISOString()),
+    // Low-stock sample only — full valuation via RPC.
     supabase
       .from("products")
       .select("id, name, stock_quantity, low_stock_threshold, cost_price, retail_price, is_active")
@@ -167,32 +182,24 @@ export async function getDashboardData(): Promise<DashboardData> {
       .eq("is_active", true)
       .is("deleted_at", null)
       .order("stock_quantity")
-      .limit(300),
-    supabase
-      .from("sales")
-      .select("id, total, completed_at")
-      .eq("organization_id", orgId)
-      .in("status", ["COMPLETED", "AMENDED"])
-      .is("deleted_at", null)
-      .gte("completed_at", chartStart.toISOString())
-      .order("completed_at")
-      .limit(2000),
-    supabase
-      .from("sales")
-      .select("customer_id, total")
-      .eq("organization_id", orgId)
-      .in("status", ["COMPLETED", "AMENDED"])
-      .is("deleted_at", null)
-      .not("customer_id", "is", null)
-      .gte("completed_at", thirtyDaysAgo.toISOString())
-      .limit(2000),
-    supabase
-      .from("appointments")
-      .select("scheduled_at")
-      .eq("organization_id", orgId)
-      .is("deleted_at", null)
-      .gte("scheduled_at", chartStart.toISOString())
-      .limit(2000),
+      .limit(50),
+    supabase.rpc("dashboard_revenue_by_day", {
+      p_organization_id: orgId,
+      p_since: chartStart.toISOString(),
+      p_until: todayEnd.toISOString(),
+    }),
+    supabase.rpc("dashboard_retention_stats", {
+      p_organization_id: orgId,
+      p_since: thirtyDaysAgo.toISOString(),
+    }),
+    supabase.rpc("dashboard_appointments_by_day", {
+      p_organization_id: orgId,
+      p_since: chartStart.toISOString(),
+      p_until: todayEnd.toISOString(),
+    }),
+    supabase.rpc("dashboard_inventory_valuation", {
+      p_organization_id: orgId,
+    }),
     supabase
       .from("appointment_deposits")
       .select("amount")
@@ -200,11 +207,14 @@ export async function getDashboardData(): Promise<DashboardData> {
       .in("status", ["APPROVED", "REFUNDED"])
       .gte("paid_at", todayStart.toISOString())
       .lte("paid_at", todayEnd.toISOString()),
+    // Exclude payroll mirrors linked via staff_payment_id — those are counted
+    // once via staff_payments below (same rule as finance_period_cash_totals).
     supabase
       .from("expenses")
       .select("amount")
       .eq("organization_id", orgId)
-      .eq("expense_date", todayLabel),
+      .eq("expense_date", todayLabel)
+      .is("staff_payment_id", null),
     supabase
       .from("staff_payments")
       .select("amount")
@@ -216,6 +226,12 @@ export async function getDashboardData(): Promise<DashboardData> {
       p_limit: 5,
     }),
   ]);
+
+  if (revenueByDayRpc.error) throw new Error(revenueByDayRpc.error.message);
+  if (retentionRpc.error) throw new Error(retentionRpc.error.message);
+  if (appointmentsByDayRpc.error) throw new Error(appointmentsByDayRpc.error.message);
+  if (inventoryValRpc.error) throw new Error(inventoryValRpc.error.message);
+  if (topServicesRpc.error) throw new Error(topServicesRpc.error.message);
 
   const todayStartMs = todayStart.getTime();
   const todayEndMs = todayEnd.getTime();
@@ -236,22 +252,32 @@ export async function getDashboardData(): Promise<DashboardData> {
   const todayRevenue = roundMoney(todayRevenueRaw);
   const yesterdayRevenue = roundMoney(yesterdayRevenueRaw);
 
-  const productLines =
+  const productLineRows =
     todaySaleIds.length > 0
-      ? await supabase
-          .from("sale_items")
-          .select("name, quantity, line_total, unit_cost")
-          .eq("organization_id", orgId)
-          .eq("item_type", "PRODUCT")
-          .in("sale_id", todaySaleIds)
-      : {
-          data: [] as {
-            name: string;
-            quantity: number;
-            line_total: number;
-            unit_cost: number | null;
-          }[],
-        };
+      ? (
+          await Promise.all(
+            chunkIds(todaySaleIds, SAFE_SALE_ID_CHUNK).map((chunk) =>
+              fetchAllPages<{
+                name: string;
+                quantity: number;
+                line_total: number;
+                unit_cost: number | null;
+              }>((from, to) =>
+                supabase
+                  .from("sale_items")
+                  .select("name, quantity, line_total, unit_cost")
+                  .eq("organization_id", orgId)
+                  .eq("item_type", "PRODUCT")
+                  .in("sale_id", chunk)
+                  .order("sale_id")
+                  .order("id")
+                  .range(from, to)
+              )
+            )
+          )
+        ).flat()
+      : [];
+  const productLines = { data: productLineRows };
 
   const appointmentsRaw = (appointmentsRes.data ?? []) as unknown as ApptRow[];
   const appointments = appointmentsRaw.map(mapAppointment);
@@ -282,44 +308,70 @@ export async function getDashboardData(): Promise<DashboardData> {
       threshold: p.low_stock_threshold,
     }));
 
-  const inventorySummary = getInventorySummary(productsRes.data ?? []);
+  const invRow = (Array.isArray(inventoryValRpc.data)
+    ? inventoryValRpc.data[0]
+    : inventoryValRpc.data) as
+    | {
+        value_at_cost?: number | string | null;
+        value_at_retail?: number | string | null;
+        units_on_hand?: number | string | null;
+        retail_value_at_cost?: number | string | null;
+        retail_value_at_retail?: number | string | null;
+        retail_units?: number | string | null;
+        in_house_value_at_cost?: number | string | null;
+        in_house_units?: number | string | null;
+      }
+    | null
+    | undefined;
+
+  // Prefer sellable-only columns when migration is applied; fall back to totals.
+  const hasRetailSplit = invRow?.retail_value_at_cost != null;
+  const retailValueAtCost = roundMoney(
+    Number(hasRetailSplit ? invRow?.retail_value_at_cost : invRow?.value_at_cost) || 0
+  );
+  const retailValueAtRetail = roundMoney(
+    Number(hasRetailSplit ? invRow?.retail_value_at_retail : invRow?.value_at_retail) || 0
+  );
+  const retailUnits = Number(
+    hasRetailSplit ? invRow?.retail_units : invRow?.units_on_hand
+  ) || 0;
+  const inHouseValueAtCost = roundMoney(Number(invRow?.in_house_value_at_cost) || 0);
+  const inHouseUnits = Number(invRow?.in_house_units) || 0;
+  const inventorySummary = {
+    totalValueAtCost: retailValueAtCost,
+    totalValueAtRetail: retailValueAtRetail,
+    totalPotentialProfit: roundMoney(retailValueAtRetail - retailValueAtCost),
+    totalUnits: retailUnits,
+    inHouseValueAtCost,
+    inHouseUnits,
+  };
 
   const revenueByDayMap: Record<string, number> = {};
   for (let i = 0; i < 30; i++) {
     revenueByDayMap[addLocalDays(todayStr, -29 + i)] = 0;
   }
-  for (const sale of chartSalesRes.data ?? []) {
-    if (!sale.completed_at) continue;
-    const day = isoToLocalDateString(sale.completed_at);
-    if (day in revenueByDayMap) {
-      revenueByDayMap[day] = roundMoney(revenueByDayMap[day] + Number(sale.total));
+  for (const row of revenueByDayRpc.data ?? []) {
+    const day = typeof row.day === "string" ? row.day.slice(0, 10) : "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day) && day in revenueByDayMap) {
+      revenueByDayMap[day] = roundMoney(Number(row.revenue) || 0);
     }
   }
   const revenueByDay = Object.entries(revenueByDayMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, revenue]) => ({ date, revenue }));
 
-  let topServices: { name: string; qty: number; revenue: number }[] = [];
-  if (!topServicesRpc.error && Array.isArray(topServicesRpc.data)) {
-    topServices = topServicesRpc.data.map((r) => ({
-      name: String(r.name),
-      qty: Number(r.qty) || 0,
-      revenue: roundMoney(Number(r.revenue) || 0),
-    }));
-  }
+  const topServices = (topServicesRpc.data ?? []).map((r) => ({
+    name: String(r.name),
+    qty: Number(r.qty) || 0,
+    revenue: roundMoney(Number(r.revenue) || 0),
+  }));
 
-  const customerSaleCounts = new Map<string, number>();
-  let totalSpend = 0;
-  for (const sale of retentionSalesRes.data ?? []) {
-    if (!sale.customer_id) continue;
-    customerSaleCounts.set(
-      sale.customer_id,
-      (customerSaleCounts.get(sale.customer_id) ?? 0) + 1
-    );
-    totalSpend = roundMoney(totalSpend + Number(sale.total));
-  }
-  const customersWithSales = customerSaleCounts.size;
-  const returningCustomers = [...customerSaleCounts.values()].filter((c) => c > 1).length;
+  const retentionRow = Array.isArray(retentionRpc.data)
+    ? retentionRpc.data[0]
+    : retentionRpc.data;
+  const customersWithSales = Number(retentionRow?.customers_with_sales) || 0;
+  const returningCustomers = Number(retentionRow?.returning_customers) || 0;
+  const totalSpend = roundMoney(Number(retentionRow?.total_spend) || 0);
   const averageSpend =
     customersWithSales > 0 ? roundMoney(totalSpend / customersWithSales) : 0;
   const retentionRate =
@@ -329,10 +381,10 @@ export async function getDashboardData(): Promise<DashboardData> {
   for (let i = 0; i < 30; i++) {
     appointmentsByDayMap[addLocalDays(todayStr, -29 + i)] = 0;
   }
-  for (const appt of recentAppointmentsRes.data ?? []) {
-    const day = isoToLocalDateString(appt.scheduled_at);
-    if (day in appointmentsByDayMap) {
-      appointmentsByDayMap[day] += 1;
+  for (const row of appointmentsByDayRpc.data ?? []) {
+    const day = typeof row.day === "string" ? row.day.slice(0, 10) : "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day) && day in appointmentsByDayMap) {
+      appointmentsByDayMap[day] = Number(row.appt_count) || 0;
     }
   }
   const appointmentsByDay = Object.entries(appointmentsByDayMap)
@@ -427,6 +479,8 @@ export async function getDashboardData(): Promise<DashboardData> {
       inventoryValueAtCost: inventorySummary.totalValueAtCost,
       inventoryValueAtRetail: inventorySummary.totalValueAtRetail,
       inventoryUnitsOnHand: inventorySummary.totalUnits,
+      inHouseValueAtCost: inventorySummary.inHouseValueAtCost,
+      inHouseUnitsOnHand: inventorySummary.inHouseUnits,
       serviceRevenue: 0,
       lowStockCount: lowStockProducts.length,
       productsSold,

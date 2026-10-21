@@ -51,7 +51,6 @@ export default async function InHouseProductDetailPage({
     getActiveServicesForLinking(),
     getProductCategories(),
   ]);
-  const canManage = caps.canManage;
   const canEdit = caps.canEdit;
 
   if (!detail) notFound();
@@ -82,7 +81,7 @@ export default async function InHouseProductDetailPage({
           >
             In-house report
           </Button>
-          {canManage ? (
+          {canEdit ? (
             <>
               <LinkProductToServiceButton
                 product={product}
@@ -199,9 +198,10 @@ export default async function InHouseProductDetailPage({
         {canEdit ? (
           <Card>
             <CardHeader>
-              <CardTitle>Restock / adjust</CardTitle>
+              <CardTitle>Update quantity</CardTitle>
               <CardDescription>
-                Add stock in {unit} (e.g. +{stats.packSize ?? 100} when you open a new bottle).
+                Stock in adds {unit}; Set on-hand replaces. Prefer Edit → Update quantity for add
+                bottles (×{stats.packSize ?? "?"} {unit} each).
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -42,13 +42,33 @@ async function loadOrgSubscriptionUncached(
   return resolveSubscription(data as OrgBillingRow);
 }
 
+/** `unstable_cache` JSON-serializes Dates → ISO strings; restore Date instances. */
+function reviveSubscriptionSnapshot(
+  raw: SubscriptionSnapshot | null
+): SubscriptionSnapshot | null {
+  if (!raw) return null;
+  const asDate = (v: unknown): Date | null => {
+    if (v == null) return null;
+    if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+    const d = new Date(String(v));
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  return {
+    ...raw,
+    trialEndsAt: asDate(raw.trialEndsAt),
+    subscriptionEndsAt: asDate(raw.subscriptionEndsAt),
+    graceEndsAt: asDate(raw.graceEndsAt),
+    lockedAt: asDate(raw.lockedAt),
+  };
+}
+
 /**
  * Load + resolve subscription for an org.
  * Per-request memo + short cross-request cache. Read-only — no status writes.
  */
 export const getOrgSubscriptionSnapshot = cache(
   async (organizationId: string): Promise<SubscriptionSnapshot | null> => {
-    return unstable_cache(
+    const cached = await unstable_cache(
       () => loadOrgSubscriptionUncached(organizationId),
       ["org-subscription", organizationId],
       {
@@ -56,6 +76,7 @@ export const getOrgSubscriptionSnapshot = cache(
         tags: [orgSubscriptionCacheTag(organizationId)],
       }
     )();
+    return reviveSubscriptionSnapshot(cached);
   }
 );
 

@@ -9,12 +9,14 @@ import {
   type PublicProductCard,
 } from "@/lib/marketplace/actions";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
+import { MarketplaceQuickViewProvider } from "@/components/marketplace/product-quick-view";
 import { formatCurrency, formatDuration } from "@/lib/format";
 import { resolveStorePublicContact } from "@/lib/marketing/store-contact";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { localBusinessFromDetail } from "@/lib/seo/local-business";
 import { JsonLd } from "@/components/seo/json-ld";
 import { SYNCOPS } from "@/lib/print/syncops";
+import { createClient } from "@/lib/supabase/server";
 
 export const revalidate = 300;
 
@@ -58,6 +60,12 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const store = await getPublicStoreBySlug(slug);
   if (!store) notFound();
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isLoggedIn = Boolean(user);
+
   const marketplace = await getPublicSalonMarketplaceStore(slug);
   let marketplaceCards: PublicProductCard[] = [];
   if (marketplace?.seller) {
@@ -97,7 +105,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(12,31,28,0.88)_0%,rgba(12,31,28,0.5)_50%,rgba(12,31,28,0.25)_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(12,31,28,0.7)_0%,transparent_45%)]" />
 
-        <div className="relative mx-auto flex min-h-[58vh] max-w-6xl flex-col justify-end px-6 pb-14 pt-[calc(var(--m-chrome)+2rem)] sm:min-h-[68vh] sm:pb-20 lg:pt-[calc(var(--m-chrome)+2.5rem)]">
+        <div className="relative mx-auto flex min-h-[58vh] max-w-6xl flex-col justify-end px-6 pb-14 pt-14 sm:min-h-[68vh] sm:pb-20 lg:pt-16">
           <Link
             href="/stores"
             className="mb-8 w-fit text-sm font-medium text-white/70 transition-colors hover:text-white"
@@ -308,11 +316,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 </Link>
               ) : null}
             </div>
-            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {marketplaceCards.map((p) => (
-                <MarketplaceProductCard key={p.id} product={p} />
-              ))}
-            </div>
+            <MarketplaceQuickViewProvider isLoggedIn={isLoggedIn}>
+              <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {marketplaceCards.map((p) => (
+                  <MarketplaceProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            </MarketplaceQuickViewProvider>
           </div>
         </section>
       ) : null}

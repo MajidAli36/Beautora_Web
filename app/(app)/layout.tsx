@@ -42,13 +42,19 @@ export default async function AppLayout({
   if (!org) {
     redirect("/onboarding");
   }
-  const [permConfig, billing, isPlatformAdmin, linkedStaff, appMode] = await Promise.all([
-    getOrgPermissionConfig(),
-    getOrganizationSubscription(),
-    getPlatformAdminFlag(),
-    getLinkedStaffProfile().catch(() => null),
-    getAppMode(),
-  ]);
+  const { getCustomerAppByOrg } = await import("@/lib/customer-apps/service");
+  const [permConfig, billing, isPlatformAdmin, linkedStaff, appMode, customerAppRow] =
+    await Promise.all([
+      getOrgPermissionConfig(),
+      getOrganizationSubscription(),
+      getPlatformAdminFlag(),
+      getLinkedStaffProfile().catch(() => null),
+      getAppMode(),
+      getCustomerAppByOrg(org.organizationId).catch(() => null),
+    ]);
+  const customerAppEnabled = Boolean(
+    customerAppRow && customerAppRow.status !== "deactivated"
+  );
   const overrides = permConfig.nav;
   const locked = billing?.snapshot.phase === "locked";
   const hasLifetimeAccess =
@@ -69,16 +75,22 @@ export default async function AppLayout({
   const myStaffHref = linkedStaff ? `/staff/${linkedStaff.id}` : null;
   const staffNavAllowed = canAccessNavKey(org.role, "staff", effectiveOverrides);
 
+  // If cookie says customer_app but Super Admin never enabled it, fall back to salon POS.
+  const effectiveAppMode =
+    appMode === "customer_app" && !customerAppEnabled ? "saas" : appMode;
+
   let landingPath =
-    appMode === "marketplace"
+    effectiveAppMode === "marketplace"
       ? "/marketplace"
-      : locked
-        ? "/billing"
-        : getDefaultLandingPath(org.role, effectiveOverrides);
+      : effectiveAppMode === "customer_app"
+        ? "/customer-app"
+        : locked
+          ? "/billing"
+          : getDefaultLandingPath(org.role, effectiveOverrides);
 
   // Staff login with a linked salon profile lands on their own dashboard.
   if (
-    appMode !== "marketplace" &&
+    effectiveAppMode === "saas" &&
     !locked &&
     myStaffHref &&
     (org.role === "STAFF" || !staffNavAllowed)
@@ -90,14 +102,22 @@ export default async function AppLayout({
   const pathname = headerList.get("x-pathname") ?? "";
   const onMarketplace =
     pathname === "/marketplace" || pathname.startsWith("/marketplace/");
+  const onCustomerApp =
+    pathname === "/customer-app" || pathname.startsWith("/customer-app/");
   const onBilling =
     pathname.startsWith("/billing") ||
     pathname.startsWith("/platform") ||
-    onMarketplace;
+    onMarketplace ||
+    onCustomerApp;
   const onOwnStaffDashboard = isOwnStaffDashboardPath(pathname, linkedStaff?.id);
 
   if (locked && !onBilling) {
     redirect("/billing");
+  }
+
+  // Customer app mode / route — only when Super Admin enabled the app
+  if (onCustomerApp && !customerAppEnabled && !locked) {
+    redirect("/dashboard");
   }
 
   // Server-side feature gate (not only client NavRouteGuard)
@@ -113,7 +133,7 @@ export default async function AppLayout({
 
   // /staff directory without staff nav → own dashboard if linked
   if (
-    appMode !== "marketplace" &&
+    effectiveAppMode === "saas" &&
     pathname === "/staff" &&
     !locked &&
     !staffNavAllowed &&
@@ -135,8 +155,9 @@ export default async function AppLayout({
       showPlatformBilling={isPlatformAdmin}
       subscriptionLocked={Boolean(locked)}
       hasLifetimeAccess={hasLifetimeAccess}
-      appMode={appMode}
+      appMode={effectiveAppMode}
       productIntent={parseProductIntent(user.user_metadata?.product_intent) ?? "both"}
+      customerAppEnabled={customerAppEnabled}
     >
       {billing &&
         !hasLifetimeAccess &&

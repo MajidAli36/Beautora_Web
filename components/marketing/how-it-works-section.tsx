@@ -40,49 +40,50 @@ export function HowItWorksSection() {
   );
 
   return (
-    <section id="how-it-works" className="scroll-mt-28 bg-[var(--m-mist)] py-24 sm:py-32">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)] lg:items-end lg:gap-14">
+    <section id="how-it-works" className="m-section scroll-mt-28 bg-[var(--m-mist)]">
+      <div className="m-container">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)] lg:items-end lg:gap-10">
           <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
-              How it works
-            </p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
+            <p className="m-eyebrow">How it works</p>
+            <h2 className="mt-2 font-display text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight text-[var(--m-ink)]">
               Watch Beautora go live.
             </h2>
-            <p className="mt-4 text-lg leading-relaxed text-[var(--m-muted)]">
+            <p className="mt-3 text-base leading-relaxed text-[var(--m-muted)]">
               Pick a language walkthrough — or follow the written tutorial step by step.
             </p>
           </div>
 
-          <ol className="grid gap-6 sm:grid-cols-3 lg:gap-5">
+          <ol className="grid gap-5 sm:grid-cols-3 lg:gap-4">
             {OVERVIEW_STEPS.map((item) => (
               <li key={item.step}>
-                <p className="font-display text-2xl font-semibold text-[var(--m-accent)]">
+                <p className="font-display text-xl font-semibold text-[var(--m-accent)]">
                   {item.step}
                 </p>
-                <h3 className="mt-2 font-display text-xl font-medium text-[var(--m-ink)]">
+                <h3 className="mt-1.5 font-display text-lg font-medium text-[var(--m-ink)]">
                   {item.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--m-muted)]">{item.body}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-[var(--m-muted)]">{item.body}</p>
               </li>
             ))}
           </ol>
         </div>
 
-        {/* Mode tabs: Walkthrough | Tutorial */}
         <div
           role="tablist"
           aria-label="How it works mode"
-          className="mt-12 flex flex-wrap gap-2 border-b border-[var(--m-line)] pb-0 sm:mt-14"
+          className="mt-8 flex flex-wrap gap-2 border-b border-[var(--m-line)] pb-0 sm:mt-10"
         >
           <ModeTab
+            id="hiw-tab-walkthrough"
+            controls="hiw-panel-walkthrough"
             active={mainTab === "walkthrough"}
             onClick={() => setMainTab("walkthrough")}
             icon={<Clapperboard className="size-4" />}
             label="Walkthrough"
           />
           <ModeTab
+            id="hiw-tab-tutorial"
+            controls="hiw-panel-tutorial"
             active={mainTab === "tutorial"}
             onClick={() => setMainTab("tutorial")}
             icon={<BookOpen className="size-4" />}
@@ -91,7 +92,12 @@ export function HowItWorksSection() {
         </div>
 
         {mainTab === "walkthrough" ? (
-          <div className="mt-6 space-y-5">
+          <div
+            id="hiw-panel-walkthrough"
+            role="tabpanel"
+            aria-labelledby="hiw-tab-walkthrough"
+            className="mt-6 space-y-5"
+          >
             <div
               role="tablist"
               aria-label="Walkthrough language"
@@ -105,12 +111,15 @@ export function HowItWorksSection() {
                     type="button"
                     role="tab"
                     aria-selected={active}
+                    id={`hiw-lang-${lang.id}`}
+                    aria-controls="hiw-video"
+                    tabIndex={active ? 0 : -1}
                     onClick={() => setLangId(lang.id)}
                     className={cn(
                       "inline-flex h-10 items-center gap-2 px-4 text-sm font-medium tracking-wide transition-colors",
                       active
                         ? "bg-[var(--m-ink)] text-[var(--m-paper)]"
-                        : "border border-[var(--m-line)] bg-white text-[var(--m-ink)] hover:border-[var(--m-ink)]/40"
+                        : "border border-[var(--m-line)] bg-[var(--m-card)] text-[var(--m-ink)] hover:border-[var(--m-ink)]/40"
                     )}
                   >
                     <span>{lang.label}</span>
@@ -131,23 +140,27 @@ export function HowItWorksSection() {
               })}
             </div>
 
-            <div className="relative">
-              <div className="pointer-events-none absolute -inset-x-4 -inset-y-4 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(61,107,95,0.14),transparent_68%)] sm:-inset-x-8" />
+            <div id="hiw-video" className="relative">
               <HowItWorksVideo
                 source={activeLang}
                 sourceKey={activeLang.id}
-                className="shadow-[0_40px_80px_-48px_rgba(6,33,29,0.65)]"
+                className="shadow-[var(--m-shadow)]"
               />
             </div>
             <p className="text-sm text-[var(--m-muted)]">
-              Playing the {activeLang.label}
-              {activeLang.nativeLabel ? ` (${activeLang.nativeLabel})` : ""} walkthrough.
-              More languages can be added anytime.
+              {activeLang.label}
+              {activeLang.nativeLabel ? ` (${activeLang.nativeLabel})` : ""} walkthrough — press
+              play when you are ready. More languages can be added anytime.
             </p>
           </div>
         ) : (
-          <div className="mt-8 grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <ol className="space-y-0 border border-[var(--m-line)] bg-white">
+          <div
+            id="hiw-panel-tutorial"
+            role="tabpanel"
+            aria-labelledby="hiw-tab-tutorial"
+            className="mt-8"
+          >
+            <ol className="max-w-3xl space-y-0 border border-[var(--m-line)] bg-[var(--m-card)]">
               {HOW_IT_WORKS_TUTORIAL_STEPS.map((item, index) => (
                 <li
                   key={item.step}
@@ -171,53 +184,34 @@ export function HowItWorksSection() {
               ))}
             </ol>
 
-            <div className="space-y-4">
-              <p className="text-sm leading-relaxed text-[var(--m-muted)]">
-                Prefer watching? Open the walkthrough in your language — English or Urdu — then
-                come back to this checklist while you set up.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {HOW_IT_WORKS_LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.id}
-                    type="button"
-                    onClick={() => {
-                      setLangId(lang.id);
-                      setMainTab("walkthrough");
-                    }}
-                    className="inline-flex h-10 items-center border border-[var(--m-line)] bg-white px-4 text-sm font-medium text-[var(--m-ink)] transition-colors hover:border-[var(--m-ink)]/40"
-                  >
-                    Watch {lang.label}
-                    {lang.nativeLabel ? ` · ${lang.nativeLabel}` : ""}
-                  </button>
-                ))}
-              </div>
-              <div className="relative overflow-hidden">
-                <HowItWorksVideo
-                  source={activeLang}
-                  sourceKey={`tutorial-preview-${activeLang.id}`}
-                  className="shadow-[0_28px_56px_-40px_rgba(6,33,29,0.55)]"
-                />
-              </div>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {HOW_IT_WORKS_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.id}
+                  type="button"
+                  onClick={() => {
+                    setLangId(lang.id);
+                    setMainTab("walkthrough");
+                  }}
+                  className="inline-flex h-10 items-center border border-[var(--m-line)] bg-[var(--m-card)] px-4 text-sm font-medium text-[var(--m-ink)] transition-colors hover:border-[var(--m-ink)]/40"
+                >
+                  Watch {lang.label}
+                  {lang.nativeLabel ? ` · ${lang.nativeLabel}` : ""}
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        <div className="mt-10 flex flex-col gap-4 sm:mt-12 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-[var(--m-muted)]">
             Same product you just learned — live on the web today.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/signup"
-              className="inline-flex h-12 items-center bg-[var(--m-ink)] px-7 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-all duration-150 hover:bg-[var(--m-ink-soft)]"
-            >
+            <Link href="/signup" className="m-btn m-btn-primary">
               Create your store
             </Link>
-            <Link
-              href="/pricing"
-              className="inline-flex h-12 items-center border border-[var(--m-ink)]/20 px-7 text-sm font-medium tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:border-[var(--m-ink)] hover:bg-white"
-            >
+            <Link href="/pricing" className="m-btn m-btn-secondary">
               View pricing
             </Link>
           </div>
@@ -228,11 +222,15 @@ export function HowItWorksSection() {
 }
 
 function ModeTab({
+  id,
+  controls,
   active,
   onClick,
   icon,
   label,
 }: {
+  id: string;
+  controls: string;
   active: boolean;
   onClick: () => void;
   icon: ReactNode;
@@ -240,9 +238,12 @@ function ModeTab({
 }) {
   return (
     <button
+      id={id}
       type="button"
       role="tab"
       aria-selected={active}
+      aria-controls={controls}
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
       className={cn(
         "-mb-px inline-flex h-11 items-center gap-2 border-b-2 px-1 text-sm font-semibold tracking-wide transition-colors sm:px-3",

@@ -265,14 +265,14 @@ const BILLING_SECTION_MONTHLY: CheatsheetSection = {
       body: "New stores get a free trial of the full platform, then a short grace period before lock if unpaid.",
     },
     {
-      title: "Pakistan",
-      body: "After trial: $10/month (Asia) or $15/month (elsewhere) via USDT BEP-20. Upload transfer proof in Billing; SyncOps approves and unlocks 30 days.",
-      formula: "$10 Asia · $15 elsewhere · USDT",
+      title: "Regional plans",
+      body: "After trial, pay the amount shown in Billing for your store country (Asia vs elsewhere) via USDT BEP-20. Upload transfer proof; SyncOps approves and unlocks 30 days. Public rates are listed on Pricing.",
+      formula: "USDT BEP-20 · see Billing",
     },
     {
-      title: "Other countries",
-      body: "After trial: $15 USDT on BNB Smart Chain (BEP-20) to the wallet shown in Billing. Send only USDT on BEP-20 — wrong network can lose funds. Upload proof for approval.",
-      formula: "$15 USDT · BEP-20",
+      title: "Network",
+      body: "Send only USDT on BNB Smart Chain (BEP-20) to the wallet shown in Billing. Wrong network can lose funds. Upload proof for approval.",
+      formula: "USDT · BEP-20 only",
     },
   ],
 };

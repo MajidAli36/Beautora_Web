@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeCheckout } from "@/lib/actions/sales";
-import { previewCheckoutUsage } from "@/lib/actions/products";
+import { previewCheckoutUsage, searchPosCustomers } from "@/lib/actions/products";
 import {
   getCustomerDueInvoices,
   receiveCustomerAccountPayment,
@@ -909,6 +909,7 @@ export function PosTerminal({
             allowEmpty
             emptyLabel="Walk-in"
             placeholder="Search customer name or phone…"
+            searchRemote={searchPosCustomers}
           />
           {selectedAppointment && (
             <p className="text-xs text-muted-foreground">

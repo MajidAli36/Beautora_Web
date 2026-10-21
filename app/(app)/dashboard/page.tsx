@@ -22,7 +22,10 @@ export default async function DashboardPage() {
   const [user, org, data] = await Promise.all([
     requireAuth(),
     getActiveOrganization(),
-    getDashboardData().catch(() => null),
+    getDashboardData().catch((err) => {
+      console.error("[dashboard] getDashboardData failed", err);
+      return null;
+    }),
   ]);
 
   const revenueChange = data
@@ -65,20 +68,34 @@ export default async function DashboardPage() {
           icon={Users}
         />
         <StatCard
-          label={data?.stockToday.unitsSold ? "Stock sold today" : "Stock on hand"}
+          label={
+            data?.stockToday.unitsSold
+              ? "Retail sold today"
+              : data?.stockToday.inHouseValueAtCost
+                ? "In-house stock"
+                : "Retail on hand"
+          }
           value={
             data?.stockToday.unitsSold
               ? formatCurrency(data.stockToday.retailRevenue)
-              : formatCurrency(data?.stockToday.inventoryValueAtCost ?? 0)
+              : data?.stockToday.inHouseValueAtCost && !data.stockToday.inventoryValueAtCost
+                ? formatCurrency(data.stockToday.inHouseValueAtCost)
+                : formatCurrency(data?.stockToday.inventoryValueAtCost ?? 0)
           }
           subtext={
             data?.stockToday.unitsSold
               ? `${data.stockToday.unitsSold} units · ${formatCurrency(data.stockToday.grossProfit)} profit`
-              : data?.stockToday.inventoryUnitsOnHand
-                ? `${data.stockToday.inventoryUnitsOnHand} units in inventory`
-                : data?.lowStockCount
-                  ? `${data.lowStockCount} low stock`
-                  : "No stock yet"
+              : data?.stockToday.inHouseValueAtCost && !data.stockToday.inventoryValueAtCost
+                ? `${data.stockToday.inHouseUnitsOnHand} back-bar units at cost`
+                : data?.stockToday.inventoryUnitsOnHand
+                  ? `${data.stockToday.inventoryUnitsOnHand} retail units${
+                      data.stockToday.inHouseValueAtCost
+                        ? ` · in-house ${formatCurrency(data.stockToday.inHouseValueAtCost)}`
+                        : ""
+                    }`
+                  : data?.lowStockCount
+                    ? `${data.lowStockCount} low stock`
+                    : "No stock yet — add Products or In-house"
           }
           icon={Package}
           iconClassName={

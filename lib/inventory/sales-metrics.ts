@@ -1,6 +1,33 @@
 import { createClient } from "@/lib/supabase/server";
 import { parseLocalDateRange } from "@/lib/dates/local";
 import { getInventorySummary } from "@/lib/inventory/valuation";
+import {
+  SAFE_SALE_ID_CHUNK,
+  chunkIds,
+  fetchAllPages,
+} from "@/lib/supabase/paginate";
+
+/**
+ * Chunked `.in(id, …)` with per-chunk range pagination so PostgREST max_rows
+ * cannot silently truncate COGS / revenue splits.
+ */
+async function fetchInIdChunks<T>(
+  ids: string[],
+  fetchChunkPage: (
+    chunk: string[],
+    from: number,
+    to: number
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  idChunkSize = SAFE_SALE_ID_CHUNK
+): Promise<T[]> {
+  if (!ids.length) return [];
+  const parts = await Promise.all(
+    chunkIds(ids, idChunkSize).map((chunk) =>
+      fetchAllPages<T>((from, to) => fetchChunkPage(chunk, from, to))
+    )
+  );
+  return parts.flat();
+}
 
 export type ProductSalesMetrics = {
   unitsSold: number;
@@ -63,24 +90,46 @@ export async function getProductSalesBreakdown(
   }
   if (!saleIds.length) return [];
 
-  const { data: lines } = await supabase
-    .from("sale_items")
-    .select("item_id, name, quantity, line_total, unit_price, unit_cost")
-    .eq("organization_id", organizationId)
-    .eq("item_type", "PRODUCT")
-    .in("sale_id", saleIds);
+  const lines = await fetchInIdChunks<{
+    item_id: string;
+    name: string;
+    quantity: number;
+    line_total: number;
+    unit_price: number;
+    unit_cost: number | null;
+  }>(saleIds, (chunk, from, to) =>
+    supabase
+      .from("sale_items")
+      .select("item_id, name, quantity, line_total, unit_price, unit_cost")
+      .eq("organization_id", organizationId)
+      .eq("item_type", "PRODUCT")
+      .in("sale_id", chunk)
+      .range(from, to)
+  );
 
-  if (!lines?.length) return [];
+  if (!lines.length) return [];
 
   const productIds = [...new Set(lines.map((l) => l.item_id))];
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, name, sku, cost_price, retail_price")
-    .eq("organization_id", organizationId)
-    .in("id", productIds);
+  const products = await fetchInIdChunks<{
+    id: string;
+    name: string;
+    sku: string | null;
+    cost_price: number;
+    retail_price: number;
+  }>(
+    productIds,
+    (chunk, from, to) =>
+      supabase
+        .from("products")
+        .select("id, name, sku, cost_price, retail_price")
+        .eq("organization_id", organizationId)
+        .in("id", chunk)
+        .range(from, to),
+    200
+  );
 
   const productMap = new Map(
-    (products ?? []).map((p) => [
+    products.map((p) => [
       p.id,
       {
         name: p.name,
@@ -109,7 +158,6 @@ export async function getProductSalesBreakdown(
     const qty = Number(line.quantity) || 0;
     const revenue = Number(line.line_total) || 0;
     const unitRetail = Number(line.unit_price) || 0;
-    // Prefer snapshotted unit_cost; fall back to catalog for any legacy gap
     const unitCost =
       line.unit_cost != null && Number(line.unit_cost) >= 0
         ? Number(line.unit_cost)
@@ -184,14 +232,21 @@ export async function getRevenueSplit(
   };
   if (!saleIds.length) return empty;
 
-  const { data: lines } = await supabase
-    .from("sale_items")
-    .select("item_type, line_total, quantity")
-    .eq("organization_id", organizationId)
-    .in("sale_id", saleIds);
+  const lines = await fetchInIdChunks<{
+    item_type: string;
+    line_total: number;
+    quantity: number;
+  }>(saleIds, (chunk, from, to) =>
+    supabase
+      .from("sale_items")
+      .select("item_type, line_total, quantity")
+      .eq("organization_id", organizationId)
+      .in("sale_id", chunk)
+      .range(from, to)
+  );
 
   const split = { ...empty };
-  for (const line of lines ?? []) {
+  for (const line of lines) {
     const revenue = Number(line.line_total) || 0;
     const qty = Number(line.quantity) || 0;
     if (line.item_type === "SERVICE") {
@@ -225,47 +280,65 @@ export async function getServiceUsageCogs(
       .select("id")
       .eq("organization_id", organizationId)
       .in("status", ["COMPLETED", "AMENDED", "VOID", "REFUNDED"])
+      .is("deleted_at", null)
       .gte("completed_at", start.toISOString())
       .lte("completed_at", end.toISOString());
     saleIds = (sales ?? []).map((s) => s.id);
   }
   if (!saleIds.length) return 0;
 
-  const { data: usageLines } = await supabase
-    .from("sale_usage_lines")
-    .select("sale_id, quantity, unit_cost")
-    .eq("organization_id", organizationId)
-    .in("sale_id", saleIds);
+  const usageLines = await fetchInIdChunks<{
+    sale_id: string;
+    quantity: number;
+    unit_cost: number;
+  }>(saleIds, (chunk, from, to) =>
+    supabase
+      .from("sale_usage_lines")
+      .select("sale_id, quantity, unit_cost")
+      .eq("organization_id", organizationId)
+      .in("sale_id", chunk)
+      .range(from, to)
+  );
 
   const salesWithUsage = new Set<string>();
   let cogs = 0;
-  for (const line of usageLines ?? []) {
+  for (const line of usageLines) {
     salesWithUsage.add(line.sale_id);
     const qty = Number(line.quantity) || 0;
     const unitCost = Number(line.unit_cost) || 0;
     cogs += qty * unitCost;
   }
 
-  // Legacy sales before sale_usage_lines: fall back to SERVICE/PACKAGE unit_cost snapshot
-  // Only for still-posted tickets (VOID/REFUNDED without snapshot stay at 0 write-off).
   const legacySaleIds = saleIds.filter((id) => !salesWithUsage.has(id));
   if (legacySaleIds.length) {
-    const { data: postedLegacy } = await supabase
-      .from("sales")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .in("id", legacySaleIds)
-      .in("status", ["COMPLETED", "AMENDED"]);
-    const legacyPostedIds = (postedLegacy ?? []).map((s) => s.id);
+    const postedLegacy = await fetchInIdChunks<{ id: string }>(
+      legacySaleIds,
+      (chunk, from, to) =>
+        supabase
+          .from("sales")
+          .select("id")
+          .eq("organization_id", organizationId)
+          .in("id", chunk)
+          .in("status", ["COMPLETED", "AMENDED"])
+          .is("deleted_at", null)
+          .range(from, to),
+      200
+    );
+    const legacyPostedIds = postedLegacy.map((s) => s.id);
     if (legacyPostedIds.length) {
-      const { data: lines } = await supabase
-        .from("sale_items")
-        .select("quantity, unit_cost")
-        .eq("organization_id", organizationId)
-        .in("item_type", ["SERVICE", "PACKAGE"])
-        .in("sale_id", legacyPostedIds);
+      const lines = await fetchInIdChunks<{ quantity: number; unit_cost: number }>(
+        legacyPostedIds,
+        (chunk, from, to) =>
+          supabase
+            .from("sale_items")
+            .select("quantity, unit_cost")
+            .eq("organization_id", organizationId)
+            .in("item_type", ["SERVICE", "PACKAGE"])
+            .in("sale_id", chunk)
+            .range(from, to)
+      );
 
-      for (const line of lines ?? []) {
+      for (const line of lines) {
         const qty = Number(line.quantity) || 0;
         const unitCost = Number(line.unit_cost) || 0;
         cogs += qty * unitCost;
@@ -307,14 +380,22 @@ export async function getProductSalesMetrics(
     };
   }
 
-  const { data: lines } = await supabase
-    .from("sale_items")
-    .select("item_id, quantity, line_total, unit_cost")
-    .eq("organization_id", organizationId)
-    .eq("item_type", "PRODUCT")
-    .in("sale_id", saleIds);
+  const lines = await fetchInIdChunks<{
+    item_id: string;
+    quantity: number;
+    line_total: number;
+    unit_cost: number | null;
+  }>(saleIds, (chunk, from, to) =>
+    supabase
+      .from("sale_items")
+      .select("item_id, quantity, line_total, unit_cost")
+      .eq("organization_id", organizationId)
+      .eq("item_type", "PRODUCT")
+      .in("sale_id", chunk)
+      .range(from, to)
+  );
 
-  if (!lines?.length) {
+  if (!lines.length) {
     return {
       unitsSold: 0,
       retailRevenue: 0,
@@ -325,15 +406,19 @@ export async function getProductSalesMetrics(
   }
 
   const productIds = [...new Set(lines.map((l) => l.item_id))];
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, cost_price")
-    .eq("organization_id", organizationId)
-    .in("id", productIds);
-
-  const costMap = new Map(
-    (products ?? []).map((p) => [p.id, Number(p.cost_price) || 0])
+  const products = await fetchInIdChunks<{ id: string; cost_price: number }>(
+    productIds,
+    (chunk, from, to) =>
+      supabase
+        .from("products")
+        .select("id, cost_price")
+        .eq("organization_id", organizationId)
+        .in("id", chunk)
+        .range(from, to),
+    200
   );
+
+  const costMap = new Map(products.map((p) => [p.id, Number(p.cost_price) || 0]));
 
   let unitsSold = 0;
   let retailRevenue = 0;
@@ -372,14 +457,24 @@ export async function getInventoryMoneySnapshot(
 ): Promise<InventoryMoneySnapshot> {
   const supabase = await createClient();
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("cost_price, retail_price, stock_quantity, low_stock_threshold, is_active")
-    .eq("organization_id", organizationId)
-    .eq("is_active", true)
-    .is("deleted_at", null);
+  const products = await fetchAllPages<{
+    cost_price: number;
+    retail_price: number;
+    stock_quantity: number;
+    low_stock_threshold: number;
+    is_active: boolean;
+  }>((from, to) =>
+    supabase
+      .from("products")
+      .select("cost_price, retail_price, stock_quantity, low_stock_threshold, is_active")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .order("id")
+      .range(from, to)
+  );
 
-  const summary = getInventorySummary(products ?? []);
+  const summary = getInventorySummary(products);
   const productSales = await getProductSalesMetrics(
     organizationId,
     from,

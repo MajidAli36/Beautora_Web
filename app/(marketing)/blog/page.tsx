@@ -22,9 +22,9 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default function BlogIndexPage() {
   return (
-    <div className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
+    <div className="bg-[var(--m-paper)] m-under-chrome">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
-        <div className="mx-auto max-w-6xl px-6 py-14">
+        <div className="mx-auto max-w-6xl px-6 pt-6 pb-14 sm:pt-8 sm:pb-16">
           <Breadcrumbs items={[{ name: "Home", path: "/" }, { name: "Blog", path: "/blog" }]} />
           <h1 className="mt-8 font-display text-4xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-5xl">
             Salon Management, POS & Marketplace blog

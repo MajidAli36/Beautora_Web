@@ -27,6 +27,7 @@ type AppShellProps = {
   hasLifetimeAccess?: boolean;
   appMode?: AppMode;
   productIntent?: ProductIntent | null;
+  customerAppEnabled?: boolean;
 };
 
 export function AppShell({
@@ -44,8 +45,15 @@ export function AppShell({
   hasLifetimeAccess = false,
   appMode = "saas",
   productIntent = "both",
+  customerAppEnabled = false,
 }: AppShellProps) {
   const isMarketplace = appMode === "marketplace";
+  const isCustomerApp = appMode === "customer_app";
+  const modeLanding = isMarketplace
+    ? "/marketplace"
+    : isCustomerApp
+      ? "/customer-app"
+      : landingPath;
   return (
     <CurrencyProvider country={organizationCountry}>
       <SidebarProvider>
@@ -55,10 +63,11 @@ export function AppShell({
           organizationName={organizationName}
           userEmail={userEmail}
           userRole={userRole}
-          myStaffHref={isMarketplace ? null : myStaffHref}
+          myStaffHref={isMarketplace || isCustomerApp ? null : myStaffHref}
           showPlatformBilling={showPlatformBilling}
           appMode={appMode}
           productIntent={productIntent}
+          customerAppEnabled={customerAppEnabled}
         />
         <SidebarInset className="flex min-h-svh min-w-0 max-w-full flex-col overflow-x-clip bg-background">
           <AppHeader
@@ -70,8 +79,8 @@ export function AppShell({
           <NavRouteGuard
             role={memberRole}
             overrides={navOverrides}
-            landingPath={isMarketplace ? "/marketplace" : landingPath}
-            myStaffHref={isMarketplace ? null : myStaffHref}
+            landingPath={modeLanding}
+            myStaffHref={isMarketplace || isCustomerApp ? null : myStaffHref}
             subscriptionLocked={subscriptionLocked}
           >
             <div className="app-main relative min-w-0 flex-1 overflow-x-hidden overscroll-x-contain px-3 py-4 sm:p-6 lg:p-8">

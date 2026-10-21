@@ -73,6 +73,11 @@ export type Database = {
           marketplace_store_published_at: string | null;
           referred_by_partner_id: string | null;
           referral_code_used: string | null;
+          late_grace_minutes: number;
+          late_allowed_days_per_month: number;
+          late_fine_amount: number;
+          default_duty_start: string | null;
+          default_duty_end: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -112,6 +117,11 @@ export type Database = {
           marketplace_store_published_at?: string | null;
           referred_by_partner_id?: string | null;
           referral_code_used?: string | null;
+          late_grace_minutes?: number;
+          late_allowed_days_per_month?: number;
+          late_fine_amount?: number;
+          default_duty_start?: string | null;
+          default_duty_end?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -151,6 +161,11 @@ export type Database = {
           marketplace_store_published_at?: string | null;
           referred_by_partner_id?: string | null;
           referral_code_used?: string | null;
+          late_grace_minutes?: number;
+          late_allowed_days_per_month?: number;
+          late_fine_amount?: number;
+          default_duty_start?: string | null;
+          default_duty_end?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1209,6 +1224,7 @@ export type Database = {
           payment_method: "CASH" | "CARD" | "OTHER";
           created_by: string | null;
           staff_id: string | null;
+          staff_payment_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -1227,6 +1243,7 @@ export type Database = {
           description?: string | null;
           expense_date?: string;
           payment_method?: "CASH" | "CARD" | "OTHER";
+          staff_payment_id?: string | null;
           created_by?: string | null;
           staff_id?: string | null;
           created_at?: string;
@@ -1402,6 +1419,24 @@ export type Database = {
           thumb_id: string | null; thumb_enrolled_at: string | null;
           is_active: boolean;
           online_booking_enabled: boolean;
+          employee_code: string | null;
+          department: string | null;
+          pay_type: "MONTHLY" | "HOURLY" | null;
+          monthly_salary: number | null;
+          hourly_rate: number | null;
+          expected_hours_per_day: number;
+          expected_days_per_week: number;
+          break_minutes_per_day: number;
+          break_paid: boolean;
+          overtime_eligible: boolean;
+          overtime_multiplier: number;
+          salary_policy: "FIXED" | "ATTENDANCE_ADJUSTED";
+          weekly_off_days: number[];
+          schedule_start_time: string | null;
+          schedule_end_time: string | null;
+          salary_effective_from: string | null;
+          hired_on: string | null;
+          left_on: string | null;
           deleted_at: string | null; deleted_by: string | null; deleted_by_role: MemberRole | null;
           created_by: string | null; updated_by: string | null;
           created_at: string; updated_at: string;
@@ -1413,6 +1448,24 @@ export type Database = {
           thumb_id?: string | null; thumb_enrolled_at?: string | null;
           is_active?: boolean;
           online_booking_enabled?: boolean;
+          employee_code?: string | null;
+          department?: string | null;
+          pay_type?: "MONTHLY" | "HOURLY" | null;
+          monthly_salary?: number | null;
+          hourly_rate?: number | null;
+          expected_hours_per_day?: number;
+          expected_days_per_week?: number;
+          break_minutes_per_day?: number;
+          break_paid?: boolean;
+          overtime_eligible?: boolean;
+          overtime_multiplier?: number;
+          salary_policy?: "FIXED" | "ATTENDANCE_ADJUSTED";
+          weekly_off_days?: number[];
+          schedule_start_time?: string | null;
+          schedule_end_time?: string | null;
+          salary_effective_from?: string | null;
+          hired_on?: string | null;
+          left_on?: string | null;
           deleted_at?: string | null; deleted_by?: string | null; deleted_by_role?: MemberRole | null;
           created_by?: string | null; updated_by?: string | null;
           created_at?: string; updated_at?: string;
@@ -1450,6 +1503,84 @@ export type Database = {
           id: string; organization_id: string; staff_id: string; device_id: string | null;
           check_in_at: string; check_out_at: string | null;
           method: "MANUAL" | "DEVICE" | "APP" | "BIOMETRIC"; notes: string | null; created_at: string;
+          break_minutes: number; approved: boolean; locked: boolean;
+          corrected_by: string | null; corrected_at: string | null; correction_note: string | null;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      staff_attendance_days: {
+        Row: {
+          id: string; organization_id: string; staff_id: string; work_date: string;
+          status: "PRESENT" | "ABSENT" | "LATE" | "HALF_DAY" | "ON_LEAVE" | "HOLIDAY" | "WEEKLY_OFF";
+          payable_hours: number | null; notes: string | null;
+          created_by: string | null; created_at: string; updated_at: string;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      staff_salary_history: {
+        Row: {
+          id: string; organization_id: string; staff_id: string;
+          pay_type: "MONTHLY" | "HOURLY" | null;
+          monthly_salary: number | null; hourly_rate: number | null;
+          expected_hours_per_day: number | null; expected_days_per_week: number | null;
+          break_minutes_per_day: number | null; break_paid: boolean | null;
+          overtime_eligible: boolean | null; overtime_multiplier: number | null;
+          salary_policy: "FIXED" | "ATTENDANCE_ADJUSTED" | null;
+          weekly_off_days: number[] | null; effective_from: string;
+          changed_by: string | null; notes: string | null; created_at: string;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      payroll_runs: {
+        Row: {
+          id: string; organization_id: string;
+          period_year: number; period_month: number;
+          period_start: string; period_end: string;
+          status: "DRAFT" | "REVIEWED" | "APPROVED" | "PAID";
+          total_gross: number; total_deductions: number; total_net: number;
+          total_regular_hours: number; total_overtime_hours: number; staff_count: number;
+          notes: string | null;
+          generated_by: string | null; reviewed_by: string | null;
+          approved_by: string | null; paid_by: string | null;
+          generated_at: string; reviewed_at: string | null;
+          approved_at: string | null; paid_at: string | null;
+          created_at: string; updated_at: string;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      payroll_run_lines: {
+        Row: {
+          id: string; organization_id: string; payroll_run_id: string; staff_id: string;
+          pay_type: "MONTHLY" | "HOURLY";
+          salary_policy: "FIXED" | "ATTENDANCE_ADJUSTED" | null;
+          base_rate: number; days_present: number; days_absent: number; days_leave: number;
+          expected_working_days: number; regular_hours: number; overtime_hours: number;
+          regular_earnings: number; overtime_earnings: number; other_earnings: number;
+          gross_earnings: number; advances: number; other_deductions: number;
+          total_deductions: number; net_pay: number;
+          payment_id: string | null; breakdown: Record<string, unknown>; created_at: string;
+        };
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      staff_fines: {
+        Row: {
+          id: string; organization_id: string; staff_id: string; work_date: string;
+          reason: "LATE" | "ABSENCE" | "HALF_DAY" | "OTHER";
+          amount: number; status: "OPEN" | "WAIVED" | "APPLIED";
+          minutes_late: number | null; grace_minutes: number | null; notes: string | null;
+          payroll_run_id: string | null;
+          waived_by: string | null; waived_at: string | null; waive_note: string | null;
+          created_by: string | null; created_at: string; updated_at: string;
         };
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
@@ -2365,6 +2496,100 @@ export type Database = {
           name: string;
           qty: number;
           revenue: number;
+        }[];
+      };
+      dashboard_revenue_by_day: {
+        Args: {
+          p_organization_id: string;
+          p_since: string;
+          p_until: string;
+        };
+        Returns: {
+          day: string;
+          revenue: number;
+        }[];
+      };
+      dashboard_appointments_by_day: {
+        Args: {
+          p_organization_id: string;
+          p_since: string;
+          p_until: string;
+        };
+        Returns: {
+          day: string;
+          appt_count: number;
+        }[];
+      };
+      dashboard_retention_stats: {
+        Args: {
+          p_organization_id: string;
+          p_since: string;
+        };
+        Returns: {
+          customers_with_sales: number;
+          returning_customers: number;
+          total_spend: number;
+        }[];
+      };
+      finance_period_cash_totals: {
+        Args: {
+          p_organization_id: string;
+          p_start: string;
+          p_end: string;
+          p_from_date: string;
+          p_to_date: string;
+        };
+        Returns: {
+          advances_collected: number;
+          unapplied_deposits: number;
+          staff_payments: number;
+          staff_payment_count: number;
+          cash_from_sales: number;
+          expenses_total: number;
+          expense_count: number;
+          expenses_by_category: Record<string, number>;
+          sale_refunds_total: number;
+          staff_payments_by_type?: Record<string, number> | null;
+        }[];
+      };
+      finance_period_sales_bundle: {
+        Args: {
+          p_organization_id: string;
+          p_start: string;
+          p_end: string;
+        };
+        Returns: {
+          sales_revenue: number;
+          sale_count: number;
+          posted_ids: string[];
+          usage_ids: string[];
+        }[];
+      };
+      dashboard_inventory_valuation: {
+        Args: {
+          p_organization_id: string;
+        };
+        Returns: {
+          value_at_cost: number;
+          value_at_retail: number;
+          units_on_hand: number;
+          retail_value_at_cost?: number;
+          retail_value_at_retail?: number;
+          retail_units?: number;
+          in_house_value_at_cost?: number;
+          in_house_units?: number;
+        }[];
+      };
+      low_stock_products: {
+        Args: {
+          p_organization_id: string;
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          stock_quantity: number;
+          low_stock_threshold: number;
         }[];
       };
     };

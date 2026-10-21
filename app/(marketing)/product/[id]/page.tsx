@@ -83,7 +83,7 @@ export default async function ProductDetailPage({ params }: Props) {
   const currency = currencyFromCountry(raw.marketplace_sellers.country).code;
 
   return (
-    <div className="pt-[var(--m-chrome)]">
+    <div className="m-under-chrome">
       <JsonLd
         data={{
           "@context": "https://schema.org",

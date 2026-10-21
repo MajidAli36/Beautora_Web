@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingDoc } from "@/components/marketing/marketing-doc";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -16,8 +15,6 @@ export const metadata: Metadata = buildPageMetadata({
     "salon POS software",
   ],
 });
-
-const PRICE = `$${SUBSCRIPTION.asiaAmountUsd}–$${SUBSCRIPTION.usdtAmountUsd}`;
 
 export default function AboutPage() {
   const jsonLd = {
@@ -65,7 +62,7 @@ export default function AboutPage() {
             name: "How much does Beautora cost?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: `First month free, then ${PRICE}/month via USDT per store (Asia $${SUBSCRIPTION.asiaAmountUsd} · elsewhere $${SUBSCRIPTION.usdtAmountUsd}).`,
+              text: "Beautora starts with a free trial, then regional USDT plans per store. See current rates on the Pricing page at beautora.app/pricing.",
             },
           },
           {
@@ -130,11 +127,11 @@ export default function AboutPage() {
         </section>
 
         <section>
-          <h2>Pricing, simply</h2>
+          <h2>Pricing</h2>
           <p>
-            Start with {SUBSCRIPTION.trialDays} days free, then {PRICE} per store per month via
-            USDT. See current pricing on the{" "}
-            <Link href="/pricing">pricing page</Link>.
+            Beautora starts with a free trial, then regional USDT plans per store. Current rates
+            and payment details live in one place — the{" "}
+            <Link href="/pricing">Pricing</Link> page.
           </p>
         </section>
 
@@ -171,7 +168,8 @@ export default function AboutPage() {
           </p>
           <h3>How much does Beautora cost?</h3>
           <p>
-            First month free, then {PRICE}/month via USDT per store.
+            Beautora starts with a free trial, then regional USDT plans per store. See{" "}
+            <Link href="/pricing">Pricing</Link> for current rates.
           </p>
           <h3>Where do I start?</h3>
           <p>

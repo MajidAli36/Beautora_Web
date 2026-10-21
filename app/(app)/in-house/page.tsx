@@ -33,6 +33,7 @@ export default async function InHousePage() {
   const canManage = caps.canManage;
   const canCreate = caps.canCreate;
   const canEdit = caps.canEdit;
+  const canDelete = caps.canDelete;
 
   const usageTxns = (transactions ?? []).filter((t) =>
     String((t as { reference_type?: string | null }).reference_type ?? "").startsWith(
@@ -128,7 +129,8 @@ export default async function InHousePage() {
             categories={categories}
             services={services}
             linksByProduct={linksByProduct}
-            canManage={canManage}
+            canEdit={canEdit}
+            canDelete={canDelete}
           />
         </CardContent>
       </Card>
@@ -136,9 +138,10 @@ export default async function InHousePage() {
       {canEdit && (
         <Card>
           <CardHeader>
-            <CardTitle>Restock / adjust</CardTitle>
+            <CardTitle>Update quantity</CardTitle>
             <CardDescription>
-              Add stock in the same unit (e.g. +50 ml for one new 50 ml tube). Decimals allowed.
+              Quick restock without opening Edit. Stock in adds; Set on-hand replaces. Or use Edit →
+              Update quantity (keep / set / add / add bottles).
             </CardDescription>
           </CardHeader>
           <CardContent>

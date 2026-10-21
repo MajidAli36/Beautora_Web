@@ -657,7 +657,12 @@ export function renderAppointmentReceiptHtml(data: AppointmentReceiptInput): str
   const serviceTotal = roundMoney(
     data.services.reduce((s, x) => s + (Number(x.price) || 0), 0)
   );
-  const sourceLabel = data.source === "ONLINE" ? "Online booking" : "Reception";
+  const sourceLabel =
+    data.source === "ONLINE"
+      ? "Online booking"
+      : data.source === "CUSTOMER_APP"
+        ? "Customer app"
+        : "Reception";
 
   const servicesHtml = data.services
     .map(

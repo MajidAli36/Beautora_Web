@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { PartnerApplyForm } from "@/components/features/partners/partner-apply-form";
 import { PartnerIncomingRefBanner } from "@/components/partners/partner-incoming-ref-banner";
 import { buildPageMetadata } from "@/lib/seo/site";
@@ -9,7 +8,7 @@ import { SYNCOPS } from "@/lib/print/syncops";
 
 export const metadata: Metadata = buildPageMetadata({
   title: `Partner program`,
-  description: `Earn the full first subscription ($${SUBSCRIPTION.asiaAmountUsd} Asia · $${SUBSCRIPTION.usdtAmountUsd} elsewhere) when you refer a salon to ${SYNCOPS.name} by ${SYNCOPS.builder.name}.`,
+  description: `Earn the full first subscription when you refer a salon to ${SYNCOPS.name} by ${SYNCOPS.builder.name}. Regional plan amounts are on Pricing.`,
   path: "/partner",
   keywords: ["Beautora partner", "SyncOps partner", "salon referral program"],
 });
@@ -22,7 +21,7 @@ export default function PartnerLandingPage() {
       </Suspense>
       <section className="relative overflow-hidden border-b border-[var(--m-line)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(15,157,140,0.08),_transparent_55%)]" />
-        <div className="relative mx-auto grid max-w-6xl gap-12 px-6 pb-16 pt-28 lg:grid-cols-2 lg:items-start lg:gap-16 lg:pb-24 lg:pt-32">
+        <div className="relative mx-auto grid max-w-6xl gap-12 px-6 pb-16 pt-14 lg:grid-cols-2 lg:items-start lg:gap-16 lg:pb-24 lg:pt-20">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--m-accent)]">
               Partner program
@@ -34,10 +33,13 @@ export default function PartnerLandingPage() {
               </span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--m-muted)] sm:text-lg">
-              Share your personal link. When a new salon opens under your username and pays
-              their first subscription (${SUBSCRIPTION.asiaAmountUsd}–$
-              {SUBSCRIPTION.usdtAmountUsd} USDT by region), that full first payment is credited
-              to you — every referred client, tracked in your partner dashboard.
+              Share your personal link. When a new salon opens under your username and pays their
+              first subscription, that full first payment is credited to you — every referred
+              client, tracked in your partner dashboard. Regional plan amounts are on{" "}
+              <Link href="/pricing" className="font-medium text-[var(--m-ink)] underline-offset-2 hover:underline">
+                Pricing
+              </Link>
+              .
             </p>
 
             <ul className="mt-8 space-y-3 text-sm text-[var(--m-ink-soft)]">
@@ -47,8 +49,7 @@ export default function PartnerLandingPage() {
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-[var(--m-accent)]" />
-                First paid subscription only (not renewals) — full first month ($
-                {SUBSCRIPTION.asiaAmountUsd}–${SUBSCRIPTION.usdtAmountUsd}) to you
+                First paid subscription only (not renewals) — full first month credited to you
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-[var(--m-accent)]" />

@@ -59,7 +59,9 @@ export async function listSellerLedger(sellerId: string, limit = 50) {
 }
 
 /**
- * On seller-order delivered: credit seller (gross - commission) + commission debit.
+ * On seller-order delivered: credit gross, then debit commission (when > 0).
+ * Available balance = gross − commission. Do NOT credit (gross − commission) and
+ * also debit commission — that double-charges the seller.
  * Idempotent via idempotency_key.
  */
 export async function recordDeliveryLedger(input: {
@@ -72,7 +74,11 @@ export async function recordDeliveryLedger(input: {
   createdBy?: string | null;
   currency?: string | null;
 }): Promise<{ error?: string }> {
-  const sellerNet = Math.round((input.grossAmount - input.commissionAmount) * 100) / 100;
+  const gross = Math.round(Number(input.grossAmount) * 100) / 100;
+  const commissionAmt = Math.max(
+    0,
+    Math.round(Number(input.commissionAmount) * 100) / 100
+  );
   const creditKey = `deliver_credit:${input.sellerOrderId}`;
   const commissionKey = `deliver_commission:${input.sellerOrderId}`;
   const currency = (input.currency ?? "PKR").toUpperCase();
@@ -80,22 +86,22 @@ export async function recordDeliveryLedger(input: {
   const credit = await appendSellerLedger({
     seller_id: input.sellerId,
     entry_type: "SELLER_CREDIT" as LedgerEntryType,
-    amount: sellerNet,
+    amount: gross,
     currency,
     order_id: input.orderId,
     seller_order_id: input.sellerOrderId,
     commission_id: input.commissionId ?? null,
     idempotency_key: creditKey,
-    notes: "Order delivered — seller credit",
+    notes: "Order delivered — seller credit (gross)",
     created_by: input.createdBy ?? null,
   });
   if (credit.error) return credit;
 
-  if (input.commissionAmount > 0) {
+  if (commissionAmt > 0) {
     const commission = await appendSellerLedger({
       seller_id: input.sellerId,
       entry_type: "COMMISSION" as LedgerEntryType,
-      amount: input.commissionAmount,
+      amount: commissionAmt,
       currency,
       order_id: input.orderId,
       seller_order_id: input.sellerOrderId,
@@ -108,4 +114,14 @@ export async function recordDeliveryLedger(input: {
   }
 
   return {};
+}
+
+/** Pure helper for tests: expected available after delivery ledger entries. */
+export function sellerAvailableAfterDelivery(
+  grossAmount: number,
+  commissionAmount: number
+): number {
+  const gross = Math.round(Number(grossAmount) * 100) / 100;
+  const commission = Math.max(0, Math.round(Number(commissionAmount) * 100) / 100);
+  return Math.round((gross - commission) * 100) / 100;
 }

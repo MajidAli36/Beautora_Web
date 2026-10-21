@@ -1,5 +1,5 @@
-# Dependencies
-/node_modules
+# Dependencies (any package folder — including apps/*/node_modules)
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*

@@ -1,5 +1,3 @@
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
-
 type TrustBarProps = {
   storeCount: number;
 };
@@ -26,30 +24,27 @@ export function TrustBar({ storeCount }: TrustBarProps) {
       label: "login per store",
     },
     {
-      value: String(SUBSCRIPTION.trialDays),
-      label: "days free to start",
+      value: "3",
+      label: "products in one app",
     },
     {
-      value: `$${SUBSCRIPTION.asiaAmountUsd}–$${SUBSCRIPTION.usdtAmountUsd}`,
-      label: "per store / month after",
+      value: "USDT",
+      label: "regional billing",
     },
   ];
 
   return (
     <section
       aria-label="Trust highlights"
-      className="border-b border-[var(--m-line)] bg-[var(--m-paper)]"
+      className="border-b border-[var(--m-line)] bg-[var(--m-card)]"
     >
       <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-[var(--m-line)] sm:grid-cols-4">
         {items.map((item) => (
-          <div
-            key={item.label}
-            className="bg-[var(--m-paper)] px-5 py-7 text-center sm:py-8"
-          >
-            <p className="font-display text-2xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-3xl">
+          <div key={item.label} className="bg-[var(--m-card)] px-4 py-4 text-center sm:py-5">
+            <p className="font-display text-xl font-semibold tracking-tight text-[var(--m-ink)] sm:text-2xl">
               {item.value}
             </p>
-            <p className="mt-1.5 text-xs font-medium uppercase tracking-[0.16em] text-[var(--m-muted)]">
+            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--m-muted)] sm:text-xs">
               {item.label}
             </p>
           </div>

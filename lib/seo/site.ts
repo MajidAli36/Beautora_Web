@@ -51,7 +51,7 @@ export const SITE_FAQ = [
   {
     question: "Does Beautora work outside Pakistan?",
     answer:
-      "Yes. Beautora is built for beauty businesses internationally. Country settings select your subscription rate automatically ($10 Asia · $15 elsewhere, USDT).",
+      "Yes. Beautora is built for beauty businesses internationally. Your store country in Settings selects the regional USDT subscription rate automatically — see Pricing for current plans.",
   },
   {
     question: "Who builds Beautora?",
@@ -59,7 +59,7 @@ export const SITE_FAQ = [
   },
   {
     question: "How much does Beautora cost?",
-    answer: `Start with a ${SUBSCRIPTION.trialDays}-day free trial. After trial: Asia renews at $${SUBSCRIPTION.asiaAmountUsd}/month; all other countries renew at $${SUBSCRIPTION.usdtAmountUsd}/month — both via USDT on BNB Smart Chain (BEP-20). Upload proof in Billing for SyncOps review.`,
+    answer: `Beautora offers a free trial, then regional USDT plans per store. Current rates, trial length, and payment details are on the Pricing page at beautora.app/pricing.`,
   },
   {
     question: "Can customers book online?",

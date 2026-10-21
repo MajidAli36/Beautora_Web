@@ -16,12 +16,14 @@ export const NAV_KEYS = [
   "chairs",
   "staff",
   "attendance",
+  "payroll",
   "devices",
   "reports",
   "finances",
   "whatsapp",
   "feedback",
   "billing",
+  "customer_app",
   "settings",
 ] as const;
 
@@ -40,12 +42,14 @@ export const NAV_KEY_LABELS: Record<NavKey, string> = {
   chairs: "Chairs",
   staff: "Staff",
   attendance: "Attendance",
+  payroll: "Payroll",
   devices: "Devices",
   reports: "Reports",
   finances: "Finances",
   whatsapp: "WhatsApp",
   feedback: "Feedback",
   billing: "Billing",
+  customer_app: "Customer app",
   settings: "Settings",
 };
 
@@ -64,12 +68,14 @@ export const HREF_TO_NAV_KEY: Record<string, NavKey> = {
   "/chairs": "chairs",
   "/staff": "staff",
   "/attendance": "attendance",
+  "/payroll": "payroll",
   "/devices": "devices",
   "/reports": "reports",
   "/finances": "finances",
   "/whatsapp": "whatsapp",
   "/feedback": "feedback",
   "/billing": "billing",
+  "/customer-app": "customer_app",
   "/settings": "settings",
 };
 
@@ -88,6 +94,7 @@ export const DEFAULT_NAV_BY_ROLE: Record<MemberRole, Record<NavKey, boolean>> = 
   ADMIN: { ...ALL_TRUE },
   MANAGER: {
     ...ALL_TRUE,
+    customer_app: false,
   },
   CASHIER: {
     dashboard: true,
@@ -102,17 +109,20 @@ export const DEFAULT_NAV_BY_ROLE: Record<MemberRole, Record<NavKey, boolean>> = 
     chairs: false,
     staff: false,
     attendance: false,
+    payroll: false,
     devices: false,
     reports: false,
     finances: false,
     whatsapp: false,
     feedback: true,
     billing: false,
+    customer_app: false,
     settings: false,
   },
   RECEPTIONIST: {
     ...ALL_TRUE,
     billing: false,
+    customer_app: false,
   },
   STAFF: {
     dashboard: true,
@@ -127,12 +137,14 @@ export const DEFAULT_NAV_BY_ROLE: Record<MemberRole, Record<NavKey, boolean>> = 
     products: false,
     chairs: false,
     staff: false,
+    payroll: false,
     devices: false,
     reports: false,
     finances: false,
     whatsapp: false,
     feedback: false,
     billing: false,
+    customer_app: false,
     settings: false,
   },
 };
@@ -157,6 +169,7 @@ export function getEffectiveNavPermissions(
   if (role === "ADMIN") {
     base.settings = true;
     base.staff = true;
+    base.customer_app = true;
   }
 
   return base;
@@ -180,8 +193,11 @@ export function canAccessPath(
   pathname: string,
   overrides?: NavPermissionsConfig | null
 ): boolean {
-  // Marketplace seller area is gated by app mode + auth, not salon nav permissions.
+  // Marketplace / customer-app areas are gated by app mode + auth, not salon nav alone.
   if (pathname === "/marketplace" || pathname.startsWith("/marketplace/")) {
+    return true;
+  }
+  if (pathname === "/customer-app" || pathname.startsWith("/customer-app/")) {
     return true;
   }
   const key = pathnameToNavKey(pathname);

@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 export function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [accountType, setAccountType] = useState<SignupAccountType>("owner");
+  const [accountType, setAccountType] = useState<SignupAccountType>("customer");
   const [salonName, setSalonName] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -300,7 +300,7 @@ export function SignupForm() {
           </Link>
         </p>
         <p className="mt-2 text-sm leading-relaxed text-[var(--m-muted)] sm:mt-3">
-          First tell us why you&apos;re here — we only ask for the fields that match your path.
+          Choose User or Owner — we only ask for what you need next.
         </p>
         {isOwner && partnerRef ? (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
@@ -318,47 +318,51 @@ export function SignupForm() {
       <form onSubmit={handleSubmit} className="mt-4 space-y-3.5 sm:mt-7 sm:space-y-5">
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-[var(--m-ink-soft)]">
-            Why are you joining Beautora?
+            I am a…
           </legend>
-          <div className="grid gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => setAccountType("customer")}
+              aria-pressed={isCustomer}
               className={cn(
-                "flex min-h-[3.25rem] items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
+                "flex min-h-[4.25rem] flex-col items-start gap-1.5 border-2 px-3 py-3 text-left transition-colors",
                 isCustomer
-                  ? "border-[var(--m-ink)] bg-[var(--m-mist)]"
-                  : "border-[var(--m-line)] hover:border-[var(--m-accent)]/50"
+                  ? "border-[var(--m-ink)] bg-[var(--m-mist)] shadow-sm"
+                  : "border-[var(--m-line)] bg-white hover:border-[var(--m-ink)]/35"
               )}
             >
-              <ShoppingBag className="mt-0.5 size-4 shrink-0 text-[var(--m-accent)]" />
-              <span>
-                <span className="block text-sm font-semibold text-[var(--m-ink)]">
-                  I want to shop
-                </span>
-                <span className="mt-0.5 block text-xs leading-snug text-[var(--m-muted)]">
-                  Marketplace buyer — sign in to add to cart &amp; COD checkout
-                </span>
+              <span className="inline-flex items-center gap-2">
+                <ShoppingBag className="size-4 shrink-0 text-[var(--m-ink-soft)]" />
+                <span className="text-sm font-semibold text-[var(--m-ink)]">User</span>
+              </span>
+              <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--m-ink-soft)]">
+                Buy things
+              </span>
+              <span className="text-xs leading-snug text-[var(--m-muted)]">
+                Shop products from salons online
               </span>
             </button>
             <button
               type="button"
               onClick={() => setAccountType("owner")}
+              aria-pressed={isOwner}
               className={cn(
-                "flex min-h-[3.25rem] w-full items-start gap-2.5 border px-3 py-2.5 text-left transition-colors sm:gap-3 sm:py-3",
+                "flex min-h-[4.25rem] w-full flex-col items-start gap-1.5 border-2 px-3 py-3 text-left transition-colors",
                 isOwner
-                  ? "border-[var(--m-ink)] bg-[var(--m-mist)]"
-                  : "border-[var(--m-line)] hover:border-[var(--m-accent)]/50"
+                  ? "border-[var(--m-ink)] bg-[var(--m-mist)] shadow-sm"
+                  : "border-[var(--m-line)] bg-white hover:border-[var(--m-ink)]/35"
               )}
             >
-              <Store className="mt-0.5 size-4 shrink-0 text-[var(--m-accent)]" />
-              <span>
-                <span className="block text-sm font-semibold text-[var(--m-ink)]">
-                  I run a salon / shop
-                </span>
-                <span className="mt-0.5 block text-xs leading-snug text-[var(--m-muted)]">
-                  Owner — after email verify, pick Marketplace, Salon POS, or Both
-                </span>
+              <span className="inline-flex items-center gap-2">
+                <Store className="size-4 shrink-0 text-[var(--m-ink-soft)]" />
+                <span className="text-sm font-semibold text-[var(--m-ink)]">Owner</span>
+              </span>
+              <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--m-ink-soft)]">
+                Sell things
+              </span>
+              <span className="text-xs leading-snug text-[var(--m-muted)]">
+                Run your salon or online shop
               </span>
             </button>
           </div>
@@ -391,7 +395,7 @@ export function SignupForm() {
             )}
             {!nameHint && (
               <p className="text-xs text-[var(--m-muted)]">
-                Must be unique. You&apos;ll choose Marketplace, Salon POS, or Both next.
+                Must be unique. Next you&apos;ll choose how you sell.
               </p>
             )}
           </div>
@@ -410,7 +414,7 @@ export function SignupForm() {
               className={fieldClassName}
             />
             <p className="text-xs text-[var(--m-muted)]">
-              Optional — used on Marketplace orders after you sign in.
+              Optional — shown on your orders when you buy.
             </p>
           </div>
         )}

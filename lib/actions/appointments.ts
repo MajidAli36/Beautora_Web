@@ -108,7 +108,12 @@ export async function createAppointment(
       .from("services")
       .select("duration_minutes")
       .in("id", serviceIds)
-      .eq("organization_id", org.organizationId);
+      .eq("organization_id", org.organizationId)
+      .eq("is_active", true)
+      .is("deleted_at", null);
+    if ((svc ?? []).length !== serviceIds.length) {
+      return { error: "One or more services are unavailable" };
+    }
     durationMinutes = sumServiceDuration(svc ?? [], durationMinutes);
   }
 
@@ -141,7 +146,13 @@ export async function createAppointment(
       .from("services")
       .select("id, name, price, duration_minutes")
       .in("id", serviceIds)
-      .eq("organization_id", org.organizationId);
+      .eq("organization_id", org.organizationId)
+      .eq("is_active", true)
+      .is("deleted_at", null);
+
+    if ((services ?? []).length !== serviceIds.length) {
+      return { error: "One or more services are unavailable" };
+    }
 
     if (services?.length) {
       await supabase.from("appointment_services").insert(
@@ -582,10 +593,16 @@ export async function getAppointments(
     excludeStatuses?: string[];
     /** Include soft-deleted rows (cancelled online bookings). */
     includeSoftDeleted?: boolean;
+    /** Fetch specific appointment IDs (e.g. pending-deposit inbox). */
+    appointmentIds?: string[];
   }
 ) {
   const org = await requireOrganization();
   const supabase = await createClient();
+
+  if (options?.appointmentIds && options.appointmentIds.length === 0) {
+    return [];
+  }
 
   let query = supabase
     .from("appointments")
@@ -604,7 +621,9 @@ export async function getAppointments(
     query = query.is("deleted_at", null);
   }
 
-  if (date) {
+  if (options?.appointmentIds?.length) {
+    query = query.in("id", options.appointmentIds);
+  } else if (date) {
     const { start, end } = getDayRange(date);
     query = query.gte("scheduled_at", start).lt("scheduled_at", end);
   } else if (options?.from || options?.to) {
@@ -616,7 +635,10 @@ export async function getAppointments(
     }
   }
 
-  if (options?.source) {
+  if (options?.source === "ONLINE") {
+    // Customer-app bookings share the appointments engine; show with online list.
+    query = query.in("source", ["ONLINE", "CUSTOMER_APP"]);
+  } else if (options?.source) {
     query = query.eq("source", options.source);
   }
 
@@ -726,6 +748,9 @@ export async function createOnlineBooking(input: {
   advanceMethod?: "CASH" | "CARD" | "OTHER";
   advanceNotes?: string;
   paymentProof?: File | null;
+  /** When set, booking is attributed to the customer app (shared appointments row). */
+  customerAppId?: string;
+  appCustomerId?: string;
 }): Promise<{
   error?: string;
   success?: boolean;
@@ -780,7 +805,12 @@ export async function createOnlineBooking(input: {
       .from("services")
       .select("duration_minutes")
       .in("id", input.serviceIds)
-      .eq("organization_id", org.id);
+      .eq("organization_id", org.id)
+      .eq("is_active", true)
+      .is("deleted_at", null);
+    if ((services ?? []).length !== input.serviceIds.length) {
+      return { error: "One or more services are unavailable" };
+    }
     durationMinutes = sumServiceDuration(services ?? [], 30);
   }
 
@@ -800,7 +830,12 @@ export async function createOnlineBooking(input: {
       .from("services")
       .select("id, name, price, duration_minutes")
       .in("id", input.serviceIds)
-      .eq("organization_id", org.id);
+      .eq("organization_id", org.id)
+      .eq("is_active", true)
+      .is("deleted_at", null);
+    if ((services ?? []).length !== input.serviceIds.length) {
+      return { error: "One or more services are unavailable" };
+    }
     serviceRows = services ?? [];
   }
 
@@ -857,15 +892,22 @@ export async function createOnlineBooking(input: {
     bookingNumber = null;
   }
 
+  const fromCustomerApp = Boolean(input.customerAppId);
   const baseAppt = {
     organization_id: org.id,
     customer_id: customerId,
     staff_id: input.staffId,
     scheduled_at: new Date(input.scheduledAt).toISOString(),
     duration_minutes: durationMinutes,
-    source: "ONLINE" as const,
+    source: (fromCustomerApp ? "CUSTOMER_APP" : "ONLINE") as "CUSTOMER_APP" | "ONLINE",
     status: "SCHEDULED" as const,
     notes: input.notes ?? null,
+    ...(fromCustomerApp
+      ? {
+          customer_app_id: input.customerAppId,
+          app_customer_id: input.appCustomerId ?? null,
+        }
+      : {}),
   };
 
   let apptId: string | null = null;
@@ -1048,7 +1090,9 @@ export async function cancelOnlineAppointment(appointmentId: string): Promise<Ac
     .single();
 
   if (fetchErr || !appt) return { error: "Appointment not found" };
-  if (appt.source !== "ONLINE") return { error: "Only online appointments can be cancelled here" };
+  if (appt.source !== "ONLINE" && appt.source !== "CUSTOMER_APP") {
+    return { error: "Only online appointments can be cancelled here" };
+  }
   if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(appt.status)) {
     return { error: "This appointment is already closed" };
   }
@@ -1281,16 +1325,22 @@ export async function approveAppointmentDeposit(depositId: string): Promise<Acti
   if (fetchErr || !deposit) return { error: "Deposit not found" };
   if (deposit.status !== "PENDING") return { error: "Deposit is not pending" };
 
-  const { error } = await supabase
+  // Claim PENDING → APPROVED atomically (mirrors reject) to avoid approve/reject races.
+  const { data: claimed, error } = await supabase
     .from("appointment_deposits")
     .update({
       status: "APPROVED",
       approved_at: new Date().toISOString(),
       approved_by: user?.id ?? null,
     })
-    .eq("id", depositId);
+    .eq("id", depositId)
+    .eq("organization_id", org.organizationId)
+    .eq("status", "PENDING")
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!claimed) return { error: "Deposit is not pending" };
 
   await syncAppointmentAfterDepositChange(deposit.appointment_id, org.organizationId);
 

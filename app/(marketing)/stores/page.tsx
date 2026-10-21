@@ -26,9 +26,9 @@ export default async function StoresPage() {
   const [stores, cities] = await Promise.all([listPublicStores(), listPublicStoreCities()]);
 
   return (
-    <div className="pt-[var(--m-chrome)]">
+    <div className="m-under-chrome">
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
-        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl px-6 pt-6 pb-14 sm:pt-8 sm:pb-20">
           <Breadcrumbs
             items={[
               { name: "Home", path: "/" },

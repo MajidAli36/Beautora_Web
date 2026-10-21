@@ -49,10 +49,10 @@ export default async function BlogPostPage({ params }: Props) {
   };
 
   return (
-    <article className="bg-[var(--m-paper)] pt-[var(--m-chrome)]">
+    <article className="bg-[var(--m-paper)] m-under-chrome">
       <JsonLd data={articleLd} />
       <div className="border-b border-[var(--m-line)] bg-[var(--m-mist)]">
-        <div className="mx-auto max-w-3xl px-6 py-14">
+        <div className="mx-auto max-w-3xl px-6 pt-6 pb-14 sm:pt-8 sm:pb-16">
           <Breadcrumbs
             items={[
               { name: "Home", path: "/" },

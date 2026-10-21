@@ -360,13 +360,16 @@ export async function updateProduct(
   if (error) return { error: error.message };
   if (!updated) return { error: "Product not found or already deleted" };
 
-  // Optional on-hand qty from Edit (in-house) — apply via inventory movement + verified write.
+  // Optional qty update from Edit (in-house): keep | set | add | add_bottles.
+  const qtyMode = String(formData.get("stock_qty_mode") ?? "keep").trim();
   const stockRaw = formData.get("stock_quantity");
-  if (stockRaw != null && String(stockRaw).trim() !== "") {
-    const nextStock = Number(stockRaw);
-    if (!Number.isFinite(nextStock) || nextStock < 0) {
-      return { error: "On-hand quantity cannot be negative" };
-    }
+  const shouldTouchStock =
+    qtyMode === "set" ||
+    qtyMode === "add" ||
+    qtyMode === "add_bottles" ||
+    (qtyMode !== "keep" && stockRaw != null && String(stockRaw).trim() !== "");
+
+  if (shouldTouchStock && qtyMode !== "keep") {
     const { createAdminClient } = await import("@/lib/supabase/admin");
     let admin;
     try {
@@ -379,12 +382,38 @@ export async function updateProduct(
     }
     const { data: current } = await admin
       .from("products")
-      .select("stock_quantity")
+      .select("stock_quantity, pack_size")
       .eq("id", id)
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null)
       .maybeSingle();
     const before = Number(current?.stock_quantity) || 0;
+    const packSize =
+      Number(formData.get("pack_size")) || Number(current?.pack_size) || 0;
+
+    let nextStock = before;
+    if (qtyMode === "set" || (qtyMode !== "add" && qtyMode !== "add_bottles")) {
+      nextStock = Number(stockRaw);
+    } else if (qtyMode === "add") {
+      const addQty = Number(formData.get("stock_add_qty") ?? stockRaw);
+      if (!Number.isFinite(addQty) || addQty < 0) {
+        return { error: "Add quantity must be 0 or more" };
+      }
+      nextStock = before + addQty;
+    } else if (qtyMode === "add_bottles") {
+      const bottles = Number(formData.get("stock_add_bottles") ?? 0);
+      if (!Number.isFinite(bottles) || bottles < 0) {
+        return { error: "Bottle count must be 0 or more" };
+      }
+      if (packSize <= 0) {
+        return { error: "Set bottle size (ml per bottle) before adding bottles" };
+      }
+      nextStock = before + bottles * packSize;
+    }
+
+    if (!Number.isFinite(nextStock) || nextStock < 0) {
+      return { error: "On-hand quantity cannot be negative" };
+    }
     const target = Math.round(nextStock * 1000) / 1000;
     if (Math.abs(before - target) > 0.0005) {
       const {
@@ -393,7 +422,14 @@ export async function updateProduct(
       let txnType: "IN" | "OUT" | "ADJUSTMENT" = "ADJUSTMENT";
       let txnQty = target;
       let txnNotes = "Set on-hand from product edit";
-      if (target === 0) {
+      if (qtyMode === "add" || qtyMode === "add_bottles") {
+        txnType = "IN";
+        txnQty = Math.round((target - before) * 1000) / 1000;
+        txnNotes =
+          qtyMode === "add_bottles"
+            ? "Added bottles from product edit"
+            : "Added quantity from product edit";
+      } else if (target === 0) {
         if (before > 0) {
           txnType = "OUT";
           txnQty = before;
@@ -729,31 +765,27 @@ export async function getLowStockCount() {
 export async function getLowStockProducts() {
   const org = await requireOrganization();
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("products")
-    .select("id, name, stock_quantity, low_stock_threshold")
-    .eq("organization_id", org.organizationId)
-    .eq("is_active", true)
-    .is("deleted_at", null)
-    .order("stock_quantity");
+  const { data, error } = await supabase.rpc("low_stock_products", {
+    p_organization_id: org.organizationId,
+    p_limit: 100,
+  });
   if (error) {
     console.error("[inventory] low-stock query failed", error.message);
     return [];
   }
-  return (data ?? [])
-    .filter((p) => p.stock_quantity <= p.low_stock_threshold)
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      stock: p.stock_quantity,
-      threshold: p.low_stock_threshold,
-    }));
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    stock: p.stock_quantity,
+    threshold: p.low_stock_threshold,
+  }));
 }
 
 export async function getPosCatalog() {
   const org = await requireOrganization();
   const supabase = await createClient();
 
+  // Cap catalog payloads; customers are recent-only — search via searchPosCustomers.
   const [services, products, packages, customers, staff] = await Promise.all([
     supabase
       .from("services")
@@ -761,7 +793,8 @@ export async function getPosCatalog() {
       .eq("organization_id", org.organizationId)
       .eq("is_active", true)
       .is("deleted_at", null)
-      .order("name"),
+      .order("name")
+      .limit(500),
     supabase
       .from("products")
       .select("id, name, retail_price, stock_quantity, product_kind")
@@ -769,28 +802,31 @@ export async function getPosCatalog() {
       .eq("is_active", true)
       .is("deleted_at", null)
       .in("product_kind", ["RETAIL", "BOTH"])
-      .order("name"),
+      .order("name")
+      .limit(500),
     supabase
       .from("packages")
       .select("id, name, price")
       .eq("organization_id", org.organizationId)
       .eq("is_active", true)
       .is("deleted_at", null)
-      .order("name"),
+      .order("name")
+      .limit(200),
     supabase
       .from("customers")
       .select("id, first_name, last_name, phone")
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(500),
+      .limit(40),
     supabase
       .from("staff")
       .select("id, full_name")
       .eq("organization_id", org.organizationId)
       .eq("is_active", true)
       .is("deleted_at", null)
-      .order("full_name"),
+      .order("full_name")
+      .limit(100),
   ]);
 
   return {
@@ -802,6 +838,46 @@ export async function getPosCatalog() {
     customers: customers.data ?? [],
     staff: staff.data ?? [],
   };
+}
+
+/** POS customer typeahead — lean columns, capped results. */
+export async function searchPosCustomers(search: string) {
+  const org = await requireOrganization();
+  const q = search.trim();
+  if (q.length < 2) return [];
+
+  const supabase = await createClient();
+  const {
+    normalizeBookingPhone,
+    phoneLookupVariants,
+  } = await import("@/lib/customers/ensure-from-booking");
+
+  const safe = q.replace(/[%_,]/g, " ").trim();
+  const term = `%${safe}%`;
+  const parts = [
+    `first_name.ilike.${term}`,
+    `last_name.ilike.${term}`,
+    `phone.ilike.${term}`,
+  ];
+  const normalized = normalizeBookingPhone(q);
+  if (normalized) {
+    for (const variant of phoneLookupVariants(normalized)) {
+      parts.push(`phone.eq.${variant}`);
+      parts.push(`phone.ilike.%${variant}%`);
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, first_name, last_name, phone")
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .or(parts.join(","))
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
 /** Products that can be attached to a service recipe (in-house or both). */

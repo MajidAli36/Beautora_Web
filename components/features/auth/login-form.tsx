@@ -182,18 +182,18 @@ export function LoginForm() {
           <PartnerAwareSignupLink className="font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline">
             Sign up
           </PartnerAwareSignupLink>
-          {" · "}
+        </p>
+        <div className="mt-3 border border-[var(--m-line)] bg-white px-3 py-2.5">
           <Link
             href="/partner"
-            className="font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline"
+            className="text-sm font-semibold text-[var(--m-accent)] underline-offset-4 hover:underline"
           >
             Partner program
           </Link>
-        </p>
-        <p className="mt-2 text-xs text-[var(--m-muted)]">
-          Shoppers land on Marketplace Shop. Salon owners continue to onboarding or their
-          workspace. Partners use the partner dashboard only.
-        </p>
+          <p className="mt-0.5 text-xs leading-snug text-[var(--m-muted)]">
+            Earn by referring salons — opens the partner dashboard
+          </p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-7 sm:space-y-5">
@@ -204,7 +204,7 @@ export function LoginForm() {
           <input
             id="email"
             type="email"
-            placeholder="you@salon.com"
+            placeholder="you@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required

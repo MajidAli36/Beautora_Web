@@ -138,27 +138,60 @@ export async function createStaffPayment(
   const paidAt = formData.get("paid_at") as string;
   const paidAtIso = paidAt ? new Date(paidAt).toISOString() : new Date().toISOString();
 
-  const { error } = await supabase.from("staff_payments").insert({
-    organization_id: org.organizationId,
-    staff_id: parsed.data.staff_id,
-    amount: parsed.data.amount,
-    payment_type: parsed.data.payment_type,
-    payment_method: parsed.data.payment_method,
-    payment_date: parsed.data.payment_date,
-    paid_at: paidAtIso,
-    period_start: parsed.data.period_start ?? null,
-    period_end: parsed.data.period_end ?? null,
-    amount_due: parsed.data.amount_due ?? null,
-    notes: parsed.data.notes ?? null,
-    created_by: user?.id ?? null,
-  });
+  const { data: staffRow } = await supabase
+    .from("staff")
+    .select("full_name")
+    .eq("id", parsed.data.staff_id)
+    .eq("organization_id", org.organizationId)
+    .maybeSingle();
+
+  const { data: payment, error } = await supabase
+    .from("staff_payments")
+    .insert({
+      organization_id: org.organizationId,
+      staff_id: parsed.data.staff_id,
+      amount: parsed.data.amount,
+      payment_type: parsed.data.payment_type,
+      payment_method: parsed.data.payment_method,
+      payment_date: parsed.data.payment_date,
+      paid_at: paidAtIso,
+      period_start: parsed.data.period_start ?? null,
+      period_end: parsed.data.period_end ?? null,
+      amount_due: parsed.data.amount_due ?? null,
+      notes: parsed.data.notes ?? null,
+      created_by: user?.id ?? null,
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: error.message };
+
+  const { createExpenseForStaffPayment } = await import(
+    "@/lib/finances/staff-payment-expense"
+  );
+  const exp = await createExpenseForStaffPayment(supabase as never, {
+    organizationId: org.organizationId,
+    staffPaymentId: payment.id,
+    staffId: parsed.data.staff_id,
+    staffName: staffRow?.full_name,
+    amount: parsed.data.amount,
+    paymentType: parsed.data.payment_type,
+    paymentMethod: parsed.data.payment_method,
+    paymentDate: parsed.data.payment_date,
+    notes: parsed.data.notes,
+    createdBy: user?.id ?? null,
+  });
+  if (exp.error) {
+    await supabase.from("staff_payments").delete().eq("id", payment.id);
+    return { error: `Payment saved but expense failed: ${exp.error}` };
+  }
 
   revalidatePath("/finances");
   revalidatePath("/reports");
   revalidatePath("/dashboard");
   revalidatePath("/staff");
+  revalidatePath(`/staff/${parsed.data.staff_id}`);
+  revalidatePath("/payroll");
   return { success: true, recordDate: parsed.data.payment_date };
 }
 

@@ -34,69 +34,59 @@ const HERO_SLIDES = [
     src: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1400&q=70",
     alt: "Makeup palette and beauty cosmetics flat lay",
   },
-  {
-    src: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?auto=format&fit=crop&w=1400&q=70",
-    alt: "Makeup brushes and cosmetic products",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?auto=format&fit=crop&w=1400&q=70",
-    alt: "Hair coloring tools and salon product bottles",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=1400&q=70",
-    alt: "Beauty and skincare products on display",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=1400&q=70",
-    alt: "Skincare bottles and beauty care products",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=1400&q=70",
-    alt: "Skincare and beauty product bottles arranged on a shelf",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1612817288484-6f916006741a?auto=format&fit=crop&w=1400&q=70",
-    alt: "Makeup and cosmetic product flat lay",
-  },
 ] as const;
 
-const ROTATE_MS = 3000;
+const ROTATE_MS = 4500;
 
 export function LandingHeroBackground() {
   const [active, setActive] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduceMotion(mq.matches);
+    const onChange = () => setReduceMotion(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       setActive((current) => (current + 1) % HERO_SLIDES.length);
     }, ROTATE_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [reduceMotion]);
 
   const next = (active + 1) % HERO_SLIDES.length;
-  const visibleIndexes = active === next ? [active] : [active, next];
+  const visibleIndexes = reduceMotion
+    ? [active]
+    : active === next
+      ? [active]
+      : [active, next];
 
   return (
-    <div className="absolute inset-0">
+    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
       {visibleIndexes.map((index) => {
         const slide = HERO_SLIDES[index]!;
         return (
           <Image
             key={`${slide.src}-${index}`}
             src={slide.src}
-            alt={slide.alt}
+            alt=""
             fill
             priority={index === active}
             sizes="100vw"
             className={cn(
-              "object-cover object-center transition-opacity duration-700 ease-out",
+              "object-cover object-center transition-opacity duration-700 ease-out motion-reduce:transition-none",
               index === active ? "opacity-100" : "opacity-0"
             )}
           />
         );
       })}
-      <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(6,33,29,0.94)_0%,rgba(6,33,29,0.72)_46%,rgba(6,33,29,0.42)_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(6,33,29,0.78)_0%,transparent_45%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(7,59,50,0.94)_0%,rgba(7,59,50,0.74)_48%,rgba(7,59,50,0.45)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(7,59,50,0.8)_0%,transparent_48%)]" />
     </div>
   );
 }

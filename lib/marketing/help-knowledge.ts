@@ -14,8 +14,6 @@ export type HelpArticle = {
   links?: { label: string; href: string }[];
 };
 
-const PRICE_LINE = `$${SUBSCRIPTION.asiaAmountUsd} Asia · $${SUBSCRIPTION.usdtAmountUsd} elsewhere`;
-
 export const HELP_SUGGESTIONS = [
   "What is Beautora?",
   "List all features",
@@ -124,7 +122,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "grace",
       "plan",
     ],
-    answer: `New stores get ${SUBSCRIPTION.trialDays} days free — no card required. Asia stores renew at $${SUBSCRIPTION.asiaAmountUsd}/month; all other countries renew at $${SUBSCRIPTION.usdtAmountUsd}/month — both via USDT on BNB Smart Chain (BEP-20). SyncOps can also grant lifetime access from Platform admin. After a paid period ends there is a short ${SUBSCRIPTION.graceDays}-day grace before lock.`,
+    answer: `Beautora starts with a free trial (no card required), then regional USDT plans per store on BNB Smart Chain (BEP-20). Current trial length, Asia vs elsewhere rates, and payment steps are on the Pricing page — that is the single public source for dollar amounts. SyncOps can also grant lifetime access from Platform admin. After a paid period ends there is a short ${SUBSCRIPTION.graceDays}-day grace before lock.`,
     links: [
       { label: "Pricing", href: "/pricing" },
       { label: "Start free", href: "/signup" },
@@ -147,9 +145,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "guide",
       "tutorial",
     ],
-    answer: `1) Sign up and create your salon (name, city, country). 2) Use the in-app Getting Started guide: Services → Products → Customers → Queue → POS → WhatsApp & feedback → Appointments & online booking → Reports. 3) Invite your team with roles. You get ${SUBSCRIPTION.trialDays} days free on the full platform.`,
+    answer: `1) Sign up and create your salon (name, city, country). 2) Use the in-app Getting Started guide: Services → Products → Customers → Queue → POS → WhatsApp & feedback → Appointments & online booking → Reports. 3) Invite your team with roles. New stores get a free trial on the full platform — see Pricing for trial length and renewals.`,
     links: [
-      { label: "Start 30 days free", href: "/signup" },
+      { label: "Start free", href: "/signup" },
+      { label: "Pricing", href: "/pricing" },
       { label: "How it works", href: "/how-it-works" },
     ],
   },
@@ -583,8 +582,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "commission",
       "earn",
     ],
-    answer: `Partners get a personal referral link. When a referred salon pays its first subscription (${PRICE_LINE}), that first month credits the partner (not renewals). Apply with email + username; SyncOps approves before the link goes live. Track stores and earnings in the partner dashboard.`,
-    links: [{ label: "Become a partner", href: "/partner" }],
+    answer: `Partners get a personal referral link. When a referred salon pays its first subscription, that first month credits the partner (not renewals). Regional plan amounts are on the Pricing page. Apply with email + username; SyncOps approves before the link goes live. Track stores and earnings in the partner dashboard.`,
+    links: [
+      { label: "Become a partner", href: "/partner" },
+      { label: "Pricing", href: "/pricing" },
+    ],
   },
   {
     id: "contact",
@@ -645,7 +647,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "per store",
       "another salon",
     ],
-    answer: `Beautora bills ${PRICE_LINE} per store / month after trial (USDT). Each salon organization has its own catalog, team, bookings, and finances. Open another store as a separate Beautora organization if you run multiple locations.`,
+    answer: `Beautora bills per store after trial via USDT (regional plans). Current rates are on the Pricing page. Each salon organization has its own catalog, team, bookings, and finances. Open another store as a separate Beautora organization if you run multiple locations.`,
     links: [{ label: "Pricing", href: "/pricing" }],
   },
   {
@@ -661,8 +663,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "urdu",
     ],
     answer:
-      "During onboarding / Settings you set the store country. Beautora formats salon money with that country’s currency (Pakistan → PKR, India → INR, UAE → AED, USA → USD, and so on). Subscription billing remains USDT: $10 for Asia, $15 elsewhere — selected automatically from the store country.",
-    links: [{ label: "Start free", href: "/signup" }],
+      "During onboarding / Settings you set the store country. Beautora formats salon money with that country’s currency (Pakistan → PKR, India → INR, UAE → AED, USA → USD, and so on). Subscription billing remains USDT with regional rates selected automatically from the store country — see Pricing for current amounts.",
+    links: [
+      { label: "Pricing", href: "/pricing" },
+      { label: "Start free", href: "/signup" },
+    ],
   },
 ];
 
@@ -673,7 +678,7 @@ export function getHelpSystemPrompt(): string {
   return [
     `You are the Beautora site assistant for ${SYNCOPS.url}.`,
     "Answer ONLY using the knowledge below. If unknown, say so and point to Contact or Signup.",
-    "Be clear and helpful (2–6 short sentences). Never invent prices, modules, or integrations.",
+    "Be clear and helpful (2–6 short sentences). Never invent prices, modules, or integrations. For dollar amounts and plan rates, point users to /pricing — do not quote specific monthly fees from memory.",
     `Brand: ${SYNCOPS.name} by ${SYNCOPS.builder.name}. Support: ${SYNCOPS.email}, ${SYNCOPS.phoneDisplay}.`,
     "",
     "## Knowledge",

@@ -7,13 +7,13 @@ import type { AppMode } from "@/lib/marketplace/constants";
 export const BEAUTORA_PRODUCTS = {
   saas: {
     id: "saas" as const satisfies AppMode,
-    name: "Salon Management",
-    shortLabel: "Salon Management",
+    name: "Salon POS",
+    shortLabel: "Salon POS",
     eyebrow: "POS & operations",
     tagline: "Booking, POS & the floor",
     description:
       "Online booking, POS checkout, queue, staff, inventory, CRM, and reports — everything to run the salon day.",
-    switchHint: "Switch to Salon Management: booking, POS, stock & team.",
+    switchHint: "Switch to Salon POS: booking, POS, stock & team.",
   },
   marketplace: {
     id: "marketplace" as const satisfies AppMode,
@@ -24,6 +24,16 @@ export const BEAUTORA_PRODUCTS = {
     description:
       "List products, take COD orders, manage marketplace stock & payouts — separate from salon POS inventory and finances.",
     switchHint: "Switch to Marketplace: products, orders & commissions.",
+  },
+  customer_app: {
+    id: "customer_app" as const satisfies AppMode,
+    name: "App dashboard",
+    shortLabel: "App dashboard",
+    eyebrow: "Customer app",
+    tagline: "Branding, points & reels",
+    description:
+      "Manage your branded customer app — branding, loyalty points, leaderboard, products in app, and TikTok-style reels.",
+    switchHint: "Switch to App dashboard: customer app settings.",
   },
 } as const;
 
@@ -47,5 +57,7 @@ export const BEAUTORA_PRODUCT_PAIR = {
 } as const;
 
 export function productForMode(mode: AppMode) {
-  return mode === "marketplace" ? BEAUTORA_PRODUCTS.marketplace : BEAUTORA_PRODUCTS.saas;
+  if (mode === "marketplace") return BEAUTORA_PRODUCTS.marketplace;
+  if (mode === "customer_app") return BEAUTORA_PRODUCTS.customer_app;
+  return BEAUTORA_PRODUCTS.saas;
 }

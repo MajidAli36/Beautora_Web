@@ -18,12 +18,14 @@ import {
   Armchair,
   Star,
   Store,
+  Smartphone,
   Ticket,
   UserCog,
   Users,
   Wallet,
   Boxes,
   ClipboardList,
+  Banknote,
 } from "lucide-react";
 
 export type NavItem = {
@@ -69,6 +71,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: "Staff", href: "/staff", icon: UserCog, key: "staff" },
       { title: "Attendance", href: "/attendance", icon: CalendarCheck, key: "attendance" },
+      { title: "Payroll", href: "/payroll", icon: Banknote, key: "payroll" },
       { title: "Devices", href: "/devices", icon: Monitor, key: "devices" },
     ],
   },
@@ -84,6 +87,28 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: "WhatsApp", href: "/whatsapp", icon: MessageSquare, key: "whatsapp" },
       { title: "Feedback", href: "/feedback", icon: Star, key: "feedback" },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { title: "Billing", href: "/billing", icon: Wallet, key: "billing" },
+      { title: "Settings", href: "/settings", icon: Settings, key: "settings" },
+    ],
+  },
+];
+
+/** Shown when workspace mode = App dashboard (after Super Admin enables customer app). */
+export const customerAppNavGroups: NavGroup[] = [
+  {
+    label: "Customer app",
+    items: [
+      {
+        title: "App dashboard",
+        href: "/customer-app",
+        icon: Smartphone,
+        key: "customer_app",
+      },
     ],
   },
   {

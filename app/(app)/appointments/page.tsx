@@ -52,15 +52,18 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
   const today = getLocalDateString();
   const focus = params.focus === "deposits" ? "deposits" : null;
 
-  const canViewInHouse = await canAccessFeature("appointments");
-  const canViewOnline = (await canAccessFeature("online_booking")) || canViewInHouse;
+  const [canViewInHouse, canViewOnlineFeature, canConfigureEarly] = await Promise.all([
+    canAccessFeature("appointments"),
+    canAccessFeature("online_booking"),
+    canConfigureOnlineBooking(),
+  ]);
+  const canViewOnline = canViewOnlineFeature || canViewInHouse;
 
   let initialTab = focus === "deposits" ? "incoming" : parseTab(params.tab);
   if (!canViewInHouse && initialTab === "in-house") initialTab = "online";
   if (!canViewOnline && initialTab === "online") initialTab = canViewInHouse ? "in-house" : "history";
-  if (params.tab === "setup") {
-    const canConfigureEarly = await canConfigureOnlineBooking();
-    if (!canConfigureEarly) initialTab = canViewInHouse ? "in-house" : "online";
+  if (params.tab === "setup" && !canConfigureEarly) {
+    initialTab = canViewInHouse ? "in-house" : "online";
   }
 
   // `date` applies to the active schedule tab (in-house or online), not both blindly.
@@ -123,7 +126,7 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
     checkAction("sales.refund"),
     canOperateQueue(),
     canUsePos(),
-    canConfigureOnlineBooking(),
+    Promise.resolve(canConfigureEarly),
     checkAction("appointments.create"),
     checkAction("appointments.cancel"),
   ]);

@@ -5,9 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StoreProfileForm } from "@/components/features/settings/store-profile-form";
 import { StoreHoursForm } from "@/components/features/settings/store-hours-form";
 import { StorePaymentAccountsForm } from "@/components/features/settings/store-payment-accounts-form";
+import { AttendancePolicyForm } from "@/components/features/settings/attendance-policy-form";
 import { AuditLogTable } from "@/components/features/settings/audit-log-table";
 import { DeletedRecordsPanel } from "@/components/features/settings/deleted-records-panel";
 import type { StoreProfile } from "@/lib/actions/store-profile";
+import type { AttendancePolicy } from "@/lib/actions/staff-fines";
 import type { AuditLogRow } from "@/lib/actions/audit";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,12 +22,14 @@ export function SettingsTabs({
   auditLogs,
   deletedRecords,
   roleLabel,
+  attendancePolicy,
 }: {
   profile: StoreProfile;
   canManage: boolean;
   auditLogs: AuditLogRow[];
   deletedRecords: DeletedRecord[];
   roleLabel: string;
+  attendancePolicy: AttendancePolicy;
 }) {
   return (
     <Tabs defaultValue="profile" className="gap-6">
@@ -35,6 +39,9 @@ export function SettingsTabs({
         </TabsTrigger>
         <TabsTrigger value="hours" className="px-3 py-2">
           Hours
+        </TabsTrigger>
+        <TabsTrigger value="attendance" className="px-3 py-2">
+          Attendance & late
         </TabsTrigger>
         <TabsTrigger value="payments" className="px-3 py-2">
           Payment accounts
@@ -55,6 +62,26 @@ export function SettingsTabs({
       <TabsContent value="hours">
         {canManage ? (
           <StoreHoursForm hours={profile.business_hours} />
+        ) : (
+          <ReadOnlyNotice />
+        )}
+      </TabsContent>
+
+      <TabsContent value="attendance">
+        {canManage ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Duty time & late fines</CardTitle>
+              <CardDescription>
+                Salon-wide duty start/end, grace minutes, free late days per month, and
+                fine amount. Per-staff duty times on the staff profile override these
+                defaults.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AttendancePolicyForm policy={attendancePolicy} />
+            </CardContent>
+          </Card>
         ) : (
           <ReadOnlyNotice />
         )}

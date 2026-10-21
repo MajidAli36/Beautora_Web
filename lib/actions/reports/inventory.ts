@@ -1,8 +1,12 @@
 "use server";
 
 import { getInventoryMoneySnapshot, getProductSalesBreakdown } from "@/lib/inventory/sales-metrics";
-import { createReportContext, getSupabase } from "@/lib/reports/context";
-import { cmp } from "@/lib/reports/context";
+import {
+  cmp,
+  createReportContext,
+  fetchCompletedSales,
+  getSupabase,
+} from "@/lib/reports/context";
 import type { CompareResult } from "@/lib/reports/range";
 
 export type StockProductRow = {
@@ -51,10 +55,17 @@ export async function getInventoryReport(from?: string, to?: string): Promise<In
   const ctx = await createReportContext(from, to);
   const supabase = await getSupabase();
 
+  const [curSales, prevSales] = await Promise.all([
+    fetchCompletedSales(ctx, "current"),
+    fetchCompletedSales(ctx, "previous"),
+  ]);
+  const curIds = curSales.map((s) => s.id);
+  const prevIds = prevSales.map((s) => s.id);
+
   const [snapshot, prevSnapshot, { data: products }, { data: txns }, soldBreakdown] =
     await Promise.all([
-    getInventoryMoneySnapshot(ctx.organizationId, ctx.from, ctx.to),
-    getInventoryMoneySnapshot(ctx.organizationId, ctx.prevFrom, ctx.prevTo),
+    getInventoryMoneySnapshot(ctx.organizationId, ctx.from, ctx.to, curIds),
+    getInventoryMoneySnapshot(ctx.organizationId, ctx.prevFrom, ctx.prevTo, prevIds),
     supabase
       .from("products")
       .select("id, name, sku, stock_quantity, low_stock_threshold, cost_price, retail_price, is_active")
@@ -67,7 +78,7 @@ export async function getInventoryReport(from?: string, to?: string): Promise<In
       .lte("created_at", ctx.end.toISOString())
       .order("created_at", { ascending: false })
       .limit(500),
-    getProductSalesBreakdown(ctx.organizationId, ctx.from, ctx.to),
+    getProductSalesBreakdown(ctx.organizationId, ctx.from, ctx.to, curIds),
   ]);
 
   const soldIds = new Set(soldBreakdown.map((p) => p.productId));

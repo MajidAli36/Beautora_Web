@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingDoc } from "@/components/marketing/marketing-doc";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { SYNCOPS } from "@/lib/print/syncops";
 
@@ -10,8 +9,6 @@ export const metadata: Metadata = buildPageMetadata({
   description: `Terms of Service for ${SYNCOPS.name} Salon Management, POS & Marketplace by ${SYNCOPS.builder.name}.`,
   path: "/terms",
 });
-
-const PRICE = `$${SUBSCRIPTION.asiaAmountUsd}–$${SUBSCRIPTION.usdtAmountUsd}`;
 
 export default function TermsPage() {
   return (
@@ -42,10 +39,10 @@ export default function TermsPage() {
       <section>
         <h2>Subscriptions &amp; billing</h2>
         <p>
-          New stores may receive a {SUBSCRIPTION.trialDays}-day trial. Ongoing use is billed per
-          store at the published rate (currently {PRICE}/month) according to the payment process
-          shown in Billing. Platform review of payment proofs may be required before a period is
-          activated.
+          New stores may receive a free trial. Ongoing use is billed per store at the rates
+          published on the{" "}
+          <Link href="/pricing">Pricing</Link> page, according to the payment process shown in
+          Billing. Platform review of payment proofs may be required before a period is activated.
         </p>
       </section>
       <section>

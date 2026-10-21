@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
+import { MarketplaceQuickViewProvider } from "@/components/marketplace/product-quick-view";
 import {
   listMarketplaceCategories,
   listPublicMarketplaceProducts,
@@ -9,6 +10,7 @@ import {
 import { listPublicStores } from "@/lib/actions/stores";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,12 @@ export default async function DiscoverPage({
   const { q } = await searchParams;
   const query = (q ?? "").trim();
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isLoggedIn = Boolean(user);
+
   const [products, categories, stores, sellers] = await Promise.all([
     listPublicMarketplaceProducts({ q: query || undefined }),
     listMarketplaceCategories(),
@@ -64,10 +72,10 @@ export default async function DiscoverPage({
   const productSlice = products.slice(0, 8);
 
   return (
-    <div className="pt-[var(--m-chrome)]">
+    <div className="m-under-chrome">
       <section className="relative overflow-hidden border-b border-[var(--m-line)] bg-[var(--m-ink)] text-white">
         <div className="absolute inset-0 bg-[radial-gradient(900px_420px_at_15%_-10%,rgba(15,157,140,0.4),transparent_55%),radial-gradient(700px_380px_at_90%_80%,rgba(197,212,206,0.12),transparent_50%)]" />
-        <div className="relative mx-auto max-w-6xl px-6 py-14 sm:py-20">
+        <div className="relative mx-auto max-w-6xl px-6 pt-6 pb-14 sm:pt-8 sm:pb-20">
           <Breadcrumbs
             items={[
               { name: "Home", path: "/" },
@@ -155,11 +163,13 @@ export default async function DiscoverPage({
         {productSlice.length === 0 ? (
           <p className="mt-10 text-sm text-[var(--m-muted)]">No products found.</p>
         ) : (
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {productSlice.map((p) => (
-              <MarketplaceProductCard key={p.id} product={p} />
-            ))}
-          </div>
+          <MarketplaceQuickViewProvider isLoggedIn={isLoggedIn}>
+            <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {productSlice.map((p) => (
+                <MarketplaceProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </MarketplaceQuickViewProvider>
         )}
       </section>
 

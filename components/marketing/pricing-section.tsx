@@ -32,63 +32,60 @@ export function PricingSection({
   const secondary = primary.amount === ASIA_PLAN.amount ? STANDARD_PLAN : ASIA_PLAN;
 
   return (
-    <section id="pricing" className="scroll-mt-28 bg-[var(--m-ink)] py-28 text-white sm:py-32">
-      <div className="mx-auto max-w-6xl px-6">
+    <section id="pricing" className="m-section scroll-mt-28 bg-[var(--m-ink)] text-white">
+      <div className="m-container">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent-soft)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
             Pricing
           </p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h2 className="mt-2 font-display text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight">
             {SUBSCRIPTION.trialDays} days free.
             <span className="block">Then a clear monthly plan.</span>
           </h2>
-          <p className="mt-4 text-lg leading-relaxed text-white/70">
+          <p className="mt-3 text-base leading-relaxed text-white/70">
             Every new store gets the full Beautora platform for {SUBSCRIPTION.trialDays} days.
             After the trial, Asia stores renew at ${SUBSCRIPTION.asiaAmountUsd}; all other
             countries renew at ${SUBSCRIPTION.usdtAmountUsd} — both via USDT on BNB Smart Chain.
           </p>
           {detectedCountry ? (
-            <p className="mt-3 text-sm text-white/50">
+            <p className="mt-2 text-sm text-white/50">
               Showing payment details for your region ({detectedCountry} · USDT).
             </p>
           ) : null}
         </div>
 
-        <div className="mt-14 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="border border-white/15 bg-white/[0.03] p-8 sm:p-10">
+        <div className="mt-8 grid gap-5 sm:mt-10 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="border border-white/15 bg-white/[0.03] p-5 sm:p-7">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-accent-soft)]">
               {primary.title}
             </p>
-            <p className="mt-4 font-display text-5xl font-semibold tracking-tight sm:text-6xl">
+            <p className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
               {formatPlanAmount(primary)}
             </p>
-            <p className="mt-2 text-lg text-white/60">per store / month</p>
-            <p className="mt-6 text-sm text-white/75">
+            <p className="mt-1.5 text-base text-white/60">per store / month</p>
+            <p className="mt-4 text-sm text-white/75">
               {SUBSCRIPTION.trialDays} days free · No card required to start
             </p>
             {primary.networkLabel ? (
-              <p className="mt-3 text-xs text-white/55">{primary.networkLabel}</p>
+              <p className="mt-2 text-xs text-white/55">{primary.networkLabel}</p>
             ) : null}
-            <p className="mt-4 break-all text-sm text-white/80">
+            <p className="mt-3 break-all text-sm text-white/80">
               Wallet:{" "}
               <span className="font-semibold text-white">{primary.destinationDisplay}</span>
             </p>
-            <Link
-              href="/signup"
-              className="mt-8 inline-flex h-12 w-full items-center justify-center bg-white px-6 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-all duration-150 hover:bg-[var(--m-mist)] sm:w-auto"
-            >
+            <Link href="/signup" className="m-btn m-btn-light mt-5 w-full sm:w-auto">
               Start {SUBSCRIPTION.trialDays} days free
             </Link>
-            <p className="mt-6 text-xs leading-relaxed text-white/45">{primary.instructions}</p>
+            <p className="mt-4 text-xs leading-relaxed text-white/45">{primary.instructions}</p>
           </div>
 
-          <div className="border border-white/15 p-8 sm:p-10">
+          <div className="border border-white/15 p-5 sm:p-7">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-accent-soft)]">
               Included
             </p>
-            <ul className="mt-6 space-y-3 text-sm text-white/80">
+            <ul className="mt-4 space-y-2.5 text-sm text-white/80">
               {INCLUDED.map((item) => (
-                <li key={item} className="flex gap-3 border-b border-white/10 pb-3 last:border-0">
+                <li key={item} className="flex gap-2.5 border-b border-white/10 pb-2.5 last:border-0">
                   <span className="text-[var(--m-accent-soft)]" aria-hidden>
                     ✓
                   </span>
@@ -96,7 +93,7 @@ export function PricingSection({
                 </li>
               ))}
             </ul>
-            <div className="mt-8 border-t border-white/10 pt-6">
+            <div className="mt-5 border-t border-white/10 pt-4">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
                 Other region
               </p>

@@ -55,14 +55,18 @@ export function InHouseProductsTable({
   categories,
   services,
   linksByProduct,
-  canManage,
+  canEdit = false,
+  canDelete = false,
 }: {
   products: ProductRow[];
   categories: ProductCategory[];
   services: ServiceOption[];
   linksByProduct: Record<string, ServiceLink[]>;
-  canManage: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }) {
+  const showActions = canEdit || canDelete;
+
   return (
     <PaginatedList
       items={products}
@@ -90,7 +94,7 @@ export function InHouseProductsTable({
                 <TableHead className="text-right">Stock value</TableHead>
                 <TableHead>Linked services</TableHead>
                 <TableHead>Status</TableHead>
-                {canManage && <TableHead className="min-w-[320px]" />}
+                {showActions && <TableHead className="min-w-[320px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -196,7 +200,7 @@ export function InHouseProductsTable({
                         {p.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
-                    {canManage && (
+                    {showActions && (
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-2">
                           <Button
@@ -207,17 +211,23 @@ export function InHouseProductsTable({
                           >
                             Details
                           </Button>
-                          <LinkProductToServiceButton
-                            product={p}
-                            services={services}
-                            linkedServiceIds={links.map((l) => l.serviceId)}
-                          />
-                          <EditProductButton
-                            product={p}
-                            categories={categories}
-                            catalog="inhouse"
-                          />
-                          <DeleteProductButton id={p.id} name={p.name} />
+                          {canEdit ? (
+                            <>
+                              <LinkProductToServiceButton
+                                product={p}
+                                services={services}
+                                linkedServiceIds={links.map((l) => l.serviceId)}
+                              />
+                              <EditProductButton
+                                product={p}
+                                categories={categories}
+                                catalog="inhouse"
+                              />
+                            </>
+                          ) : null}
+                          {canDelete ? (
+                            <DeleteProductButton id={p.id} name={p.name} />
+                          ) : null}
                         </div>
                       </TableCell>
                     )}

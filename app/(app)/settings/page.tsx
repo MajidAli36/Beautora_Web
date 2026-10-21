@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { getAuditLogs, getDeletedRecords } from "@/lib/actions/audit";
 import { getStoreProfile } from "@/lib/actions/store-profile";
+import { getAttendancePolicy } from "@/lib/actions/staff-fines";
 import { getActiveOrganization } from "@/lib/auth/organization";
 import { canManageRecords } from "@/lib/auth/permissions";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
@@ -18,18 +19,23 @@ export default async function SettingsPage() {
   if (!profile) redirect("/onboarding");
 
   const canManage = await canManageRecords();
-  const [auditLogs, deletedRecords] = canManage
-    ? await Promise.all([
-        getAuditLogs(200).catch(() => []),
-        getDeletedRecords().catch(() => []),
-      ])
-    : [[], []];
+  const [auditLogs, deletedRecords, attendancePolicy] = await Promise.all([
+    canManage ? getAuditLogs(200).catch(() => []) : Promise.resolve([]),
+    canManage ? getDeletedRecords().catch(() => []) : Promise.resolve([]),
+    getAttendancePolicy().catch(() => ({
+      late_grace_minutes: 15,
+      late_allowed_days_per_month: 3,
+      late_fine_amount: 0,
+      default_duty_start: "10:00",
+      default_duty_end: "20:00",
+    })),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Settings"
-        description="Store profile, hours, and payment accounts used on online booking — plus system tools."
+        description="Store profile, hours, attendance/late policy, and payment accounts — plus system tools."
         actions={
           <StorePublicListingToggle
             enabled={profile.public_listing_enabled}
@@ -44,6 +50,7 @@ export default async function SettingsPage() {
         auditLogs={auditLogs}
         deletedRecords={deletedRecords}
         roleLabel={ROLE_LABELS[org.role]}
+        attendancePolicy={attendancePolicy}
       />
     </div>
   );

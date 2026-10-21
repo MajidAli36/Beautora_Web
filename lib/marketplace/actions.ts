@@ -1,7 +1,7 @@
 "use server";
 
 import { cache } from "react";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, unstable_cache, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { requireAuth } from "@/lib/auth/session";
 import { getActiveOrganization } from "@/lib/auth/organization";
@@ -25,25 +25,45 @@ type CategoryRow = Database["public"]["Tables"]["marketplace_categories"]["Row"]
 export const getAppMode = cache(async (): Promise<AppMode> => {
   const jar = await cookies();
   const v = jar.get(APP_MODE_COOKIE)?.value;
-  return v === "marketplace" ? "marketplace" : "saas";
+  if (v === "marketplace") return "marketplace";
+  if (v === "customer_app") return "customer_app";
+  return "saas";
 });
 
 export async function setAppMode(mode: AppMode): Promise<ActionResult & { mode?: AppMode }> {
   const user = await requireAuth();
-  const { parseProductIntent, productIntentAllowsMode } = await import(
-    "@/lib/auth/account-types"
-  );
-  const intent = parseProductIntent(user.user_metadata?.product_intent);
-  if (!productIntentAllowsMode(intent, mode)) {
-    return {
-      error:
-        intent === "marketplace"
-          ? "This store is configured for Marketplace only."
-          : intent === "salon_pos"
-            ? "This store is configured for Salon POS only."
-            : "This mode is not available for your workspace.",
-    };
+
+  if (mode === "customer_app") {
+    const org = await getActiveOrganization();
+    if (!org) return { error: "No salon workspace." };
+    const { getCustomerAppByOrg } = await import("@/lib/customer-apps/service");
+    const app = await getCustomerAppByOrg(org.organizationId);
+    if (!app || app.status === "deactivated") {
+      return {
+        error:
+          "App dashboard is not enabled for this salon. Ask Beautora Super Admin to enable Customer apps.",
+      };
+    }
+    if (app.status === "suspended") {
+      return { error: "Customer app is suspended. Contact Super Admin." };
+    }
+  } else {
+    const { parseProductIntent, productIntentAllowsMode } = await import(
+      "@/lib/auth/account-types"
+    );
+    const intent = parseProductIntent(user.user_metadata?.product_intent);
+    if (!productIntentAllowsMode(intent, mode)) {
+      return {
+        error:
+          intent === "marketplace"
+            ? "This store is configured for Marketplace only."
+            : intent === "salon_pos"
+              ? "This store is configured for Salon POS only."
+              : "This mode is not available for your workspace.",
+      };
+    }
   }
+
   const jar = await cookies();
   jar.set(APP_MODE_COOKIE, mode, {
     path: "/",
@@ -126,14 +146,28 @@ export async function registerMarketplaceSeller(
   return { success: true };
 }
 
+const MARKETPLACE_CATEGORIES_TAG = "marketplace-categories";
+const MARKETPLACE_PUBLIC_PRODUCTS_TAG = "marketplace-public-products";
+
+export async function invalidateMarketplacePublicCache() {
+  updateTag(MARKETPLACE_CATEGORIES_TAG);
+  updateTag(MARKETPLACE_PUBLIC_PRODUCTS_TAG);
+}
+
 export async function listMarketplaceCategories(): Promise<CategoryRow[]> {
-  const admin = tryCreateAdminClient() ?? (await createClient());
-  const { data } = await admin
-    .from("marketplace_categories")
-    .select("*")
-    .eq("is_active", true)
-    .order("sort_order");
-  return (data ?? []) as CategoryRow[];
+  return unstable_cache(
+    async () => {
+      const admin = tryCreateAdminClient() ?? (await createClient());
+      const { data } = await admin
+        .from("marketplace_categories")
+        .select("id, name, slug, sort_order, is_active, parent_id, kind, image_url, created_at")
+        .eq("is_active", true)
+        .order("sort_order");
+      return (data ?? []) as CategoryRow[];
+    },
+    ["marketplace-categories"],
+    { revalidate: 120, tags: [MARKETPLACE_CATEGORIES_TAG] }
+  )();
 }
 
 export async function listSellerProducts(): Promise<ProductRow[]> {
@@ -260,10 +294,24 @@ export async function adjustSellerStock(formData: FormData): Promise<ActionResul
   revalidatePath("/marketplace/inventory");
   revalidatePath("/marketplace/products");
   revalidatePath("/shop");
+  invalidateMarketplacePublicCache();
   return { success: true };
 }
 
-export type PublicProductCard = ProductRow & {
+export type PublicProductCard = {
+  id: string;
+  seller_id: string;
+  category_id: string | null;
+  title: string;
+  slug: string;
+  description: string | null;
+  short_description: string | null;
+  price: number;
+  sale_price: number | null;
+  stock: number;
+  image_url: string | null;
+  status: ProductRow["status"];
+  updated_at: string;
   seller_name: string;
   seller_slug: string;
   category_name: string | null;
@@ -273,44 +321,19 @@ export type PublicProductCard = ProductRow & {
   currency: string;
 };
 
-export async function listPublicMarketplaceProducts(opts?: {
+const PUBLIC_PRODUCT_SELECT =
+  "id, seller_id, category_id, title, slug, description, short_description, price, sale_price, stock, image_url, status, updated_at, marketplace_sellers!inner(shop_name, slug, status, country, organization_id), marketplace_categories(name, slug)";
+
+async function listPublicMarketplaceProductsUncached(opts?: {
   q?: string;
   category?: string;
 }): Promise<PublicProductCard[]> {
   const admin = tryCreateAdminClient();
   if (!admin) return [];
 
-  let query = admin
-    .from("marketplace_products")
-    .select(
-      "*, marketplace_sellers!inner(shop_name, slug, status, country, organization_id), marketplace_categories(name, slug)"
-    )
-    .eq("status", "published")
-    .eq("marketplace_sellers.status", "approved")
-    .gt("stock", 0)
-    .order("updated_at", { ascending: false })
-    .limit(500);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[marketplace] listPublicMarketplaceProducts failed", error.message);
-    return [];
-  }
-  if (!data) return [];
-
-  const q = (opts?.q ?? "").trim().toLowerCase();
-  let rows = data as unknown as Array<
-    ProductRow & {
-      marketplace_sellers: {
-        shop_name: string;
-        slug: string;
-        status: string;
-        country: string | null;
-        organization_id: string | null;
-      };
-      marketplace_categories: { name: string; slug: string; parent_id?: string | null } | null;
-    }
-  >;
+  const q = (opts?.q ?? "").trim();
+  const qSafe = q.replace(/[%(),]/g, "").slice(0, 80);
+  let categoryIds: string[] | null = null;
 
   if (opts?.category) {
     const { data: cats } = await admin
@@ -323,25 +346,77 @@ export async function listPublicMarketplaceProducts(opts?: {
       parent_id: string | null;
     }>;
     const match = allCats.find((c) => c.slug === opts.category);
-    if (match) {
-      const ids = new Set<string>([match.id]);
-      for (const c of allCats) {
-        if (c.parent_id === match.id) ids.add(c.id);
-      }
-      rows = rows.filter((p) => p.category_id && ids.has(p.category_id));
-    } else {
-      rows = [];
+    if (!match) return [];
+    categoryIds = [match.id];
+    for (const c of allCats) {
+      if (c.parent_id === match.id) categoryIds.push(c.id);
     }
   }
 
-  rows = rows.filter((p) => {
-    if (!q) return true;
-    return (
-      p.title.toLowerCase().includes(q) ||
-      (p.description ?? "").toLowerCase().includes(q) ||
-      p.marketplace_sellers.shop_name.toLowerCase().includes(q)
-    );
-  });
+  let sellerIdsFromName: string[] = [];
+  if (qSafe) {
+    const { data: sellers } = await admin
+      .from("marketplace_sellers")
+      .select("id")
+      .eq("status", "approved")
+      .ilike("shop_name", `%${qSafe}%`)
+      .limit(40);
+    sellerIdsFromName = (sellers ?? []).map((s) => s.id);
+  }
+
+  let query = admin
+    .from("marketplace_products")
+    .select(PUBLIC_PRODUCT_SELECT)
+    .eq("status", "published")
+    .eq("marketplace_sellers.status", "approved")
+    .gt("stock", 0)
+    .order("updated_at", { ascending: false })
+    .limit(120);
+
+  if (categoryIds) {
+    query = query.in("category_id", categoryIds);
+  }
+  if (qSafe) {
+    const textOr = `title.ilike.%${qSafe}%,description.ilike.%${qSafe}%,short_description.ilike.%${qSafe}%`;
+    if (sellerIdsFromName.length) {
+      query = query.or(`${textOr},seller_id.in.(${sellerIdsFromName.join(",")})`);
+    } else {
+      query = query.or(textOr);
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[marketplace] listPublicMarketplaceProducts failed", error.message);
+    return [];
+  }
+  if (!data) return [];
+
+  type Row = {
+    id: string;
+    seller_id: string;
+    category_id: string | null;
+    title: string;
+    slug: string;
+    description: string | null;
+    short_description: string | null;
+    price: number;
+    sale_price: number | null;
+    stock: number;
+    image_url: string | null;
+    status: ProductRow["status"];
+    updated_at: string;
+    marketplace_sellers: {
+      shop_name: string;
+      slug: string;
+      status: string;
+      country: string | null;
+      organization_id: string | null;
+    };
+    marketplace_categories: { name: string; slug: string } | null;
+  };
+
+  const rows = data as unknown as Row[];
 
   const productIds = rows.map((r) => r.id);
   const ratingMap = new Map<string, { sum: number; n: number }>();
@@ -361,7 +436,6 @@ export async function listPublicMarketplaceProducts(opts?: {
 
   const { currencyFromCountry } = await import("@/lib/currency/from-country");
 
-  // Prefer linked salon country when seller profile country is empty
   const orgIds = [
     ...new Set(
       rows
@@ -389,7 +463,19 @@ export async function listPublicMarketplaceProducts(opts?: {
         : null) ||
       null;
     return {
-      ...p,
+      id: p.id,
+      seller_id: p.seller_id,
+      category_id: p.category_id,
+      title: p.title,
+      slug: p.slug,
+      description: p.description,
+      short_description: p.short_description,
+      price: p.price,
+      sale_price: p.sale_price,
+      stock: p.stock,
+      image_url: p.image_url,
+      status: p.status,
+      updated_at: p.updated_at,
       seller_name: p.marketplace_sellers.shop_name,
       seller_slug: p.marketplace_sellers.slug,
       category_name: p.marketplace_categories?.name ?? null,
@@ -398,6 +484,63 @@ export async function listPublicMarketplaceProducts(opts?: {
       currency: currencyFromCountry(country).code,
     };
   });
+}
+
+export async function listPublicMarketplaceProducts(opts?: {
+  q?: string;
+  category?: string;
+}): Promise<PublicProductCard[]> {
+  const qKey = (opts?.q ?? "").trim().toLowerCase();
+  const catKey = opts?.category ?? "";
+  return unstable_cache(
+    () => listPublicMarketplaceProductsUncached(opts),
+    ["marketplace-public-products", qKey, catKey],
+    { revalidate: 60, tags: [MARKETPLACE_PUBLIC_PRODUCTS_TAG] }
+  )();
+}
+
+/** Lightweight detail payload for the product Quick View drawer. */
+export type MarketplaceQuickViewDetail = {
+  images: string[];
+  variants: Array<{
+    id: string;
+    name: string;
+    price: number;
+    sale_price: number | null;
+    stock: number;
+  }>;
+  description: string | null;
+  short_description: string | null;
+};
+
+export async function fetchMarketplaceQuickView(
+  productId: string
+): Promise<MarketplaceQuickViewDetail | null> {
+  const { getProductCatalogDetail } = await import("@/lib/marketplace/catalog");
+  const detail = await getProductCatalogDetail(productId);
+  if (!detail) return null;
+  const product = detail.product as {
+    image_url: string | null;
+    description: string | null;
+    short_description: string | null;
+  };
+  const urls = [
+    ...(product.image_url ? [product.image_url] : []),
+    ...detail.images.map((i) => i.url).filter(Boolean),
+  ];
+  const unique = [...new Set(urls)];
+  return {
+    images: unique,
+    variants: detail.variants.map((v) => ({
+      id: v.id,
+      name: v.name,
+      price: Number(v.price),
+      sale_price: v.sale_price != null ? Number(v.sale_price) : null,
+      stock: v.stock,
+    })),
+    description: product.description,
+    short_description: product.short_description,
+  };
 }
 
 export async function getPublicMarketplaceProduct(
@@ -1170,6 +1313,7 @@ export async function submitMarketplaceReview(formData: FormData): Promise<Actio
   });
   if (error) return { error: error.message };
   revalidatePath("/shop");
+  invalidateMarketplacePublicCache();
   return { success: true };
 }
 

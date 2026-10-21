@@ -72,16 +72,19 @@ function appointmentSearchText(a: AppointmentRow): string {
   const customer = a.customer;
   const services = (a.services ?? []).map((s) => s.service_name).join(" ");
   const bookingNo = displayBookingNumber(a.booking_number, a.id);
+  const src = (a.source ?? "").toUpperCase();
   const sourceLabel =
-    (a.source ?? "").toUpperCase() === "ONLINE"
+    src === "ONLINE"
       ? "Online"
-      : (a.source ?? "").toUpperCase() === "STAFF"
-        ? "In-house"
-        : (a.source ?? "").toUpperCase() === "PHONE"
-          ? "Phone"
-          : (a.source ?? "").toUpperCase() === "WALK_IN"
-            ? "Walk-in"
-            : (a.source ?? "");
+      : src === "CUSTOMER_APP"
+        ? "Customer app"
+        : src === "STAFF"
+          ? "In-house"
+          : src === "PHONE"
+            ? "Phone"
+            : src === "WALK_IN"
+              ? "Walk-in"
+              : (a.source ?? "");
   const statusLabel =
     a.status === "NO_SHOW"
       ? "No-show"
@@ -151,7 +154,8 @@ export function AppointmentsScheduleTable({
             const serviceTotal = sumServicePrices(services);
             const approvedAdvance = getApprovedDepositTotal(deposits);
             const pendingAdvance = getPendingDepositTotal(deposits);
-            const isOnline = (a.source ?? "").toUpperCase() === "ONLINE";
+            const src = (a.source ?? "").toUpperCase();
+            const isOnline = src === "ONLINE" || src === "CUSTOMER_APP";
             // Online advance settings apply ONLY to public online bookings — never in-house/staff.
             const rowAdvanceSettings = isOnline ? advanceSettings : undefined;
             const balanceDue = getAdvanceState(deposits, serviceTotal, rowAdvanceSettings)
@@ -165,17 +169,19 @@ export function AppointmentsScheduleTable({
               canCollectAdvance(deposits, serviceTotal, undefined);
             const bookingNo = displayBookingNumber(a.booking_number, a.id);
             const sourceLabel =
-              (a.source ?? "").toUpperCase() === "ONLINE"
+              src === "ONLINE"
                 ? "Online"
-                : (a.source ?? "").toUpperCase() === "STAFF"
-                  ? "In-house"
-                  : (a.source ?? "").toUpperCase() === "PHONE"
-                    ? "Phone"
-                    : (a.source ?? "").toUpperCase() === "WALK_IN"
-                      ? "Walk-in"
-                      : a.source
-                        ? a.source
-                        : null;
+                : src === "CUSTOMER_APP"
+                  ? "Customer app"
+                  : src === "STAFF"
+                    ? "In-house"
+                    : src === "PHONE"
+                      ? "Phone"
+                      : src === "WALK_IN"
+                        ? "Walk-in"
+                        : a.source
+                          ? a.source
+                          : null;
 
             return (
               <div

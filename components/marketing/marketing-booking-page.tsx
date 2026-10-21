@@ -66,7 +66,7 @@ export function MarketingBookingPage({ org }: { org: BookingOrg | null }) {
 
   return (
     <CurrencyProvider country={org?.country}>
-    <div className="bg-[var(--m-paper)] pt-[calc(var(--m-chrome)+1rem)] sm:pt-[calc(var(--m-chrome)+1.5rem)]">
+    <div className="bg-[var(--m-paper)] pt-8 sm:pt-10">
       <div className="mx-auto max-w-6xl px-6 py-14 lg:py-20">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">

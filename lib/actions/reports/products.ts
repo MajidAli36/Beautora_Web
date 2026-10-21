@@ -4,7 +4,12 @@ import {
   getProductSalesBreakdown,
   getProductSalesMetrics,
 } from "@/lib/inventory/sales-metrics";
-import { cmp, createReportContext, getSupabase } from "@/lib/reports/context";
+import {
+  cmp,
+  createReportContext,
+  fetchCompletedSales,
+  getSupabase,
+} from "@/lib/reports/context";
 import type { CompareResult } from "@/lib/reports/range";
 
 export type ProductReportRow = {
@@ -43,11 +48,18 @@ export async function getProductsReport(from?: string, to?: string): Promise<Pro
   const ctx = await createReportContext(from, to);
   const supabase = await getSupabase();
 
+  const [curSales, prevSales] = await Promise.all([
+    fetchCompletedSales(ctx, "current"),
+    fetchCompletedSales(ctx, "previous"),
+  ]);
+  const curIds = curSales.map((s) => s.id);
+  const prevIds = prevSales.map((s) => s.id);
+
   const [curRows, prevRows, prevMetrics, curMetrics] = await Promise.all([
-    getProductSalesBreakdown(ctx.organizationId, ctx.from, ctx.to),
-    getProductSalesBreakdown(ctx.organizationId, ctx.prevFrom, ctx.prevTo),
-    getProductSalesMetrics(ctx.organizationId, ctx.prevFrom, ctx.prevTo),
-    getProductSalesMetrics(ctx.organizationId, ctx.from, ctx.to),
+    getProductSalesBreakdown(ctx.organizationId, ctx.from, ctx.to, curIds),
+    getProductSalesBreakdown(ctx.organizationId, ctx.prevFrom, ctx.prevTo, prevIds),
+    getProductSalesMetrics(ctx.organizationId, ctx.prevFrom, ctx.prevTo, prevIds),
+    getProductSalesMetrics(ctx.organizationId, ctx.from, ctx.to, curIds),
   ]);
 
   const productIds = curRows.map((r) => r.productId);

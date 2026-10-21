@@ -1,101 +1,84 @@
 import Link from "next/link";
 import { BeautoraWordmark } from "@/components/brand/beautora-logo";
-import { SUBSCRIPTION } from "@/lib/billing/subscription";
 import { SYNCOPS } from "@/lib/print/syncops";
+
+const PRODUCT_LINKS = [
+  { href: "/salon-management-software", label: "Salon management" },
+  { href: "/salon-booking-software", label: "Booking" },
+  { href: "/salon-pos", label: "POS" },
+  { href: "/features", label: "Features" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/signup", label: "Start free" },
+] as const;
+
+const DISCOVER_LINKS = [
+  { href: "/stores", label: "Stores" },
+  { href: "/shop", label: "Shop" },
+  { href: "/discover", label: "Discover" },
+  { href: "/videos", label: "Videos" },
+  { href: "/blog", label: "Blog" },
+  { href: "/tools", label: "Tools" },
+  { href: "/apps", label: "Apps" },
+] as const;
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
     <footer className="bg-[var(--m-ink)] text-[var(--m-accent-soft)]">
-      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:gap-10">
         <div>
           <BeautoraWordmark size="lg" textClassName="text-white" />
-          <p className="mt-2 text-sm text-white/60">
-            Salon Management, POS & Marketplace for modern beauty businesses.
+          <p className="mt-3 text-sm leading-relaxed text-white/60">
+            Salon management, POS & marketplace for modern beauty businesses.
           </p>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--m-accent-soft)]">
+          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--m-accent)]">
             {SYNCOPS.builder.label}
           </p>
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/45">
-            {SUBSCRIPTION.trialDays} days free, then $
-            {SUBSCRIPTION.asiaAmountUsd}/mo (Asia) or ${SUBSCRIPTION.usdtAmountUsd}/mo
-            (elsewhere) via USDT.
+            Free trial to start. Current plans and regional USDT rates are on{" "}
+            <Link href="/pricing" className="text-white/70 underline-offset-2 hover:underline">
+              Pricing
+            </Link>
+            .
           </p>
         </div>
 
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
-            Product
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">Product</p>
           <ul className="mt-4 space-y-2.5 text-sm text-white/70">
-            <li>
-              <Link href="/salon-management-software" className="transition-colors hover:text-white">
-                Salon management
-              </Link>
-            </li>
-            <li>
-              <Link href="/salon-booking-software" className="transition-colors hover:text-white">
-                Booking
-              </Link>
-            </li>
-            <li>
-              <Link href="/salon-pos" className="transition-colors hover:text-white">
-                POS
-              </Link>
-            </li>
-            <li>
-              <Link href="/features" className="transition-colors hover:text-white">
-                Features
-              </Link>
-            </li>
-            <li>
-              <Link href="/pricing" className="transition-colors hover:text-white">
-                Pricing
-              </Link>
-            </li>
-            <li>
-              <Link href="/stores" className="transition-colors hover:text-white">
-                Stores
-              </Link>
-            </li>
-            <li>
-              <Link href="/shop" className="transition-colors hover:text-white">
-                Shop
-              </Link>
-            </li>
-            <li>
-              <Link href="/discover" className="transition-colors hover:text-white">
-                Discover
-              </Link>
-            </li>
-            <li>
-              <Link href="/videos" className="transition-colors hover:text-white">
-                Videos
-              </Link>
-            </li>
-            <li>
-              <Link href="/blog" className="transition-colors hover:text-white">
-                Blog
-              </Link>
-            </li>
-            <li>
-              <Link href="/tools" className="transition-colors hover:text-white">
-                Tools
-              </Link>
-            </li>
-            <li>
-              <Link href="/signup" className="transition-colors hover:text-white">
-                Start free
-              </Link>
-            </li>
+            {PRODUCT_LINKS.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className="rounded-sm transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--m-accent)]"
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
 
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
-            Company
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">Explore</p>
+          <ul className="mt-4 space-y-2.5 text-sm text-white/70">
+            {DISCOVER_LINKS.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className="rounded-sm transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--m-accent)]"
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">Company</p>
           <ul className="mt-4 space-y-2.5 text-sm text-white/70">
             <li>
               <Link href="/about" className="transition-colors hover:text-white">
@@ -123,13 +106,11 @@ export function SiteFooter() {
               </Link>
             </li>
           </ul>
-        </div>
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
+          <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
             Contact
           </p>
-          <ul className="mt-4 space-y-3 text-sm text-white/70">
+          <ul className="mt-3 space-y-2.5 text-sm text-white/70">
             <li>
               <a
                 href={`tel:${SYNCOPS.phone.replace(/\s/g, "")}`}
@@ -143,20 +124,9 @@ export function SiteFooter() {
                 {SYNCOPS.email}
               </a>
             </li>
-            <li>
-              <a
-                href={SYNCOPS.builder.url}
-                target="_blank"
-                rel="noopener noreferrer me author"
-                className="transition-colors hover:text-white"
-              >
-                Built by SyncOps
-              </a>
-            </li>
           </ul>
-          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.22em] text-white/45">
-            Legal
-          </p>
+
+          <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-white/45">Legal</p>
           <ul className="mt-3 space-y-2 text-sm text-white/55">
             <li>
               <Link href="/privacy" className="transition-colors hover:text-white/80">

@@ -85,12 +85,14 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/devices") ||
     pathname.startsWith("/staff") ||
     pathname.startsWith("/attendance") ||
+    pathname.startsWith("/payroll") ||
     pathname.startsWith("/reports") ||
     pathname.startsWith("/finances") ||
     pathname.startsWith("/whatsapp") ||
     pathname.startsWith("/feedback") ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/billing") ||
+    pathname.startsWith("/customer-app") ||
     pathname.startsWith("/platform") ||
     pathname.startsWith("/marketplace") ||
     isPartnerDashboard;
