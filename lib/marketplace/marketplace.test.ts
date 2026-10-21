@@ -11,7 +11,7 @@ import {
 } from "./cart";
 import { effectiveProductPrice, formatMarketplaceMoney } from "./pricing";
 import { formatCommissionPercent, MARKETPLACE_COMMISSION_RATE } from "./constants";
-import { sellerAvailableAfterDelivery } from "./ledger";
+import { sellerAvailableAfterDelivery } from "./ledger-math";
 import { CodPaymentProvider } from "./payments";
 
 describe("effectiveProductPrice", () => {

@@ -115,13 +115,3 @@ export async function recordDeliveryLedger(input: {
 
   return {};
 }
-
-/** Pure helper for tests: expected available after delivery ledger entries. */
-export function sellerAvailableAfterDelivery(
-  grossAmount: number,
-  commissionAmount: number
-): number {
-  const gross = Math.round(Number(grossAmount) * 100) / 100;
-  const commission = Math.max(0, Math.round(Number(commissionAmount) * 100) / 100);
-  return Math.round((gross - commission) * 100) / 100;
-}
