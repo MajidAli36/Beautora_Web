@@ -23,11 +23,7 @@ export default async function MarketplaceOrdersPage() {
       />
 
       {sellerOrders.length > 0 ? (
-        <MarketplaceSellerOrdersList
-          orders={sellerOrders as Parameters<
-            typeof MarketplaceSellerOrdersList
-          >[0]["orders"]}
-        />
+        <MarketplaceSellerOrdersList orders={sellerOrders} />
       ) : (
         <MarketplaceOrdersList orders={legacyOrders} />
       )}

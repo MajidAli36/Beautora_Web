@@ -90,7 +90,7 @@ export async function getStaffPayslipBundle(
     .from("staff")
     .select(
       `id, pay_type, monthly_salary, hourly_rate, salary_policy, employee_code, department,
-       schedule_start_time, schedule_end_time, expected_hours_per_day,
+       schedule_start_time, schedule_end_time, expected_hours_per_day, expected_days_per_week,
        overtime_eligible, overtime_multiplier`
     )
     .eq("id", staffId)

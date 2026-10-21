@@ -1519,7 +1519,15 @@ export type Database = {
         };
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "staff_attendance_days_staff_id_fkey";
+            columns: ["staff_id"];
+            isOneToOne: false;
+            referencedRelation: "staff";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       staff_salary_history: {
         Row: {
@@ -2095,7 +2103,22 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["marketplace_seller_orders"]["Insert"]>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_seller_orders_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "marketplace_orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "marketplace_seller_orders_seller_id_fkey";
+            columns: ["seller_id"];
+            isOneToOne: false;
+            referencedRelation: "marketplace_sellers";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       marketplace_order_items: {
         Row: {
@@ -2155,7 +2178,22 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["marketplace_order_items"]["Insert"]>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_order_items_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "marketplace_orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "marketplace_order_items_seller_order_id_fkey";
+            columns: ["seller_order_id"];
+            isOneToOne: false;
+            referencedRelation: "marketplace_seller_orders";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       marketplace_commissions: {
         Row: {
