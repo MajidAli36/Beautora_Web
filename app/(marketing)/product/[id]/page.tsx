@@ -17,6 +17,34 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ id: string }> };
 
+type CatalogProduct = {
+  id: string;
+  slug: string;
+  seller_id: string;
+  title: string;
+  price: number;
+  sale_price: number | null;
+  short_description: string | null;
+  description: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  image_url: string | null;
+  stock: number;
+  marketplace_sellers: {
+    shop_name: string;
+    slug: string;
+    logo_url: string | null;
+    city: string | null;
+    country: string | null;
+  };
+  marketplace_categories: { name: string; slug: string } | null;
+  marketplace_brands: { name: string; slug: string } | null;
+};
+
+function asCatalogProduct(product: unknown): CatalogProduct {
+  return product as CatalogProduct;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id: param } = await params;
   const detail = await getProductCatalogByParam(param);
@@ -28,16 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       noIndex: true,
     });
   }
-  const p = detail.product as {
-    id: string;
-    slug: string;
-    title: string;
-    short_description: string | null;
-    description: string | null;
-    seo_title: string | null;
-    seo_description: string | null;
-    image_url: string | null;
-  };
+  const p = asCatalogProduct(detail.product);
   const path = marketplaceProductPath(p);
   const description =
     p.seo_description ||
@@ -65,29 +84,7 @@ export default async function ProductDetailPage({ params }: Props) {
   const detail = await getProductCatalogByParam(param);
   if (!detail) notFound();
 
-  const product = detail.product as {
-    id: string;
-    slug: string;
-    seller_id: string;
-    title: string;
-    price: number;
-    sale_price: number | null;
-    short_description: string | null;
-    description: string | null;
-    seo_title: string | null;
-    seo_description: string | null;
-    image_url: string | null;
-    stock: number;
-    marketplace_sellers: {
-      shop_name: string;
-      slug: string;
-      logo_url: string | null;
-      city: string | null;
-      country: string | null;
-    };
-    marketplace_categories: { name: string; slug: string } | null;
-    marketplace_brands: { name: string; slug: string } | null;
-  };
+  const product = asCatalogProduct(detail.product);
 
   const canonicalPath = marketplaceProductPath(product);
   const parsed = parseProductParam(param);

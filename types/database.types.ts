@@ -1959,7 +1959,29 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["marketplace_products"]["Insert"]>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_products_seller_id_fkey";
+            columns: ["seller_id"];
+            isOneToOne: false;
+            referencedRelation: "marketplace_sellers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "marketplace_products_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "marketplace_categories";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "marketplace_products_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "marketplace_brands";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       marketplace_product_images: {
         Row: {
