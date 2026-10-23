@@ -18,6 +18,13 @@ import {
 } from "@/lib/partners/referral";
 import type { SignupAccountType } from "@/lib/auth/account-types";
 import { cn } from "@/lib/utils";
+import {
+  resetTurnstile,
+  TurnstileField,
+} from "@/components/features/auth/turnstile-field";
+
+const TURNSTILE_SITE_KEY =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null;
 
 export function SignupForm() {
   const router = useRouter();
@@ -39,6 +46,7 @@ export function SignupForm() {
   const [refHint, setRefHint] = useState<string | null>(null);
   const [phase, setPhase] = useState<"form" | "verify">("form");
   const [resending, setResending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const isOwner = accountType === "owner";
   const isCustomer = accountType === "customer";
@@ -191,6 +199,12 @@ export function SignupForm() {
       return;
     }
 
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      notify.error("Please complete the CAPTCHA check");
+      setLoading(false);
+      return;
+    }
+
     const created = await registerAccount({
       email: trimmedEmail,
       password,
@@ -198,10 +212,13 @@ export function SignupForm() {
       salonName: isOwner ? trimmedSalon : undefined,
       fullName: isCustomer ? trimmedName : undefined,
       referralCode: isOwner ? partnerRef : null,
+      captchaToken,
     });
 
     if (created.error) {
       notify.error(created.error);
+      setCaptchaToken(null);
+      resetTurnstile();
       setLoading(false);
       return;
     }
@@ -510,12 +527,20 @@ export function SignupForm() {
           ) : null}
         </div>
 
+        {TURNSTILE_SITE_KEY ? (
+          <TurnstileField
+            siteKey={TURNSTILE_SITE_KEY}
+            onToken={setCaptchaToken}
+          />
+        ) : null}
+
         <button
           type="submit"
           disabled={
             loading ||
             (isOwner && nameOk === false) ||
             emailOk === false ||
+            (Boolean(TURNSTILE_SITE_KEY) && !captchaToken) ||
             (confirmPassword.length > 0 && password !== confirmPassword)
           }
           className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[var(--m-ink)] text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors hover:bg-[var(--m-ink-soft)] disabled:opacity-60"

@@ -15,18 +15,36 @@ import {
   effectiveProductPrice,
   formatMarketplaceMoney,
 } from "@/lib/marketplace/pricing";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database.types";
 import { currencyFromCountry } from "@/lib/currency/from-country";
+import { marketplaceProductPath } from "@/lib/marketplace/product-url";
 
 type Product = Database["public"]["Tables"]["marketplace_products"]["Row"];
 type Variant = Database["public"]["Tables"]["marketplace_product_variants"]["Row"];
 type ImageRow = Database["public"]["Tables"]["marketplace_product_images"]["Row"];
 type Review = Database["public"]["Tables"]["marketplace_reviews"]["Row"];
+
+function hasMeaningfulText(value: string | null | undefined) {
+  return Boolean(value?.replace(/\s+/g, " ").trim());
+}
+
+/** Rich-text editors often save empty `<p></p>` / `&nbsp;` — treat as no content. */
+function hasMeaningfulHtml(html: string | null | undefined) {
+  if (!html?.trim()) return false;
+  const text = html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#160;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 0;
+}
 
 export function MarketplaceProductPdp({
   product,
@@ -66,6 +84,8 @@ export function MarketplaceProductPdp({
   const [activeImage, setActiveImage] = useState(
     images[0]?.url ?? product.image_url ?? null
   );
+  const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
 
   const selected = useMemo(
     () => variants.find((v) => v.id === variantId) ?? null,
@@ -78,6 +98,28 @@ export function MarketplaceProductPdp({
   const listPrice = selected ? Number(selected.price) : Number(product.price);
   const stock = selected ? selected.stock : product.stock;
   const title = selected ? `${product.title} (${selected.name})` : product.title;
+  const onSale = unitPrice < listPrice;
+  const discountPct =
+    onSale && listPrice > 0
+      ? Math.round((1 - unitPrice / listPrice) * 100)
+      : 0;
+
+  const shortDescription = hasMeaningfulText(product.short_description)
+    ? product.short_description!.trim()
+    : null;
+  const descriptionHtml = hasMeaningfulHtml(product.description_html)
+    ? product.description_html
+    : null;
+  const descriptionPlain = hasMeaningfulText(product.description)
+    ? product.description!.trim()
+    : null;
+  const plainDistinct =
+    descriptionPlain &&
+    shortDescription &&
+    descriptionPlain.toLowerCase() === shortDescription.toLowerCase()
+      ? null
+      : descriptionPlain;
+  const hasFullDescription = Boolean(descriptionHtml || plainDistinct);
 
   useEffect(() => {
     void trackMarketplaceEvent({
@@ -95,9 +137,11 @@ export function MarketplaceProductPdp({
     }
   }, []);
 
+  const productHref = marketplaceProductPath(product);
+
   function requireLogin(action: string) {
     notify.error(`Sign in to ${action}`);
-    router.push(`/login?redirect=${encodeURIComponent(`/product/${product.id}`)}`);
+    router.push(`/login?redirect=${encodeURIComponent(productHref)}`);
   }
 
   function addToCart() {
@@ -183,25 +227,34 @@ export function MarketplaceProductPdp({
   return (
     <div className="mx-auto grid max-w-6xl gap-10 px-6 py-10 lg:grid-cols-2 lg:gap-14 lg:py-14">
       <div>
-        <div className="aspect-square overflow-hidden bg-[var(--m-mist)]">
+        <div className="relative aspect-square overflow-hidden border border-[var(--m-line)] bg-[var(--m-mist)]">
           {activeImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={activeImage} alt="" className="size-full object-cover" />
+            <img
+              src={activeImage}
+              alt={product.title}
+              className="size-full object-cover"
+            />
           ) : (
             <div className="flex size-full items-center justify-center text-sm text-[var(--m-muted)]">
               No image
             </div>
           )}
+          {discountPct > 0 ? (
+            <span className="absolute top-4 left-4 bg-[var(--m-ink)] px-2.5 py-1 text-[11px] font-semibold tracking-wide text-[var(--m-paper)]">
+              −{discountPct}%
+            </span>
+          ) : null}
         </div>
         {gallery.length > 1 ? (
-          <div className="mt-3 flex gap-2 overflow-x-auto">
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {gallery.map((url) => (
               <button
                 key={url}
                 type="button"
                 onClick={() => setActiveImage(url)}
                 className={cn(
-                  "size-16 shrink-0 overflow-hidden border",
+                  "size-16 shrink-0 overflow-hidden border transition-opacity",
                   activeImage === url
                     ? "border-[var(--m-ink)]"
                     : "border-[var(--m-line)] opacity-80 hover:opacity-100"
@@ -226,7 +279,7 @@ export function MarketplaceProductPdp({
         ) : null}
       </div>
 
-      <div>
+      <div className="flex min-w-0 flex-col">
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--m-accent)]">
           {categoryName ?? "Marketplace"}
           {brandName ? ` · ${brandName}` : ""}
@@ -247,45 +300,32 @@ export function MarketplaceProductPdp({
 
         {avg != null ? (
           <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--m-ink-soft)]">
-            <Star className="size-4 fill-current" />
-            {avg.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? "" : "s"}
+            <Star className="size-4 fill-[var(--m-accent)] text-[var(--m-accent)]" />
+            <span className="font-medium tabular-nums">{avg.toFixed(1)}</span>
+            <span className="text-[var(--m-muted)]">
+              · {reviews.length} review{reviews.length === 1 ? "" : "s"}
+            </span>
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-3 text-sm text-[var(--m-muted)]">No reviews yet</p>
+        )}
 
-        <div className="mt-6 flex items-baseline gap-3">
+        <div className="mt-6 flex flex-wrap items-baseline gap-3">
           <p className="font-display text-3xl font-semibold text-[var(--m-ink)]">
             {formatMarketplaceMoney(unitPrice, currency)}
           </p>
-          {unitPrice < listPrice ? (
+          {onSale ? (
             <p className="text-base text-[var(--m-muted)] line-through">
               {formatMarketplaceMoney(listPrice, currency)}
             </p>
           ) : null}
         </div>
 
-        {(product.short_description || product.description_html || product.description) && (
-          <div className="mt-5 space-y-3">
-            {product.short_description ? (
-              <p className="text-base leading-relaxed text-[var(--m-ink-soft)]">
-                {product.short_description}
-              </p>
-            ) : null}
-            {product.description_html ? (
-              <div
-                className="prose prose-sm max-w-none text-[var(--m-ink-soft)] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-                dangerouslySetInnerHTML={{ __html: product.description_html }}
-              />
-            ) : product.description && !product.short_description ? (
-              <p className="text-base leading-relaxed text-[var(--m-ink-soft)]">
-                {product.description}
-              </p>
-            ) : product.description && product.short_description ? (
-              <p className="text-sm leading-relaxed text-[var(--m-muted)] whitespace-pre-wrap">
-                {product.description}
-              </p>
-            ) : null}
-          </div>
-        )}
+        {shortDescription ? (
+          <p className="mt-5 text-base leading-relaxed text-[var(--m-ink-soft)]">
+            {shortDescription}
+          </p>
+        ) : null}
 
         {variants.length > 0 ? (
           <div className="mt-6">
@@ -323,99 +363,244 @@ export function MarketplaceProductPdp({
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="flex items-center border border-[var(--m-line)]">
+          <div className="flex items-center border border-[var(--m-line)] bg-[var(--m-card)]">
             <button
               type="button"
-              className="px-3 py-2 text-sm"
+              className="px-3 py-2.5 text-sm text-[var(--m-ink)] disabled:opacity-40"
+              disabled={qty <= 1}
               onClick={() => setQty((q) => Math.max(1, q - 1))}
+              aria-label="Decrease quantity"
             >
               −
             </button>
-            <span className="min-w-8 text-center text-sm font-medium">{qty}</span>
+            <span className="min-w-8 text-center text-sm font-semibold tabular-nums text-[var(--m-ink)]">
+              {qty}
+            </span>
             <button
               type="button"
-              className="px-3 py-2 text-sm"
+              className="px-3 py-2.5 text-sm text-[var(--m-ink)] disabled:opacity-40"
+              disabled={qty >= stock || stock < 1}
               onClick={() => setQty((q) => Math.min(stock, q + 1))}
+              aria-label="Increase quantity"
             >
               +
             </button>
           </div>
-          <Button
+          <button
             type="button"
-            className="h-11 gap-2 border-0 bg-[var(--m-accent)] px-6 text-[var(--m-ink)] hover:bg-[#b8955a] hover:text-[var(--m-ink)] active:bg-[#a8844f] disabled:opacity-50"
             disabled={stock < 1 || pending}
             onClick={addToCart}
+            className={cn(
+              "inline-flex h-11 items-center justify-center gap-2 bg-[var(--m-accent)] px-6 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-colors",
+              "hover:bg-[#b8955a] disabled:opacity-50"
+            )}
           >
             <ShoppingBag className="size-4" />
             Add to cart
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            variant="outline"
-            className="h-11 gap-2"
             disabled={pending}
             onClick={onWishlist}
+            className={cn(
+              "inline-flex h-11 items-center justify-center gap-2 border border-[var(--m-ink)] bg-[var(--m-card)] px-5 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-colors",
+              "hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)] disabled:opacity-50"
+            )}
           >
-            <Heart className={cn("size-4", wished && "fill-current")} />
+            <Heart
+              className={cn(
+                "size-4",
+                wished && "fill-[var(--m-accent)] text-[var(--m-accent)]"
+              )}
+            />
             Save
-          </Button>
+          </button>
         </div>
 
-        <div className="mt-10 border-t border-[var(--m-line)] pt-8">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-muted)]">
-            Reviews
-          </h2>
-          <ul className="mt-4 space-y-4">
+        {hasFullDescription ? (
+          <section className="mt-10 border-t border-[var(--m-line)] pt-8">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-muted)]">
+              Description
+            </h2>
+            {descriptionHtml ? (
+              <div
+                className="prose prose-sm mt-4 max-w-none text-[var(--m-ink-soft)] prose-headings:font-display prose-headings:text-[var(--m-ink)] prose-a:text-[var(--m-ink)] prose-a:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+              />
+            ) : plainDistinct ? (
+              <p className="mt-4 whitespace-pre-wrap text-base leading-relaxed text-[var(--m-ink-soft)]">
+                {plainDistinct}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
+        <section className="mt-10 border-t border-[var(--m-line)] pt-8">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--m-muted)]">
+                Reviews
+              </h2>
+              <p className="mt-2 text-sm text-[var(--m-muted)]">
+                Anyone can leave a review — no account needed.
+              </p>
+            </div>
+            {avg != null ? (
+              <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--m-ink)]">
+                <Star className="size-4 fill-[var(--m-accent)] text-[var(--m-accent)]" />
+                {avg.toFixed(1)} / 5
+              </p>
+            ) : null}
+          </div>
+
+          <ul className="mt-5 space-y-4">
             {reviews.length === 0 ? (
-              <li className="text-sm text-[var(--m-muted)]">No reviews yet.</li>
+              <li className="border border-dashed border-[var(--m-line)] bg-[var(--m-mist)]/60 px-4 py-5 text-sm text-[var(--m-muted)]">
+                Be the first to review this product.
+              </li>
             ) : (
               reviews.map((r) => (
-                <li key={r.id} className="border-b border-[var(--m-line)] pb-4">
-                  <p className="text-sm font-medium text-[var(--m-ink)]">
-                    {r.reviewer_name} · {r.rating}★
-                  </p>
+                <li
+                  key={r.id}
+                  className="border-b border-[var(--m-line)] pb-4 last:border-b-0 last:pb-0"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-[var(--m-ink)]">
+                      {r.reviewer_name}
+                    </p>
+                    <span className="flex items-center gap-0.5 text-[var(--m-accent)]">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={cn(
+                            "size-3.5",
+                            i < r.rating
+                              ? "fill-current"
+                              : "fill-transparent text-[var(--m-line)]"
+                          )}
+                        />
+                      ))}
+                    </span>
+                  </div>
                   {r.comment ? (
-                    <p className="mt-1 text-sm text-[var(--m-muted)]">{r.comment}</p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[var(--m-ink-soft)]">
+                      {r.comment}
+                    </p>
                   ) : null}
                 </li>
               ))
             )}
           </ul>
+
           <form
-            className="mt-6 space-y-3"
+            className="mt-8 space-y-4 border border-[var(--m-line)] bg-[var(--m-mist)]/40 p-5"
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
               fd.set("product_id", product.id);
+              fd.set("rating", String(rating));
               startTransition(async () => {
                 const res = await submitMarketplaceReview(fd);
                 if (res.error) notify.error(res.error);
                 else {
-                  notify.success("Review submitted");
+                  notify.success("Thanks — your review is live.");
                   e.currentTarget.reset();
+                  setRating(5);
                   router.refresh();
                 }
               });
             }}
           >
-            <Input name="reviewer_name" placeholder="Your name" required />
-            <select
-              name="rating"
-              defaultValue="5"
-              className="flex h-10 w-full border border-[var(--m-line)] bg-transparent px-3 text-sm"
+            <div>
+              <p className="text-sm font-semibold text-[var(--m-ink)]">
+                Write a review
+              </p>
+              <p className="mt-1 text-xs text-[var(--m-muted)]">
+                Guests welcome. Share your experience with this product.
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--m-muted)]">
+                Rating
+              </p>
+              <div
+                className="flex items-center gap-1"
+                onMouseLeave={() => setHoverRating(0)}
+              >
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const active = (hoverRating || rating) >= n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setRating(n)}
+                      onMouseEnter={() => setHoverRating(n)}
+                      className="rounded p-0.5 transition-transform hover:scale-110"
+                      aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                    >
+                      <Star
+                        className={cn(
+                          "size-6",
+                          active
+                            ? "fill-[var(--m-accent)] text-[var(--m-accent)]"
+                            : "fill-transparent text-[var(--m-line)]"
+                        )}
+                      />
+                    </button>
+                  );
+                })}
+                <span className="ml-2 text-xs tabular-nums text-[var(--m-muted)]">
+                  {rating} / 5
+                </span>
+              </div>
+              <input type="hidden" name="rating" value={rating} />
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="reviewer_name"
+                className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--m-muted)]"
+              >
+                Your name
+              </label>
+              <Input
+                id="reviewer_name"
+                name="reviewer_name"
+                placeholder="e.g. Sara"
+                required
+                className="h-11 border-[var(--m-line)] bg-[var(--m-card)]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="comment"
+                className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--m-muted)]"
+              >
+                Comment
+              </label>
+              <Textarea
+                id="comment"
+                name="comment"
+                rows={3}
+                placeholder="What did you like? How was the quality?"
+                className="border-[var(--m-line)] bg-[var(--m-card)]"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={pending}
+              className={cn(
+                "inline-flex h-11 w-full items-center justify-center bg-[var(--m-ink)] px-5 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors sm:w-auto",
+                "hover:bg-[var(--m-ink-soft)] disabled:opacity-50"
+              )}
             >
-              {[5, 4, 3, 2, 1].map((n) => (
-                <option key={n} value={n}>
-                  {n} stars
-                </option>
-              ))}
-            </select>
-            <Textarea name="comment" rows={2} placeholder="Optional comment" />
-            <Button type="submit" size="sm" variant="outline" disabled={pending}>
-              Submit review
-            </Button>
+              {pending ? "Submitting…" : "Submit review"}
+            </button>
           </form>
-        </div>
+        </section>
       </div>
     </div>
   );

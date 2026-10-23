@@ -95,11 +95,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let sellerRoutes: MetadataRoute.Sitemap = [];
   try {
     const products = await listPublicMarketplaceProducts();
+    const { marketplaceProductPath } = await import(
+      "@/lib/marketplace/product-url"
+    );
     productRoutes = products.slice(0, 500).map((p) => ({
-      url: absoluteUrl(`/product/${p.id}`),
+      url: absoluteUrl(marketplaceProductPath(p)),
       lastModified: new Date(p.updated_at),
       changeFrequency: "weekly" as const,
-      priority: 0.65,
+      priority: 0.7,
     }));
     const admin = tryCreateAdminClient();
     if (admin) {

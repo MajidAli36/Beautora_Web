@@ -1,24 +1,94 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from "@/lib/supabase/env";
 import {
   PLATFORM_HARDCODED_ADMIN,
   isHardcodedPlatformAdminEmail,
 } from "@/lib/platform/admin";
+
+function emailMatchesUser(
+  user: {
+    email?: string | null;
+    identities?: Array<{ email?: string | null; identity_data?: Record<string, unknown> }> | null;
+  },
+  target: string
+): boolean {
+  if (user.email?.toLowerCase() === target) return true;
+  return (user.identities ?? []).some((identity) => {
+    if (identity.email?.toLowerCase() === target) return true;
+    const identityEmail = identity.identity_data?.email;
+    return typeof identityEmail === "string" && identityEmail.toLowerCase() === target;
+  });
+}
+
+/** Prefer Auth Admin email filter — listUsers pagination can miss existing users. */
+async function findUserIdByEmailDirect(email: string): Promise<string | null> {
+  const target = email.trim().toLowerCase();
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceRoleKey();
+  if (!key) return null;
+
+  const endpoint = new URL(`${url}/auth/v1/admin/users`);
+  endpoint.searchParams.set("email", target);
+
+  const res = await fetch(endpoint, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) return null;
+
+  const body = (await res.json()) as {
+    users?: Array<{
+      id: string;
+      email?: string | null;
+      identities?: Array<{ email?: string | null; identity_data?: Record<string, unknown> }> | null;
+    }>;
+  };
+
+  const found = (body.users ?? []).find((u) => emailMatchesUser(u, target));
+  return found?.id ?? null;
+}
 
 async function findUserIdByEmail(
   admin: ReturnType<typeof createAdminClient>,
   email: string
 ): Promise<string | null> {
   const target = email.trim().toLowerCase();
+
+  const directId = await findUserIdByEmailDirect(target);
+  if (directId) return directId;
+
   for (let page = 1; page <= 20; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
     if (error) throw new Error(error.message);
-    const found = data.users.find((u) => u.email?.toLowerCase() === target);
+    const found = data.users.find((u) => emailMatchesUser(u, target));
     if (found) return found.id;
     if (data.users.length < 200) break;
   }
   return null;
+}
+
+async function syncPlatformAdminUser(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  syncPassword: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    ...(syncPassword ? { password: PLATFORM_HARDCODED_ADMIN.password } : {}),
+    email_confirm: true,
+    user_metadata: {
+      account_type: "platform_admin",
+      full_name: PLATFORM_HARDCODED_ADMIN.fullName,
+    },
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 /**
@@ -38,27 +108,8 @@ export async function ensureHardcodedPlatformAdmin(options?: {
     const existingId = await findUserIdByEmail(admin, email);
 
     if (existingId) {
-      if (syncPassword) {
-        const { error } = await admin.auth.admin.updateUserById(existingId, {
-          password: PLATFORM_HARDCODED_ADMIN.password,
-          email_confirm: true,
-          user_metadata: {
-            account_type: "platform_admin",
-            full_name: PLATFORM_HARDCODED_ADMIN.fullName,
-          },
-        });
-        if (error) return { ok: false, error: error.message };
-      } else {
-        // Soft ensure: confirm email only (no password churn on page load)
-        const { error } = await admin.auth.admin.updateUserById(existingId, {
-          email_confirm: true,
-          user_metadata: {
-            account_type: "platform_admin",
-            full_name: PLATFORM_HARDCODED_ADMIN.fullName,
-          },
-        });
-        if (error) return { ok: false, error: error.message };
-      }
+      const synced = await syncPlatformAdminUser(admin, existingId, syncPassword);
+      if (!synced.ok) return { ok: false, error: synced.error };
       return { ok: true, created: false };
     }
 
@@ -72,16 +123,16 @@ export async function ensureHardcodedPlatformAdmin(options?: {
       },
     });
     if (error) {
-      // Race: another request created the user — sync password and continue
+      // User already exists (lookup miss or race) — sync if we can find them, else let sign-in proceed
       if (/already|registered|exists/i.test(error.message)) {
         const id = await findUserIdByEmail(admin, email);
         if (id) {
-          await admin.auth.admin.updateUserById(id, {
-            password: PLATFORM_HARDCODED_ADMIN.password,
-            email_confirm: true,
-          });
+          const synced = await syncPlatformAdminUser(admin, id, true);
+          if (!synced.ok) return { ok: false, error: synced.error };
           return { ok: true, created: false };
         }
+        // Auth says the email exists; do not surface createUser's signup error on Sign in
+        return { ok: true, created: false };
       }
       return { ok: false, error: error.message };
     }

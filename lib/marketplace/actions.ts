@@ -328,6 +328,8 @@ export type PublicProductCard = {
   review_count: number;
   /** ISO currency from seller country (PKR, INR, AED, USD…). */
   currency: string;
+  /** Seller / org country label (e.g. Pakistan) — used for shop country filters. */
+  seller_country: string | null;
 };
 
 const PUBLIC_PRODUCT_SELECT =
@@ -491,6 +493,7 @@ async function listPublicMarketplaceProductsUncached(opts?: {
       avg_rating: stats ? stats.sum / stats.n : null,
       review_count: stats?.n ?? 0,
       currency: currencyFromCountry(country).code,
+      seller_country: country,
     };
   });
 }
@@ -620,6 +623,7 @@ export async function getPublicMarketplaceProduct(
     avg_rating: avg,
     review_count: list.length,
     currency: currencyFromCountry(country).code,
+    seller_country: country,
     reviews: list as Database["public"]["Tables"]["marketplace_reviews"]["Row"][],
   };
 }
@@ -1401,6 +1405,9 @@ export async function submitMarketplaceReview(formData: FormData): Promise<Actio
   });
   if (error) return { error: error.message };
   revalidatePath("/shop");
+  revalidatePath(`/product/${productId}`);
+  // Slug URLs also need refresh — path resolved client-side from product slug.
+  revalidatePath("/product", "layout");
   invalidateMarketplacePublicCache();
   return { success: true };
 }

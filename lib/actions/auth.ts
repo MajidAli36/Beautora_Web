@@ -19,6 +19,10 @@ import {
   sendSalonSignupVerificationEmail,
   sendSalonWelcomeReadyEmail,
 } from "@/lib/email/notify";
+import {
+  validateHumanDisplayName,
+  verifyTurnstileToken,
+} from "@/lib/security/turnstile";
 import type { ActionResult } from "@/types/commerce";
 
 function normalizeSalonName(name: string) {
@@ -102,12 +106,19 @@ export async function registerAccount(input: {
   accountType: SignupAccountType;
   /** Approved partner username from ?ref= (owners only) */
   referralCode?: string | null;
+  /** Cloudflare Turnstile token from the signup form */
+  captchaToken?: string | null;
 }): Promise<ActionResult & { needsEmailVerification?: boolean }> {
+  const captcha = await verifyTurnstileToken(input.captchaToken);
+  if (!captcha.ok) return { error: captcha.error };
+
   const email = normalizeEmail(input.email);
   const password = input.password;
   const accountType = parseSignupAccountType(input.accountType);
   const salonName = normalizeSalonName(input.salonName ?? "");
-  const fullName = (input.fullName ?? "").trim().replace(/\s+/g, " ");
+  const nameCheck = validateHumanDisplayName(input.fullName ?? "");
+  if (!nameCheck.ok) return { error: nameCheck.error };
+  const fullName = nameCheck.value;
 
   if (!accountType) {
     return { error: "Choose whether you are a shopper or a salon owner" };
@@ -120,6 +131,13 @@ export async function registerAccount(input: {
   }
   if (accountType === "owner" && salonName.length < 2) {
     return { error: "Salon name must be at least 2 characters" };
+  }
+  if (accountType === "owner") {
+    const salonSpam = validateHumanDisplayName(salonName, {
+      maxLength: 120,
+      label: "Salon name",
+    });
+    if (!salonSpam.ok) return { error: salonSpam.error };
   }
 
   let admin;

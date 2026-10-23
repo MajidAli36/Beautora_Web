@@ -6,6 +6,7 @@ import {
   formatMarketplaceMoney,
 } from "@/lib/marketplace/pricing";
 import { currencyFromCountry } from "@/lib/currency/from-country";
+import { marketplaceProductPath } from "@/lib/marketplace/product-url";
 
 /** Live seller reels (TikTok video) merged ahead of demo catalogue. */
 export async function listMarketplaceVideoReels(): Promise<MarketplaceReel[]> {
@@ -16,7 +17,7 @@ export async function listMarketplaceVideoReels(): Promise<MarketplaceReel[]> {
     const { data } = await admin
       .from("marketplace_products")
       .select(
-        "id, title, short_description, description, price, sale_price, image_url, reel_video_url, marketplace_sellers!inner(shop_name, slug, city, country, status), marketplace_categories(name)"
+        "id, slug, title, short_description, description, price, sale_price, image_url, reel_video_url, marketplace_sellers!inner(shop_name, slug, city, country, status), marketplace_categories(name)"
       )
       .eq("status", "published")
       .eq("marketplace_sellers.status", "approved")
@@ -27,6 +28,7 @@ export async function listMarketplaceVideoReels(): Promise<MarketplaceReel[]> {
     const live: MarketplaceReel[] = (data ?? []).map((raw) => {
       const p = raw as unknown as {
         id: string;
+        slug: string;
         title: string;
         short_description: string | null;
         description: string | null;
@@ -72,7 +74,7 @@ export async function listMarketplaceVideoReels(): Promise<MarketplaceReel[]> {
         poster:
           p.image_url ||
           "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=900&q=80",
-        href: `/product/${p.id}`,
+        href: marketplaceProductPath(p),
         sound: `Original sound — ${seller.shop_name}`,
       };
     });

@@ -9,6 +9,7 @@ import {
   formatMarketplaceMoney,
   publicDiscountPercentage,
 } from "@/lib/marketplace/pricing";
+import { marketplaceProductPath } from "@/lib/marketplace/product-url";
 import { MarketplaceQuickViewContext } from "@/components/marketplace/product-quick-view";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ export function MarketplaceProductCard({
   className?: string;
 }) {
   const quickView = useContext(MarketplaceQuickViewContext);
+  const href = marketplaceProductPath(product);
   const price = effectiveProductPrice(product);
   const list = Number(product.price);
   const onSale = price < list;
@@ -33,7 +35,7 @@ export function MarketplaceProductCard({
       )}
     >
       <div className="relative aspect-square overflow-hidden bg-[var(--m-mist)]">
-        <Link href={`/product/${product.id}`} className="absolute inset-0 z-0">
+        <Link href={href} className="absolute inset-0 z-0">
           {product.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -72,21 +74,23 @@ export function MarketplaceProductCard({
           </button>
         ) : null}
       </div>
-      <Link
-        href={`/product/${product.id}`}
-        className="flex flex-1 flex-col gap-1 p-3"
-      >
-        <p className="line-clamp-2 text-sm font-semibold text-[var(--m-ink)]">
-          {product.title}
-        </p>
-        <p className="text-[11px] text-[var(--m-muted)]">{product.seller_name}</p>
-        {product.avg_rating != null ? (
-          <p className="flex items-center gap-1 text-[11px] text-[var(--m-ink-soft)]">
-            <Star className="size-3 fill-current" />
-            {product.avg_rating.toFixed(1)}
-            <span className="text-[var(--m-muted)]">({product.review_count})</span>
+      <Link href={href} className="flex flex-1 flex-col gap-1 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="line-clamp-2 text-sm font-semibold text-[var(--m-ink)]">
+            {product.title}
           </p>
-        ) : null}
+          {product.avg_rating != null ? (
+            <p className="flex shrink-0 items-center gap-0.5 text-[11px] text-[var(--m-ink-soft)]">
+              <Star className="size-3 fill-[var(--m-accent)] text-[var(--m-accent)]" />
+              {product.avg_rating.toFixed(1)}
+              <span className="text-[var(--m-muted)]">({product.review_count})</span>
+            </p>
+          ) : null}
+        </div>
+        <p className="text-[11px] text-[var(--m-muted)]">
+          {product.seller_name}
+          {product.seller_country ? ` · ${product.seller_country}` : ""}
+        </p>
         <div className="mt-auto flex items-baseline gap-2">
           <p className="text-sm font-semibold text-[var(--m-ink)]">
             {formatMarketplaceMoney(price, product.currency)}

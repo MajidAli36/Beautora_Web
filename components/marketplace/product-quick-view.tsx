@@ -37,13 +37,13 @@ import {
   effectiveProductPrice,
   formatMarketplaceMoney,
 } from "@/lib/marketplace/pricing";
-import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { marketplaceProductPath } from "@/lib/marketplace/product-url";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -161,11 +161,11 @@ function ProductQuickViewDrawer({
     ? `${product.title} (${selected.name})`
     : product.title;
 
+  const productHref = marketplaceProductPath(product);
+
   function requireLogin(action: string) {
     notify.error(`Sign in to ${action}`);
-    router.push(
-      `/login?redirect=${encodeURIComponent(`/product/${product.id}`)}`
-    );
+    router.push(`/login?redirect=${encodeURIComponent(productHref)}`);
   }
 
   function addToCart(goCheckout: boolean) {
@@ -262,16 +262,20 @@ function ProductQuickViewDrawer({
       <SheetContent
         side="right"
         showCloseButton={false}
-        overlayClassName="z-[70] bg-[var(--m-ink)]/35 supports-backdrop-filter:backdrop-blur-[2px]"
+        // Portal renders outside `.marketing-site` — set theme vars + solid overlay so the
+        // page footer cannot show through a broken `var(--m-ink)` backdrop.
+        overlayClassName="z-[100] bg-[#073b32]/45 supports-backdrop-filter:backdrop-blur-[3px]"
         className={cn(
-          "z-[70] gap-0 overflow-hidden border-[var(--m-line)] bg-[var(--m-card)] p-0 shadow-[0_24px_80px_-24px_rgba(7,59,50,0.45)]",
-          "inset-x-0 top-auto bottom-0 h-[min(92dvh,100%)] w-full max-w-none rounded-t-[20px] border-t",
-          "data-[side=right]:data-ending-style:translate-y-[2rem] data-[side=right]:data-starting-style:translate-y-[2rem]",
-          "sm:inset-y-auto sm:top-4 sm:right-3 sm:bottom-0 sm:left-auto sm:h-[calc(100dvh-1rem)] sm:w-[min(520px,65vw)] sm:max-w-[520px] sm:rounded-t-[20px] sm:border sm:border-b-0",
-          "sm:data-[side=right]:data-ending-style:translate-x-[2.5rem] sm:data-[side=right]:data-starting-style:translate-x-[2.5rem] sm:data-[side=right]:data-ending-style:translate-y-0 sm:data-[side=right]:data-starting-style:translate-y-0"
+          "marketplace-theme z-[100] gap-0 overflow-hidden border-[var(--m-line)] bg-[var(--m-card)] p-0 text-[var(--m-body)] shadow-[0_24px_80px_-24px_rgba(7,59,50,0.45)]",
+          // Edge-to-edge height so the marketing page footer cannot sit over actions.
+          "inset-y-0 right-0 left-auto top-0 bottom-0 h-dvh max-h-dvh w-full max-w-none rounded-none border-l",
+          "data-[side=right]:inset-y-0 data-[side=right]:top-0 data-[side=right]:bottom-0 data-[side=right]:h-dvh data-[side=right]:max-h-dvh",
+          "data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem]",
+          "data-[side=right]:data-ending-style:translate-y-0 data-[side=right]:data-starting-style:translate-y-0",
+          "sm:w-[min(520px,100vw)] sm:max-w-[520px]"
         )}
       >
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 flex-col bg-[var(--m-card)]">
           <header className="relative shrink-0 bg-[linear-gradient(135deg,#073b32_0%,#0d5c4d_55%,#174b3c_100%)] px-5 pt-5 pb-5 text-white sm:min-h-[88px] sm:px-6 sm:pt-6 sm:pb-6">
             <button
               type="button"
@@ -488,55 +492,60 @@ function ProductQuickViewDrawer({
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-[var(--m-line)] bg-[var(--m-card)] px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
-            <div className="flex gap-2">
-              <Button
+          <div className="relative z-10 shrink-0 space-y-2 border-t border-[var(--m-line)] bg-[var(--m-card)] px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+            <div className="flex items-stretch gap-2">
+              <button
                 type="button"
-                variant="outline"
-                className="size-11 shrink-0 border-[var(--m-line)]"
                 disabled={pending}
                 onClick={onWishlist}
                 aria-label="Wishlist"
+                className={cn(
+                  "inline-flex size-11 shrink-0 items-center justify-center border border-[var(--m-line)] bg-[var(--m-card)] text-[var(--m-ink)] transition-colors",
+                  "hover:border-[var(--m-ink)] hover:bg-[var(--m-mist)] disabled:opacity-50"
+                )}
               >
                 <Heart
                   className={cn(
                     "size-4",
-                    wished && "fill-current text-[var(--m-accent)]"
+                    wished && "fill-[var(--m-accent)] text-[var(--m-accent)]"
                   )}
                 />
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                className="h-11 flex-1 gap-2 border-0 bg-[var(--m-accent)] text-[var(--m-ink)] hover:bg-[#b8955a] hover:text-[var(--m-ink)]"
                 disabled={stock < 1}
                 onClick={() => addToCart(false)}
+                className={cn(
+                  "inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 bg-[var(--m-accent)] px-4 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-colors",
+                  "hover:bg-[#b8955a] disabled:opacity-50"
+                )}
               >
                 <ShoppingBag className="size-4" />
                 Add to cart
-              </Button>
+              </button>
             </div>
-            <div className="mt-2 flex gap-2">
-              <Button
+            <div className="grid grid-cols-2 gap-2">
+              <button
                 type="button"
-                className="h-11 flex-1 bg-[var(--m-ink)] text-[var(--m-paper)] hover:bg-[var(--m-ink-soft)]"
                 disabled={stock < 1}
                 onClick={() => addToCart(true)}
+                className={cn(
+                  "inline-flex h-11 w-full items-center justify-center bg-[var(--m-ink)] px-4 text-sm font-semibold tracking-wide text-[var(--m-paper)] transition-colors",
+                  "hover:bg-[var(--m-ink-soft)] disabled:opacity-50"
+                )}
               >
                 Buy now
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 border-[var(--m-line)] px-4"
-                render={
-                  <Link
-                    href={`/product/${product.id}`}
-                    onClick={() => onOpenChange(false)}
-                  />
-                }
+              </button>
+              <Link
+                href={productHref}
+                onClick={() => onOpenChange(false)}
+                className={cn(
+                  "inline-flex h-11 w-full items-center justify-center border border-[var(--m-ink)] bg-[var(--m-card)] px-4 text-sm font-semibold tracking-wide text-[var(--m-ink)] transition-colors",
+                  "hover:bg-[var(--m-ink)] hover:text-[var(--m-paper)]"
+                )}
               >
                 Full details
-              </Button>
+              </Link>
             </div>
           </div>
         </div>

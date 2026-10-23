@@ -31,11 +31,15 @@ function UpArrowIcon({ className }: { className?: string }) {
   );
 }
 
+const OVERLAY_SELECTOR =
+  '[data-slot="sheet-overlay"], [data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]';
+
 export function ScrollToTopButton({
   className,
   threshold = 280,
 }: ScrollToTopButtonProps) {
   const [visible, setVisible] = useState(false);
+  const [suppressed, setSuppressed] = useState(false);
 
   useEffect(() => {
     function onScroll() {
@@ -51,12 +55,23 @@ export function ScrollToTopButton({
     return () => window.removeEventListener("scroll", onScroll);
   }, [threshold]);
 
+  useEffect(() => {
+    const sync = () =>
+      setSuppressed(Boolean(document.querySelector(OVERLAY_SELECTOR)));
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
+
   function scrollTop() {
     if (window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname || "/");
     }
     scrollMarketingToTop();
   }
+
+  if (suppressed) return null;
 
   return (
     <button
@@ -65,7 +80,7 @@ export function ScrollToTopButton({
       aria-label="Back to top"
       title="Back to top"
       className={cn(
-        "fixed z-[60] inline-flex size-12 items-center justify-center rounded-full",
+        "fixed z-40 inline-flex size-12 items-center justify-center rounded-full",
         "border border-white/20 bg-[var(--m-ink)] text-white shadow-[0_10px_30px_rgba(6,33,29,0.35)]",
         "bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-[calc(6.5rem+env(safe-area-inset-right,0px))]",
         "transition-all duration-200 hover:bg-[var(--m-ink-soft)] hover:scale-105",

@@ -181,6 +181,27 @@
     font-family: var(--font-serif), ui-serif, Georgia, "Times New Roman", serif;
   }
 
+  /*
+   * Theme tokens only — safe on portaled UI (sheets/dialogs) that render
+   * outside `.marketing-site` and would otherwise lose --m-* variables.
+   */
+  .marketplace-theme {
+    --m-ink: #073b32;
+    --m-ink-soft: #174b3c;
+    --m-body: #28352f;
+    --m-mist: #eef1ec;
+    --m-paper: #f5f6f1;
+    --m-card: #ffffff;
+    --m-line: #e2e7e1;
+    --m-muted: #68736c;
+    --m-accent: #c9a66b;
+    --m-accent-soft: #d4e0da;
+    --m-warn: #9a6b2f;
+    --m-shadow: 0 20px 50px -32px rgba(7, 59, 50, 0.45);
+    color: var(--m-body);
+    font-family: var(--font-marketing-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+
   .marketing-site {
     /* Beautora premium forest + ivory */
     --m-ink: #073b32;

@@ -27,6 +27,9 @@ const WELCOME: ChatMessage = {
   ],
 };
 
+const OVERLAY_SELECTOR =
+  '[data-slot="sheet-overlay"], [data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]';
+
 export function HelpChatbot() {
   const panelId = useId();
   const [open, setOpen] = useState(false);
@@ -34,6 +37,7 @@ export function HelpChatbot() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suppressed, setSuppressed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +47,19 @@ export function HelpChatbot() {
     if (el) el.scrollTop = el.scrollHeight;
     inputRef.current?.focus();
   }, [open, messages, pending]);
+
+  /** Stay fully behind drawers/modals — hide so it never peeks under a sheet edge. */
+  useEffect(() => {
+    const sync = () => {
+      const blocked = Boolean(document.querySelector(OVERLAY_SELECTOR));
+      setSuppressed(blocked);
+      if (blocked) setOpen(false);
+    };
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
 
   async function ask(question: string) {
     const q = question.trim();
@@ -88,10 +105,12 @@ export function HelpChatbot() {
     }
   }
 
+  if (suppressed) return null;
+
   return (
     <div
       className={cn(
-        "fixed z-50 flex flex-col items-end gap-3",
+        "fixed z-40 flex flex-col items-end gap-3",
         "bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-[calc(1.25rem+env(safe-area-inset-right,0px))]"
       )}
     >

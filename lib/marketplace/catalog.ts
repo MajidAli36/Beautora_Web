@@ -369,11 +369,17 @@ export async function deleteProductVariant(variantId: string): Promise<ActionRes
   return { success: true };
 }
 
-export async function getProductCatalogDetail(productId: string) {
+async function marketplaceReadClient() {
   const { tryCreateAdminClient } = await import("@/lib/supabase/admin");
   const admin = tryCreateAdminClient();
-  if (!admin) return null;
-  const { data: product } = await admin
+  if (admin) return admin;
+  const { createClient } = await import("@/lib/supabase/server");
+  return await createClient();
+}
+
+async function loadProductCatalogBundle(productId: string) {
+  const db = await marketplaceReadClient();
+  const { data: product } = await db
     .from("marketplace_products")
     .select(
       "*, marketplace_sellers!inner(shop_name, slug, status, logo_url, city, country), marketplace_categories(name, slug)"
@@ -384,18 +390,18 @@ export async function getProductCatalogDetail(productId: string) {
     .maybeSingle();
   if (!product) return null;
 
-  const imagesRes = await admin
+  const imagesRes = await db
     .from("marketplace_product_images")
     .select("*")
     .eq("product_id", productId)
     .order("sort_order");
-  const variantsRes = await admin
+  const variantsRes = await db
     .from("marketplace_product_variants")
     .select("*")
     .eq("product_id", productId)
     .eq("is_active", true)
     .order("sort_order");
-  const { data: reviews } = await admin
+  const { data: reviews } = await db
     .from("marketplace_reviews")
     .select("*")
     .eq("product_id", productId)
@@ -406,7 +412,7 @@ export async function getProductCatalogDetail(productId: string) {
   let brand: { name: string; slug: string } | null = null;
   const brandId = (product as { brand_id?: string | null }).brand_id;
   if (brandId) {
-    const { data } = await admin
+    const { data } = await db
       .from("marketplace_brands")
       .select("name, slug")
       .eq("id", brandId)
@@ -423,4 +429,66 @@ export async function getProductCatalogDetail(productId: string) {
     variants: variantsRes.error ? [] : variantsRes.data ?? [],
     reviews: reviews ?? [],
   };
+}
+
+/** @deprecated Prefer getProductCatalogByParam for SEO slug URLs. */
+export async function getProductCatalogDetail(productId: string) {
+  return loadProductCatalogBundle(productId);
+}
+
+/** Resolve a public product by UUID, slug-shortId, or bare slug. */
+export async function getProductCatalogByParam(param: string) {
+  const { parseProductParam, productMatchesShortId } = await import(
+    "@/lib/marketplace/product-url"
+  );
+  const db = await marketplaceReadClient();
+  const parsed = parseProductParam(param);
+
+  if (parsed.kind === "uuid") {
+    return loadProductCatalogBundle(parsed.id);
+  }
+
+  // Prefer short-id resolution — UUID prefix is stable even if slug text drifts.
+  if (parsed.kind === "slug-id") {
+    const lo = `${parsed.shortId}-0000-0000-0000-000000000000`;
+    const hi = `${parsed.shortId}-ffff-ffff-ffff-ffffffffffff`;
+    const { data: byIdRange } = await db
+      .from("marketplace_products")
+      .select("id")
+      .gte("id", lo)
+      .lte("id", hi)
+      .eq("status", "published")
+      .limit(5);
+
+    let hitId =
+      byIdRange?.find((c) => productMatchesShortId(c.id, parsed.shortId))?.id ??
+      null;
+
+    if (!hitId) {
+      // Broad fallback (uuid LIKE can be flaky across PostgREST versions).
+      const { data: published } = await db
+        .from("marketplace_products")
+        .select("id")
+        .eq("status", "published")
+        .limit(500);
+      hitId =
+        published?.find((c) => productMatchesShortId(c.id, parsed.shortId))
+          ?.id ?? null;
+    }
+
+    if (hitId) return loadProductCatalogBundle(hitId);
+    return null;
+  }
+
+  const { data: candidates } = await db
+    .from("marketplace_products")
+    .select("id, slug")
+    .eq("slug", parsed.slug)
+    .eq("status", "published")
+    .limit(20);
+
+  if (!candidates?.length) return null;
+  // Bare slug: only resolve when unique among published products.
+  if (candidates.length !== 1) return null;
+  return loadProductCatalogBundle(candidates[0].id);
 }
