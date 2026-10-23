@@ -1,0 +1,108 @@
+{
+  "generatedAt": "2026-10-23T18:02:51.009Z",
+  "mode": "dry-run",
+  "totals": {
+    "auth_total": 19,
+    "spam_matches": 0,
+    "keep_other": 19
+  },
+  "willDelete": 0,
+  "kept": [
+    {
+      "email": "admin@syncops.tech",
+      "name": "Beautora Platform Admin",
+      "created_at": "2026-09-06T01:55:12.512Z"
+    },
+    {
+      "email": "majid@majidali.tech",
+      "name": null,
+      "created_at": "2026-09-09T02:35:02.191Z"
+    },
+    {
+      "email": "alimughal809@yahoo.com",
+      "name": "ali mughal",
+      "created_at": "2026-09-09T02:41:14.677Z"
+    },
+    {
+      "email": "nedanaeem9@gmail.com",
+      "name": null,
+      "created_at": "2026-09-09T08:04:11.202Z"
+    },
+    {
+      "email": "seharfarooq960@gmail.com",
+      "name": "Sehar Farooq",
+      "created_at": "2026-09-09T14:54:09.390Z"
+    },
+    {
+      "email": "ess.majidali36@gmail.com",
+      "name": "ESS Majid Ali",
+      "created_at": "2026-09-09T15:31:54.942Z"
+    },
+    {
+      "email": "wajiharehmansyncops@gmail.com",
+      "name": "Wajiha Rehman",
+      "created_at": "2026-09-09T16:28:34.245Z"
+    },
+    {
+      "email": "moizraza547m@gmail.com",
+      "name": null,
+      "created_at": "2026-09-09T21:30:53.959Z"
+    },
+    {
+      "email": "sabahatoffical26@gmail.com",
+      "name": null,
+      "created_at": "2026-09-09T21:30:54.796Z"
+    },
+    {
+      "email": "hmrs05721@gmail.com",
+      "name": null,
+      "created_at": "2026-09-11T12:33:41.295Z"
+    },
+    {
+      "email": "ismarehman.syncops@gmail.com",
+      "name": null,
+      "created_at": "2026-09-14T11:06:15.268Z"
+    },
+    {
+      "email": "rehmanyusra285@gmail.com",
+      "name": null,
+      "created_at": "2026-09-19T14:42:59.650Z"
+    },
+    {
+      "email": "musaimran825@gmail.com",
+      "name": "Musa Imran",
+      "created_at": "2026-09-21T08:23:11.789Z"
+    },
+    {
+      "email": "rimshaimran.dev@gmail.com",
+      "name": "Rimsha Imran",
+      "created_at": "2026-09-22T13:15:07.526Z"
+    },
+    {
+      "email": "kamranakram164@gmail.com",
+      "name": null,
+      "created_at": "2026-09-23T03:49:22.642Z"
+    },
+    {
+      "email": "kr5259974@gmail.com",
+      "name": "Kamran Raja",
+      "created_at": "2026-09-23T03:51:03.821Z"
+    },
+    {
+      "email": "ismarehman2277@gmail.com",
+      "name": "Isma Rehman",
+      "created_at": "2026-09-24T15:33:12.745Z"
+    },
+    {
+      "email": "orgameticsbyws@gmail.com",
+      "name": null,
+      "created_at": "2026-10-03T23:58:26.335Z"
+    },
+    {
+      "email": "hr.syncops@gmail.com",
+      "name": null,
+      "created_at": "2026-10-04T00:14:52.006Z"
+    }
+  ],
+  "protectedSpam": []
+}

@@ -314,7 +314,7 @@ export function PosTerminal({
       return;
     }
 
-  if (appointmentId) {
+    if (appointmentId) {
       const linked = appointments.find((a) => a.id === appointmentId);
       if (!linked || linked.customerId !== nextCustomerId) {
         setAppointmentId("");

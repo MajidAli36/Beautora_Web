@@ -852,18 +852,21 @@ export async function searchPosCustomers(search: string) {
     phoneLookupVariants,
   } = await import("@/lib/customers/ensure-from-booking");
 
+  // Quote values for PostgREST `.or()` so spaces / + / · don't break the filter.
+  const quote = (value: string) => `"${value.replace(/"/g, '\\"')}"`;
   const safe = q.replace(/[%_,]/g, " ").trim();
+  if (!safe) return [];
   const term = `%${safe}%`;
   const parts = [
-    `first_name.ilike.${term}`,
-    `last_name.ilike.${term}`,
-    `phone.ilike.${term}`,
+    `first_name.ilike.${quote(term)}`,
+    `last_name.ilike.${quote(term)}`,
+    `phone.ilike.${quote(term)}`,
   ];
   const normalized = normalizeBookingPhone(q);
   if (normalized) {
     for (const variant of phoneLookupVariants(normalized)) {
-      parts.push(`phone.eq.${variant}`);
-      parts.push(`phone.ilike.%${variant}%`);
+      parts.push(`phone.eq.${quote(variant)}`);
+      parts.push(`phone.ilike.${quote(`%${variant}%`)}`);
     }
   }
 

@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useEffectEvent, useId, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { formatCustomerName } from "@/lib/format";
 import { Search, X } from "lucide-react";
@@ -78,18 +86,26 @@ export function CustomerPicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const controlled = value !== undefined;
   const [innerId, setInnerId] = useState(value ?? "");
-  const selectedId = controlled ? value : innerId;
+  const selectedId = controlled ? value! : innerId;
 
-  const selected = useMemo(
-    () => customers.find((c) => c.id === selectedId) ?? null,
-    [customers, selectedId]
-  );
+  /** Keep last picked row so label survives after remote results clear. */
+  const [picked, setPicked] = useState<CustomerOption | null>(null);
+
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    return (
+      customers.find((c) => c.id === selectedId) ||
+      (picked?.id === selectedId ? picked : null)
+    );
+  }, [customers, selectedId, picked]);
 
   const [query, setQuery] = useState(() => (selected ? labelFor(selected) : ""));
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [remoteRows, setRemoteRows] = useState<CustomerOption[]>([]);
   const [pending, startTransition] = useTransition();
+  /** True while the user is typing a search (not while a selection label is shown). */
+  const [isSearching, setIsSearching] = useState(false);
 
   const runRemoteSearch = useEffectEvent(async (q: string) => {
     if (!searchRemote || q.trim().length < 2) {
@@ -108,17 +124,26 @@ export function CustomerPicker({
   useEffect(() => {
     if (!controlled) return;
     if (!value) {
+      setPicked(null);
       setQuery("");
+      setIsSearching(false);
       return;
     }
     const c =
       customers.find((row) => row.id === value) ||
-      remoteRows.find((row) => row.id === value);
-    if (c) setQuery(labelFor(c));
-  }, [controlled, value, customers, remoteRows]);
+      (picked?.id === value ? picked : null) ||
+      remoteRows.find((row) => row.id === value) ||
+      null;
+    if (!c) return;
+    setPicked((prev) => (prev?.id === c.id ? prev : c));
+    if (!isSearching) {
+      const nextLabel = labelFor(c);
+      setQuery((prev) => (prev === nextLabel ? prev : nextLabel));
+    }
+  }, [controlled, value, customers, remoteRows, picked, isSearching]);
 
   useEffect(() => {
-    if (!searchRemote) return;
+    if (!searchRemote || !isSearching) return;
     const q = query.trim();
     if (q.length < 2) {
       setRemoteRows([]);
@@ -130,37 +155,46 @@ export function CustomerPicker({
       });
     }, 220);
     return () => clearTimeout(t);
-  }, [query, searchRemote]);
+  }, [query, searchRemote, isSearching]);
 
   const filtered = useMemo(() => {
-    const local = filterLocal(customers, query, limit);
+    // While a selection is committed and user isn't typing, open shows the seed list
+    const searchQuery = isSearching || !selectedId ? query : "";
+    const local = filterLocal(customers, searchQuery, limit);
     if (!searchRemote) return local;
     const byId = new Map<string, CustomerOption>();
     for (const c of [...remoteRows, ...local]) byId.set(c.id, c);
+    if (picked && !byId.has(picked.id) && selectedId === picked.id && !isSearching) {
+      byId.set(picked.id, picked);
+    }
     return [...byId.values()].slice(0, limit);
-  }, [customers, query, limit, searchRemote, remoteRows]);
+  }, [customers, query, limit, searchRemote, remoteRows, picked, selectedId, isSearching]);
 
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
+    function onDocPointerDown(e: PointerEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    document.addEventListener("pointerdown", onDocPointerDown);
+    return () => document.removeEventListener("pointerdown", onDocPointerDown);
   }, []);
 
-  function setSelected(nextId: string, displayQuery: string) {
+  function commitSelection(nextId: string, option: CustomerOption | null, displayQuery: string) {
+    setIsSearching(false);
+    setPicked(option);
     if (!controlled) setInnerId(nextId);
     onValueChange?.(nextId);
     setQuery(displayQuery);
+    setRemoteRows([]);
     setOpen(false);
   }
 
   function selectCustomer(c: CustomerOption) {
-    setSelected(c.id, labelFor(c));
+    commitSelection(c.id, c, labelFor(c));
   }
 
   function clearSelection() {
-    setSelected("", "");
+    commitSelection("", null, "");
+    setIsSearching(true);
     setOpen(true);
   }
 
@@ -179,7 +213,7 @@ export function CustomerPicker({
     } else if (e.key === "Enter" && open) {
       e.preventDefault();
       if (allowEmpty && highlight === 0) {
-        setSelected("", emptyLabel);
+        commitSelection("", null, "");
         return;
       }
       const idx = allowEmpty ? highlight - 1 : highlight;
@@ -192,7 +226,12 @@ export function CustomerPicker({
   return (
     <div ref={rootRef} className={cn("relative", className)}>
       {name ? (
-        <input type="hidden" name={name} value={selectedId} required={required && !allowEmpty} />
+        <input
+          type="hidden"
+          name={name}
+          value={selectedId}
+          required={required && !allowEmpty}
+        />
       ) : null}
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -207,9 +246,11 @@ export function CustomerPicker({
           className="h-9 pl-8 pr-8"
           value={query}
           onChange={(e) => {
+            setIsSearching(true);
             setQuery(e.target.value);
             setHighlight(0);
             if (selectedId) {
+              setPicked(null);
               if (!controlled) setInnerId("");
               onValueChange?.("");
             }
@@ -222,7 +263,10 @@ export function CustomerPicker({
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
-            onClick={clearSelection}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              clearSelection();
+            }}
             aria-label="Clear customer"
           >
             <X className="size-3.5" />
@@ -234,28 +278,30 @@ export function CustomerPicker({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-lg border bg-popover p-1 text-sm shadow-md"
+          className="absolute z-[80] mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md"
         >
           {allowEmpty && (
-            <li role="option" aria-selected={!selectedId}>
-              <button
-                type="button"
-                className={cn(
-                  "flex w-full items-start rounded-md px-2.5 py-1.5 text-left hover:bg-accent",
-                  highlight === 0 && "bg-accent"
-                )}
-                onMouseEnter={() => setHighlight(0)}
-                onClick={() => setSelected("", emptyLabel)}
-              >
-                <span className="font-medium text-muted-foreground">{emptyLabel}</span>
-              </button>
+            <li
+              role="option"
+              aria-selected={!selectedId}
+              className={cn(
+                "cursor-pointer rounded-md px-2.5 py-1.5 text-left text-muted-foreground hover:bg-accent",
+                highlight === 0 && "bg-accent text-accent-foreground"
+              )}
+              onMouseEnter={() => setHighlight(0)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                commitSelection("", null, "");
+              }}
+            >
+              <span className="font-medium">{emptyLabel}</span>
             </li>
           )}
           {filtered.length === 0 ? (
             <li className="px-2.5 py-2 text-muted-foreground">
               {pending
                 ? "Searching…"
-                : searchRemote && query.trim().length < 2
+                : searchRemote && isSearching && query.trim().length < 2
                   ? "Type at least 2 characters"
                   : "No customers found"}
             </li>
@@ -264,21 +310,26 @@ export function CustomerPicker({
               const rowIndex = allowEmpty ? i + 1 : i;
               const label = formatCustomerName(c.first_name, c.last_name);
               return (
-                <li key={c.id} role="option" aria-selected={selectedId === c.id}>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full flex-col items-start rounded-md px-2.5 py-1.5 text-left hover:bg-accent",
-                      rowIndex === highlight && "bg-accent"
-                    )}
-                    onMouseEnter={() => setHighlight(rowIndex)}
-                    onClick={() => selectCustomer(c)}
-                  >
-                    <span className="font-medium">{label}</span>
-                    {c.phone && (
-                      <span className="text-xs text-muted-foreground">{c.phone}</span>
-                    )}
-                  </button>
+                <li
+                  key={c.id}
+                  role="option"
+                  aria-selected={selectedId === c.id}
+                  className={cn(
+                    "flex cursor-pointer flex-col items-start rounded-md px-2.5 py-1.5 text-left hover:bg-accent",
+                    rowIndex === highlight && "bg-accent text-accent-foreground",
+                    selectedId === c.id && "ring-1 ring-primary/30"
+                  )}
+                  onMouseEnter={() => setHighlight(rowIndex)}
+                  onMouseDown={(e) => {
+                    // Prevent input blur so the list isn't torn down before selection commits
+                    e.preventDefault();
+                    selectCustomer(c);
+                  }}
+                >
+                  <span className="font-medium">{label}</span>
+                  {c.phone ? (
+                    <span className="text-xs text-muted-foreground">{c.phone}</span>
+                  ) : null}
                 </li>
               );
             })

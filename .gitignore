@@ -41,6 +41,7 @@ wrangler.toml.local
 # Local device agent secrets / temp kick files
 scripts/device-agent.env
 scripts/.device-agent-tmp/
+scripts/.spam-purge-report.json
 
 # Debug / logs
 npm-debug.log*
