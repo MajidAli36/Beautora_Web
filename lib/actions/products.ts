@@ -840,11 +840,18 @@ export async function getPosCatalog() {
   };
 }
 
+type PosCustomerOption = {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  phone: string | null;
+};
+
 /** POS customer typeahead — lean columns, capped results. */
-export async function searchPosCustomers(search: string) {
+export async function searchPosCustomers(search: string): Promise<PosCustomerOption[]> {
   const org = await requireOrganization();
   const q = search.trim();
-  if (q.length < 2) return [];
+  if (q.length < 1) return [];
 
   const supabase = await createClient();
   const {
@@ -852,35 +859,73 @@ export async function searchPosCustomers(search: string) {
     phoneLookupVariants,
   } = await import("@/lib/customers/ensure-from-booking");
 
-  // Quote values for PostgREST `.or()` so spaces / + / · don't break the filter.
-  const quote = (value: string) => `"${value.replace(/"/g, '\\"')}"`;
-  const safe = q.replace(/[%_,]/g, " ").trim();
+  const safe = q.replace(/[%_]/g, " ").replace(/\s+/g, " ").trim();
   if (!safe) return [];
-  const term = `%${safe}%`;
-  const parts = [
-    `first_name.ilike.${quote(term)}`,
-    `last_name.ilike.${quote(term)}`,
-    `phone.ilike.${quote(term)}`,
+
+  const words = safe.split(" ").filter((w) => w.length > 0);
+  const byId = new Map<string, PosCustomerOption>();
+
+  const merge = (rows: PosCustomerOption[] | null | undefined) => {
+    for (const row of rows ?? []) byId.set(row.id, row);
+  };
+
+  const base = () =>
+    supabase
+      .from("customers")
+      .select("id, first_name, last_name, phone")
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+  // Prefer column filters over `.or()` — more reliable with spaces / phones.
+  const searches = [
+    base().ilike("first_name", `%${safe}%`),
+    base().ilike("last_name", `%${safe}%`),
+    base().ilike("phone", `%${safe}%`),
   ];
+
+  // "Murad Ali" → first_name ~ Murad AND last_name ~ Ali
+  if (words.length >= 2) {
+    const first = words[0];
+    const last = words.slice(1).join(" ");
+    searches.push(
+      base().ilike("first_name", `%${first}%`).ilike("last_name", `%${last}%`)
+    );
+  }
+
   const normalized = normalizeBookingPhone(q);
   if (normalized) {
     for (const variant of phoneLookupVariants(normalized)) {
-      parts.push(`phone.eq.${quote(variant)}`);
-      parts.push(`phone.ilike.${quote(`%${variant}%`)}`);
+      if (!variant) continue;
+      searches.push(base().eq("phone", variant));
+      searches.push(base().ilike("phone", `%${variant}%`));
     }
   }
 
+  const results = await Promise.all(searches);
+  for (const res of results) {
+    if (!("error" in res) || !res.error) {
+      merge((res.data ?? null) as PosCustomerOption[] | null);
+    }
+  }
+
+  return [...byId.values()].slice(0, 25);
+}
+
+/** Lean customer row for POS picker after inline create. */
+export async function getPosCustomerOption(customerId: string) {
+  const org = await requireOrganization();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("customers")
     .select("id, first_name, last_name, phone")
+    .eq("id", customerId)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
-    .or(parts.join(","))
-    .order("created_at", { ascending: false })
-    .limit(25);
-
+    .maybeSingle();
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return data;
 }
 
 /** Products that can be attached to a service recipe (in-house or both). */

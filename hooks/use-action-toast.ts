@@ -6,6 +6,7 @@ import { notify } from "@/lib/toast";
 type ActionLike = {
   error?: string;
   success?: boolean;
+  customerId?: string;
 };
 
 type UseActionToastOptions = {
@@ -15,7 +16,7 @@ type UseActionToastOptions = {
    * Called after a successful save — typically close the dialog/drawer.
    * Prefer closing here; call `router.refresh()` via `scheduleRefresh` so the toast stays visible.
    */
-  onSuccess?: () => void;
+  onSuccess?: (state: ActionLike) => void;
   /** Override the error toast body. Defaults to `state.error`. */
   errorMessage?: string | ((error: string) => string);
 };
@@ -74,7 +75,7 @@ export function useActionToast(
 
     if (state.success) {
       // Close drawer/dialog first so the toast is not covered by z-50 panel
-      onSuccess?.();
+      onSuccess?.(state);
       requestAnimationFrame(() => {
         notify.success(successMessage ?? "Saved successfully.");
       });

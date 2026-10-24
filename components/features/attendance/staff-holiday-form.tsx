@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   assignStaffDayOff,
@@ -18,6 +18,7 @@ import { PaginatedList } from "@/components/ui/table-pagination";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
+import { StaffPicker } from "@/components/features/attendance/staff-picker";
 
 type StaffOption = { id: string; full_name: string };
 
@@ -64,6 +65,9 @@ export function StaffHolidayForm({
   className?: string;
 }) {
   const router = useRouter();
+  const [scope, setScope] = useState<"one" | "all">("one");
+  const [dayType, setDayType] = useState<(typeof DAY_TYPES)[number]["value"]>("HOLIDAY");
+  const [staffId, setStaffId] = useState(defaultStaffId ?? "");
   const [state, formAction, pending] = useActionState(
     assignStaffDayOff,
     {} as ActionResult
@@ -71,9 +75,13 @@ export function StaffHolidayForm({
   const [deleting, startDelete] = useTransition();
   useActionToast(state, {
     successMessage: "Holiday / leave saved.",
+    onSuccess: () => {
+      window.setTimeout(() => router.refresh(), 320);
+    },
   });
 
   const today = getLocalDateString();
+  const needsStaff = scope === "one";
 
   return (
     <div className={cn("space-y-8", className)}>
@@ -88,7 +96,7 @@ export function StaffHolidayForm({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
+            <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="work_date">Date *</Label>
               <Input
                 id="work_date"
@@ -96,57 +104,99 @@ export function StaffHolidayForm({
                 type="date"
                 required
                 defaultValue={today}
+                className="h-9 max-w-xs bg-background"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Type *</Label>
-              <select
-                id="status"
-                name="status"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                defaultValue="HOLIDAY"
-                required
-              >
-                {DAY_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Type *</Label>
+              <input type="hidden" name="status" value={dayType} />
+              <div className="grid gap-2 sm:grid-cols-2">
+                {DAY_TYPES.map((t) => {
+                  const active = dayType === t.value;
+                  return (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setDayType(t.value)}
+                      aria-pressed={active}
+                      className={cn(
+                        "rounded-lg border px-3 py-2.5 text-left transition-colors",
+                        active
+                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                          : "border-input bg-background hover:bg-muted/50"
+                      )}
+                    >
+                      <span className="block text-sm font-medium">{t.label}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {t.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="scope">Who *</Label>
-              <select
-                id="scope"
-                name="scope"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                defaultValue={defaultStaffId ? "one" : "one"}
-                required
-              >
-                <option value="one">One staff member</option>
-                <option value="all">All active staff (national / salon holiday)</option>
-              </select>
+              <Label>Who *</Label>
+              <input type="hidden" name="scope" value={scope} />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setScope("one")}
+                  aria-pressed={scope === "one"}
+                  className={cn(
+                    "rounded-lg border px-3 py-2.5 text-left transition-colors",
+                    scope === "one"
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                      : "border-input bg-background hover:bg-muted/50"
+                  )}
+                >
+                  <span className="block text-sm font-medium">One staff member</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Assign leave / holiday to a single person
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScope("all");
+                    setStaffId("");
+                  }}
+                  aria-pressed={scope === "all"}
+                  className={cn(
+                    "rounded-lg border px-3 py-2.5 text-left transition-colors",
+                    scope === "all"
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                      : "border-input bg-background hover:bg-muted/50"
+                  )}
+                >
+                  <span className="block text-sm font-medium">All active staff</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    National / salon holiday for everyone
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="staff_id">Staff member</Label>
-              <select
+              <Label htmlFor="staff_id">Staff member{needsStaff ? " *" : ""}</Label>
+              <StaffPicker
                 id="staff_id"
                 name="staff_id"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                defaultValue={defaultStaffId ?? ""}
-              >
-                <option value="">Select staff…</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name}
-                  </option>
-                ))}
-              </select>
+                staff={staffList}
+                value={staffId}
+                onValueChange={setStaffId}
+                disabled={!needsStaff}
+                required={needsStaff}
+                placeholder="Search staff name…"
+              />
               <p className="text-[11px] text-muted-foreground">
-                Required when “One staff member” is selected. Ignored for “All active
-                staff”.
+                {staffList.length === 0
+                  ? "Add an active staff profile above, then return here."
+                  : needsStaff
+                    ? `Pick one person from the list (${staffList.length} active).`
+                    : "Ignored for “All active staff”."}
               </p>
             </div>
 
@@ -157,11 +207,12 @@ export function StaffHolidayForm({
                 name="notes"
                 rows={2}
                 placeholder="e.g. Eid holiday · Staff request · Family emergency"
+                className="bg-background"
               />
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground space-y-2">
+          <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
             <p>
               <strong className="font-medium text-foreground">Paid holiday</strong> —
               use for national days or salon closure. Payroll treats it as present (no
@@ -175,7 +226,14 @@ export function StaffHolidayForm({
           </div>
         </section>
 
-        <Button type="submit" disabled={pending || staffList.length === 0}>
+        <Button
+          type="submit"
+          disabled={
+            pending ||
+            staffList.length === 0 ||
+            (needsStaff && !staffId)
+          }
+        >
           {pending ? "Saving…" : "Save holiday / leave"}
         </Button>
       </form>
@@ -204,7 +262,7 @@ export function StaffHolidayForm({
                     className="flex items-start justify-between gap-3 px-3 py-2.5 text-sm"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium truncate">
+                      <p className="truncate font-medium">
                         {d.work_date}
                         {d.staff_name ? ` · ${d.staff_name}` : ""}
                       </p>

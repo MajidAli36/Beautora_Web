@@ -17,7 +17,7 @@ type CustomerFormProps = {
   customer?: Customer | null;
   submitLabel?: string;
   successMessage?: string;
-  onSuccess?: () => void;
+  onSuccess?: (state: ActionResult & { customerId?: string }) => void;
   footer?: React.ReactNode;
 };
 

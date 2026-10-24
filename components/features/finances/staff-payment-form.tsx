@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaginatedList } from "@/components/ui/table-pagination";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { StaffPicker } from "@/components/features/attendance/staff-picker";
+import { cn } from "@/lib/utils";
 
 type StaffOption = { id: string; full_name: string };
 
@@ -23,12 +25,15 @@ type StaffPaymentFormProps = {
   onRecorded?: (recordDate?: string) => void;
 };
 
+const PAYMENT_TYPES = Object.keys(STAFF_PAYMENT_TYPE_LABELS) as StaffPaymentType[];
+
 export function StaffPaymentForm({ staff, defaultDate, onRecorded }: StaffPaymentFormProps) {
   const [state, formAction, pending] = useActionState(createStaffPayment, {} as ActionResult);
   useActionToast(state, {
     successMessage: "Payment recorded.",
     onSuccess: () => onRecorded?.(state.recordDate),
   });
+  const [staffId, setStaffId] = useState("");
   const [paymentType, setPaymentType] = useState<StaffPaymentType>("SALARY");
   const paymentDate = defaultDate || getLocalDateString();
   const now = new Date();
@@ -37,48 +42,51 @@ export function StaffPaymentForm({ staff, defaultDate, onRecorded }: StaffPaymen
     .slice(0, 16);
 
   return (
-    <Card>
+    <Card className="overflow-visible">
       <CardHeader>
         <CardTitle>Pay staff</CardTitle>
         <CardDescription>
           Record salary, partial payments, advances, or bonuses — with date &amp; time for your records.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-visible">
         <form action={formAction} className="grid gap-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="staff_id">Staff member *</Label>
-              <select
-                id="staff_id"
-                name="staff_id"
-                required
-                className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-              >
-                <option value="">Select…</option>
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="payment_type">Payment type *</Label>
-              <select
-                id="payment_type"
-                name="payment_type"
-                required
-                value={paymentType}
-                onChange={(e) => setPaymentType(e.target.value as StaffPaymentType)}
-                className="flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-              >
-                {(Object.keys(STAFF_PAYMENT_TYPE_LABELS) as StaffPaymentType[]).map((t) => (
-                  <option key={t} value={t}>
+          <div className="space-y-2">
+            <Label htmlFor="staff_id">Staff member *</Label>
+            <StaffPicker
+              id="staff_id"
+              name="staff_id"
+              staff={staff}
+              value={staffId}
+              onValueChange={setStaffId}
+              required
+              placeholder="Search staff name…"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Payment type *</Label>
+            <input type="hidden" name="payment_type" value={paymentType} />
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PAYMENT_TYPES.map((t) => {
+                const active = paymentType === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setPaymentType(t)}
+                    aria-pressed={active}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                      active
+                        ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                        : "border-input bg-background hover:bg-muted/50"
+                    )}
+                  >
                     {STAFF_PAYMENT_TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -143,7 +151,7 @@ export function StaffPaymentForm({ staff, defaultDate, onRecorded }: StaffPaymen
             <Textarea id="notes" name="notes" rows={2} placeholder="e.g. March salary — partial, balance next week" />
           </div>
 
-          <Button type="submit" disabled={pending || !staff.length}>
+          <Button type="submit" disabled={pending || !staff.length || !staffId}>
             {pending ? "Saving…" : "Record payment"}
           </Button>
         </form>

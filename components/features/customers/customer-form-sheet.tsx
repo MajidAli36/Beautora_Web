@@ -18,6 +18,8 @@ type CustomerFormSheetProps = {
   onOpenChange: (open: boolean) => void;
   mode: "add" | "edit";
   customer?: CustomerDirectoryRow | null;
+  /** Called after a successful create (POS can select the new customer immediately). */
+  onCreated?: (customerId: string) => void;
 };
 
 export function CustomerFormSheet({
@@ -25,6 +27,7 @@ export function CustomerFormSheet({
   onOpenChange,
   mode,
   customer,
+  onCreated,
 }: CustomerFormSheetProps) {
   const router = useRouter();
 
@@ -87,8 +90,11 @@ export function CustomerFormSheet({
                   ? "Customer added successfully."
                   : "Customer updated successfully."
               }
-              onSuccess={() => {
+              onSuccess={(result) => {
                 onOpenChange(false);
+                if (mode === "add" && result.customerId) {
+                  onCreated?.(result.customerId);
+                }
                 router.refresh();
               }}
               footer={

@@ -351,20 +351,41 @@ function AddConductForm({
   );
 }
 
+export type StaffDetailSection =
+  | "header"
+  | "stats"
+  | "appointments"
+  | "attendance"
+  | "conduct"
+  | "payments";
+
+const ALL_STAFF_SECTIONS: StaffDetailSection[] = [
+  "header",
+  "stats",
+  "appointments",
+  "attendance",
+  "conduct",
+  "payments",
+];
+
 export function StaffMonthlyDetailView({
   data,
   canManage = false,
   canBrowseStaff = true,
+  sections = ALL_STAFF_SECTIONS,
 }: {
   data: StaffMonthlyDetail;
   canManage?: boolean;
   /** False for self-service staff who cannot open the full staff directory. */
   canBrowseStaff?: boolean;
+  /** Which blocks to render (used by tabbed staff detail). */
+  sections?: StaffDetailSection[];
 }) {
   const router = useRouter();
   const prev = shiftMonth(data.yearMonth, -1);
   const next = shiftMonth(data.yearMonth, 1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const show = (section: StaffDetailSection) => sections.includes(section);
 
   const attendanceHref = `/attendance?from=${data.from}&to=${data.to}&staff=${data.staffId}`;
   const defaultNoteDate =
@@ -385,7 +406,8 @@ export function StaffMonthlyDetailView({
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className={sections.length === ALL_STAFF_SECTIONS.length ? "mx-auto max-w-4xl space-y-6" : "space-y-6"}>
+      {show("header") ? (
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
@@ -428,7 +450,9 @@ export function StaffMonthlyDetailView({
           </Button>
         </div>
       </div>
+      ) : null}
 
+      {show("stats") ? (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -513,9 +537,11 @@ export function StaffMonthlyDetailView({
           </CardContent>
         </Card>
       </div>
+      ) : null}
 
-      <StaffAppointmentsPanel data={data} />
+      {show("appointments") ? <StaffAppointmentsPanel data={data} /> : null}
 
+      {show("attendance") ? (
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -614,7 +640,9 @@ export function StaffMonthlyDetailView({
           </PaginatedList>
         </CardContent>
       </Card>
+      ) : null}
 
+      {show("conduct") ? (
       <Card>
         <CardHeader>
           <CardTitle>Warnings, complaints & behaviour</CardTitle>
@@ -713,7 +741,9 @@ export function StaffMonthlyDetailView({
           </PaginatedList>
         </CardContent>
       </Card>
+      ) : null}
 
+      {show("payments") ? (
       <Card>
         <CardHeader>
           <CardTitle>Payments this month</CardTitle>
@@ -760,6 +790,7 @@ export function StaffMonthlyDetailView({
           </PaginatedList>
         </CardContent>
       </Card>
+      ) : null}
     </div>
   );
 }

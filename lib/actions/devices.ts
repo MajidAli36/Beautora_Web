@@ -65,7 +65,7 @@ export async function getDeviceCommands(limit = 20) {
   const { data, error } = await supabase
     .from("device_commands")
     .select(
-      "id, device_id, command_type, payload, status, created_at, completed_at, device:devices(name, type)"
+      "id, device_id, command, payload, status, created_at, completed_at, device:devices(name, type)"
     )
     .eq("organization_id", org.organizationId)
     .order("created_at", { ascending: false })

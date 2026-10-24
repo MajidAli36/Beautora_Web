@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeCheckout } from "@/lib/actions/sales";
-import { previewCheckoutUsage, searchPosCustomers } from "@/lib/actions/products";
+import {
+  getPosCustomerOption,
+  previewCheckoutUsage,
+  searchPosCustomers,
+} from "@/lib/actions/products";
 import {
   getCustomerDueInvoices,
   receiveCustomerAccountPayment,
@@ -22,8 +26,9 @@ import { calculateInvoiceTotals, roundMoney } from "@/lib/sales/calculate";
 import { roundQty } from "@/lib/products/kinds";
 import type { CartItem, PaymentMethod } from "@/types/commerce";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { CustomerPicker } from "@/components/features/customers/customer-picker";
+import { CustomerFormSheet } from "@/components/features/customers/customer-form-sheet";
 import { MarkNoShowButton } from "@/components/features/online-booking/mark-no-show-button";
 import { AppointmentPicker } from "@/components/features/pos/appointment-picker";
 
@@ -68,6 +73,8 @@ export function PosTerminal({
 }: PosTerminalProps) {
   const router = useRouter();
   const [appointments, setAppointments] = useState(initialAppointments);
+  const [customerOptions, setCustomerOptions] = useState(customers);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [appointmentId, setAppointmentId] = useState("");
@@ -92,6 +99,39 @@ export function PosTerminal({
   useEffect(() => {
     setAppointments(initialAppointments);
   }, [initialAppointments]);
+
+  useEffect(() => {
+    setCustomerOptions((prev) => {
+      const serverIds = new Set(customers.map((c) => c.id));
+      const extras = prev.filter((c) => !serverIds.has(c.id));
+      return [...customers, ...extras];
+    });
+  }, [customers]);
+
+  function rememberCustomers(rows: CatalogCustomer[]) {
+    if (!rows.length) return;
+    setCustomerOptions((prev) => {
+      const byId = new Map(prev.map((c) => [c.id, c]));
+      for (const row of rows) byId.set(row.id, row);
+      return [...byId.values()];
+    });
+  }
+
+  async function searchCustomers(query: string) {
+    const rows = await searchPosCustomers(query);
+    rememberCustomers(rows);
+    return rows;
+  }
+
+  async function handleCustomerCreated(newId: string) {
+    try {
+      const row = await getPosCustomerOption(newId);
+      if (row) rememberCustomers([row]);
+      handleCustomerChange(newId);
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Could not load new customer");
+    }
+  }
 
   const selectedAppointment = useMemo(
     () => appointments.find((a) => a.id === appointmentId) ?? null,
@@ -641,7 +681,7 @@ export function PosTerminal({
         )}
       </div>
 
-      <div className="lg:col-span-2 rounded-lg border p-4 space-y-4 h-fit lg:sticky lg:top-20">
+      <div className="lg:col-span-2 h-fit space-y-4 overflow-visible rounded-lg border p-4 lg:sticky lg:top-20">
         <h2 className="font-semibold">Cart</h2>
 
         <div
@@ -900,22 +940,40 @@ export function PosTerminal({
         <Separator />
 
         <div className="space-y-2">
-          <Label htmlFor="customer">Customer</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="customer">Customer</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => setAddCustomerOpen(true)}
+            >
+              <Plus className="size-3.5" />
+              Add
+            </Button>
+          </div>
           <CustomerPicker
             id="customer"
-            customers={customers}
+            customers={customerOptions}
             value={customerId}
             onValueChange={handleCustomerChange}
             allowEmpty
             emptyLabel="Walk-in"
             placeholder="Search customer name or phone…"
-            searchRemote={searchPosCustomers}
+            searchRemote={searchCustomers}
           />
           {selectedAppointment && (
             <p className="text-xs text-muted-foreground">
               Linked: {selectedAppointment.customerName} · {selectedAppointment.status}
             </p>
           )}
+          <CustomerFormSheet
+            open={addCustomerOpen}
+            onOpenChange={setAddCustomerOpen}
+            mode="add"
+            onCreated={handleCustomerCreated}
+          />
         </div>
 
         {customerId ? (
@@ -1188,10 +1246,10 @@ export function PosTerminal({
                 />
                 <span>
                   I confirm {formatCurrency(remainingDue)} will stay as customer due for{" "}
-                  {customers.find((c) => c.id === customerId)
+                  {customerOptions.find((c) => c.id === customerId)
                     ? formatCustomerName(
-                        customers.find((c) => c.id === customerId)!.first_name,
-                        customers.find((c) => c.id === customerId)!.last_name
+                        customerOptions.find((c) => c.id === customerId)!.first_name,
+                        customerOptions.find((c) => c.id === customerId)!.last_name
                       )
                     : "this customer"}
                   .

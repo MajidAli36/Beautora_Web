@@ -48,7 +48,7 @@ export function StaffQuickPayForm({
           name="payment_type"
           required
           defaultValue="BONUS"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
         >
           {QUICK_TYPES.map((t) => (
             <option key={t} value={t}>

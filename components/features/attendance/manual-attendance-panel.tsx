@@ -14,6 +14,7 @@ import { formatDateTime, formatTime } from "@/lib/format";
 import { getLocalDateString, getLocalTimeString, pakistanDateTimeToIso } from "@/lib/dates/local";
 import { cn } from "@/lib/utils";
 import { Clock, LogIn, LogOut } from "lucide-react";
+import { StaffPicker } from "@/components/features/attendance/staff-picker";
 
 type StaffMember = {
   id: string;
@@ -131,7 +132,7 @@ export function ManualAttendancePanel({ staff, onDuty }: ManualAttendancePanelPr
   }
 
   return (
-    <Card>
+    <Card className="overflow-visible">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="size-5" />
@@ -142,30 +143,23 @@ export function ManualAttendancePanel({ staff, onDuty }: ManualAttendancePanelPr
           leaving time (up to 7 days back). Marked as Manual in the log.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_auto] lg:items-end">
-            <div className="space-y-1.5">
-              <Label htmlFor="manual-staff" className="block h-5 leading-5">
-                Staff member
-              </Label>
-              <select
-                id="manual-staff"
-                value={staffId}
-                onChange={(e) => {
-                  setStaffId(e.target.value);
-                }}
-                className="flex h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm"
-              >
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name}
-                    {onDutyById.has(s.id) ? " · on duty" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <CardContent className="space-y-5 overflow-visible">
+        <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="manual-staff" className="block h-5 leading-5">
+              Staff member
+            </Label>
+            <StaffPicker
+              id="manual-staff"
+              staff={staff}
+              value={staffId}
+              onValueChange={setStaffId}
+              required
+              placeholder="Search staff name…"
+            />
+          </div>
 
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_auto] lg:items-end">
             <div className="space-y-1.5">
               <Label htmlFor="manual-at" className="block h-5 leading-5">
                 Actual time

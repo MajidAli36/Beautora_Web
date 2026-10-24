@@ -2,20 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { getStaffMonthlyDetail } from "@/lib/actions/reports";
 import { getStaffCompensation } from "@/lib/actions/payroll-runs";
 import { getStaffPayslipBundle } from "@/lib/actions/staff-payslip";
-import { StaffMonthlyDetailView } from "@/components/features/staff/staff-monthly-detail";
-import { StaffCompensationForm } from "@/components/features/payroll/staff-compensation-form";
-import { StaffPayslipInvoice } from "@/components/features/payroll/staff-payslip-invoice";
+import { StaffDetailTabs } from "@/components/features/staff/staff-detail-tabs";
 import { getLocalDateString } from "@/lib/dates/local";
 import { canManageRecords, canAccessFeature } from "@/lib/auth/permissions";
 import { getLinkedStaffProfile } from "@/lib/staff/linked-profile";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import Link from "next/link";
 
 type StaffDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -57,44 +47,12 @@ export default async function StaffDetailPage({
   ]);
 
   return (
-    <div className="space-y-6">
-      {payslip ? (
-        <div className="mx-auto max-w-4xl space-y-2">
-          <p className="text-sm text-muted-foreground px-1">
-            {payslip.isSelfView
-              ? "Your salary invoice — pay rate, duty time, bonuses, advances, fines, and net pay."
-              : "Staff salary invoice — same view the employee sees on their login."}
-          </p>
-          <StaffPayslipInvoice bundle={payslip} staffName={data.name} />
-        </div>
-      ) : null}
-      <StaffMonthlyDetailView
-        data={data}
-        canManage={showSalaryEdit}
-        canBrowseStaff={canBrowseStaff}
-      />
-      {showSalaryEdit && compensation ? (
-        <Card className="mx-auto max-w-4xl">
-          <CardHeader>
-            <CardTitle>Salary & duty configuration</CardTitle>
-            <CardDescription>
-              Monthly or hourly pay, personal duty start/end (overrides salon default),
-              breaks, overtime, and weekly offs. Late grace/fines are set under Settings →
-              Attendance & late. One-off holidays and leave are managed on{" "}
-              <Link
-                href="/staff#holidays-leave"
-                className="font-medium text-primary underline-offset-2 hover:underline"
-              >
-                Staff → Holidays & leave
-              </Link>{" "}
-              or Attendance.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <StaffCompensationForm staff={compensation} />
-          </CardContent>
-        </Card>
-      ) : null}
-    </div>
+    <StaffDetailTabs
+      data={data}
+      canManage={showSalaryEdit}
+      canBrowseStaff={canBrowseStaff}
+      payslip={payslip}
+      compensation={compensation}
+    />
   );
 }

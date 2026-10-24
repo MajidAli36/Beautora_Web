@@ -63,7 +63,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
         />
       </Suspense>
       {canManage ? (
-        <Card id="holidays-leave" className="mx-auto max-w-4xl">
+        <Card id="holidays-leave" className="mx-auto max-w-4xl overflow-visible">
           <CardHeader>
             <CardTitle>Holidays & leave</CardTitle>
             <CardDescription>
@@ -72,7 +72,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
               Weekly offs are set on each profile under Salary & duty.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-visible">
             <StaffHolidayForm
               staffList={activeStaff.map((s) => ({
                 id: s.id,

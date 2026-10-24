@@ -99,7 +99,7 @@ export function StaffHub({
         )}
       </TabsList>
 
-      <TabsContent value="roster" className="space-y-4">
+      <TabsContent value="roster" className="space-y-4 overflow-visible">
         <Card>
           <CardHeader>
             <CardTitle>Salon team</CardTitle>
@@ -269,7 +269,7 @@ export function StaffHub({
         </Card>
 
         {canManage ? (
-          <Card id="holidays-leave">
+          <Card id="holidays-leave" className="overflow-visible">
             <CardHeader>
               <CardTitle>Holidays & leave</CardTitle>
               <CardDescription>
@@ -278,7 +278,7 @@ export function StaffHub({
                 Salary & duty.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-visible">
               <StaffHolidayForm
                 staffList={activeStaffOptions}
                 recentDays={holidayDays}

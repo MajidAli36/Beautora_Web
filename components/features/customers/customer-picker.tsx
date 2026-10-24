@@ -23,24 +23,16 @@ export type CustomerOption = {
 
 type CustomerPickerProps = {
   customers: CustomerOption[];
-  /** Hidden input name for native form posts (uncontrolled). */
   name?: string;
   required?: boolean;
   id?: string;
   placeholder?: string;
   className?: string;
-  /** Controlled selected customer id (empty string = none / walk-in). */
   value?: string;
   onValueChange?: (customerId: string) => void;
-  /** Show a clearable empty choice (e.g. Walk-in on POS). */
   allowEmpty?: boolean;
   emptyLabel?: string;
-  /** Max results shown while searching. */
   limit?: number;
-  /**
-   * Optional server search (e.g. POS). Called when query length ≥ 2;
-   * results merge with the seed `customers` list.
-   */
   searchRemote?: (query: string) => Promise<CustomerOption[]>;
 };
 
@@ -51,13 +43,19 @@ function labelFor(c: CustomerOption) {
 function filterLocal(customers: CustomerOption[], query: string, limit: number) {
   const q = query.trim().toLowerCase();
   if (!q) return customers.slice(0, limit);
+  const words = q.split(/\s+/).filter(Boolean);
   const qDigits = q.replace(/\D/g, "");
   return customers
     .filter((c) => {
       const full = formatCustomerName(c.first_name, c.last_name).toLowerCase();
+      const first = (c.first_name ?? "").toLowerCase();
+      const last = (c.last_name ?? "").toLowerCase();
       const phone = (c.phone ?? "").toLowerCase();
       const phoneDigits = phone.replace(/\D/g, "");
-      if (full.includes(q) || phone.includes(q)) return true;
+      if (full.includes(q) || phone.includes(q) || first.includes(q) || last.includes(q)) {
+        return true;
+      }
+      if (words.length > 1 && words.every((w) => full.includes(w))) return true;
       if (qDigits.length >= 3 && phoneDigits.includes(qDigits)) return true;
       if (qDigits.length >= 10) {
         const tail = qDigits.slice(-10);
@@ -68,6 +66,9 @@ function filterLocal(customers: CustomerOption[], query: string, limit: number) 
     .slice(0, limit);
 }
 
+/**
+ * In-flow combobox (not absolute) so Card/sticky/overflow parents cannot clip the list.
+ */
 export function CustomerPicker({
   customers,
   name,
@@ -88,7 +89,6 @@ export function CustomerPicker({
   const [innerId, setInnerId] = useState(value ?? "");
   const selectedId = controlled ? value! : innerId;
 
-  /** Keep last picked row so label survives after remote results clear. */
   const [picked, setPicked] = useState<CustomerOption | null>(null);
 
   const selected = useMemo(() => {
@@ -104,11 +104,10 @@ export function CustomerPicker({
   const [highlight, setHighlight] = useState(0);
   const [remoteRows, setRemoteRows] = useState<CustomerOption[]>([]);
   const [pending, startTransition] = useTransition();
-  /** True while the user is typing a search (not while a selection label is shown). */
   const [isSearching, setIsSearching] = useState(false);
 
   const runRemoteSearch = useEffectEvent(async (q: string) => {
-    if (!searchRemote || q.trim().length < 2) {
+    if (!searchRemote || q.trim().length < 1) {
       setRemoteRows([]);
       return;
     }
@@ -120,13 +119,11 @@ export function CustomerPicker({
     }
   });
 
-  // Sync display when controlled value changes from outside (e.g. POS appointment link)
   useEffect(() => {
     if (!controlled) return;
     if (!value) {
       setPicked(null);
-      setQuery("");
-      setIsSearching(false);
+      if (!isSearching) setQuery("");
       return;
     }
     const c =
@@ -145,7 +142,7 @@ export function CustomerPicker({
   useEffect(() => {
     if (!searchRemote || !isSearching) return;
     const q = query.trim();
-    if (q.length < 2) {
+    if (q.length < 1) {
       setRemoteRows([]);
       return;
     }
@@ -153,17 +150,17 @@ export function CustomerPicker({
       startTransition(() => {
         void runRemoteSearch(q);
       });
-    }, 220);
+    }, 180);
     return () => clearTimeout(t);
   }, [query, searchRemote, isSearching]);
 
   const filtered = useMemo(() => {
-    // While a selection is committed and user isn't typing, open shows the seed list
-    const searchQuery = isSearching || !selectedId ? query : "";
+    const searchQuery = isSearching ? query : selectedId ? "" : query;
     const local = filterLocal(customers, searchQuery, limit);
     if (!searchRemote) return local;
     const byId = new Map<string, CustomerOption>();
-    for (const c of [...remoteRows, ...local]) byId.set(c.id, c);
+    const ordered = isSearching ? [...remoteRows, ...local] : [...local, ...remoteRows];
+    for (const c of ordered) byId.set(c.id, c);
     if (picked && !byId.has(picked.id) && selectedId === picked.id && !isSearching) {
       byId.set(picked.id, picked);
     }
@@ -224,7 +221,7 @@ export function CustomerPicker({
   }
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div ref={rootRef} className={cn("space-y-2", className)}>
       {name ? (
         <input
           type="hidden"
@@ -243,7 +240,7 @@ export function CustomerPicker({
           aria-autocomplete="list"
           autoComplete="off"
           placeholder={placeholder}
-          className="h-9 pl-8 pr-8"
+          className="h-9 bg-background pl-8 pr-8"
           value={query}
           onChange={(e) => {
             setIsSearching(true);
@@ -274,72 +271,84 @@ export function CustomerPicker({
         )}
       </div>
 
-      {open && (
+      {open ? (
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-[80] mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md"
+          className="max-h-56 overflow-y-auto rounded-lg border border-border bg-background p-1 text-sm shadow-sm"
         >
-          {allowEmpty && (
-            <li
-              role="option"
-              aria-selected={!selectedId}
-              className={cn(
-                "cursor-pointer rounded-md px-2.5 py-1.5 text-left text-muted-foreground hover:bg-accent",
-                highlight === 0 && "bg-accent text-accent-foreground"
-              )}
-              onMouseEnter={() => setHighlight(0)}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                commitSelection("", null, "");
-              }}
-            >
-              <span className="font-medium">{emptyLabel}</span>
+          {allowEmpty ? (
+            <li role="option" aria-selected={!selectedId}>
+              <button
+                type="button"
+                className={cn(
+                  "flex w-full items-start rounded-md px-2.5 py-2 text-left font-medium",
+                  !selectedId
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+                onMouseEnter={() => setHighlight(0)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  commitSelection("", null, "");
+                }}
+              >
+                {emptyLabel}
+              </button>
             </li>
-          )}
+          ) : null}
           {filtered.length === 0 ? (
             <li className="px-2.5 py-2 text-muted-foreground">
               {pending
                 ? "Searching…"
-                : searchRemote && isSearching && query.trim().length < 2
-                  ? "Type at least 2 characters"
+                : searchRemote && isSearching && query.trim().length < 1
+                  ? "Type a name or phone"
                   : "No customers found"}
             </li>
           ) : (
             filtered.map((c, i) => {
               const rowIndex = allowEmpty ? i + 1 : i;
               const label = formatCustomerName(c.first_name, c.last_name);
+              const active = selectedId === c.id;
               return (
-                <li
-                  key={c.id}
-                  role="option"
-                  aria-selected={selectedId === c.id}
-                  className={cn(
-                    "flex cursor-pointer flex-col items-start rounded-md px-2.5 py-1.5 text-left hover:bg-accent",
-                    rowIndex === highlight && "bg-accent text-accent-foreground",
-                    selectedId === c.id && "ring-1 ring-primary/30"
-                  )}
-                  onMouseEnter={() => setHighlight(rowIndex)}
-                  onMouseDown={(e) => {
-                    // Prevent input blur so the list isn't torn down before selection commits
-                    e.preventDefault();
-                    selectCustomer(c);
-                  }}
-                >
-                  <span className="font-medium">{label}</span>
-                  {c.phone ? (
-                    <span className="text-xs text-muted-foreground">{c.phone}</span>
-                  ) : null}
+                <li key={c.id} role="option" aria-selected={active}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full flex-col items-start rounded-md px-2.5 py-2 text-left",
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted",
+                      rowIndex === highlight && !active && "bg-muted"
+                    )}
+                    onMouseEnter={() => setHighlight(rowIndex)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectCustomer(c);
+                    }}
+                  >
+                    <span className="font-medium">{label || "Unnamed"}</span>
+                    {c.phone ? (
+                      <span
+                        className={cn(
+                          "text-xs",
+                          active ? "text-primary-foreground/80" : "text-muted-foreground"
+                        )}
+                      >
+                        {c.phone}
+                      </span>
+                    ) : null}
+                  </button>
                 </li>
               );
             })
           )}
         </ul>
-      )}
+      ) : null}
 
-      {required && !allowEmpty && !selectedId && query.trim() !== "" && (
-        <p className="mt-1 text-xs text-amber-600">Pick a customer from the list</p>
-      )}
+      {required && !allowEmpty && !selectedId && query.trim() !== "" ? (
+        <p className="text-xs text-amber-600">Pick a customer from the list</p>
+      ) : null}
     </div>
   );
 }
