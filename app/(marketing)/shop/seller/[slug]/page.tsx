@@ -12,6 +12,7 @@ import {
 import { buildPageMetadata } from "@/lib/seo/site";
 import { trackMarketplaceEvent } from "@/lib/marketplace/analytics";
 import { createClient } from "@/lib/supabase/server";
+import { marketplaceBuyerSession } from "@/lib/auth/account-types";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,11 @@ export default async function SellerStorePage({ params }: Props) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const isLoggedIn = Boolean(user);
+  const { isShopper, hasOtherAccountSession } = marketplaceBuyerSession(
+    user
+      ? { user_metadata: user.user_metadata as Record<string, unknown> }
+      : null
+  );
 
   const all = await listPublicMarketplaceProducts();
   const cards: PublicProductCard[] = all.filter((p) => p.seller_id === store.seller.id);
@@ -128,7 +133,10 @@ export default async function SellerStorePage({ params }: Props) {
             No published products yet.
           </p>
         ) : (
-          <MarketplaceQuickViewProvider isLoggedIn={isLoggedIn}>
+          <MarketplaceQuickViewProvider
+            isLoggedIn={isShopper}
+            hasOtherAccountSession={hasOtherAccountSession}
+          >
             <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {cards.map((p) => (
                 <MarketplaceProductCard key={p.id} product={p} />

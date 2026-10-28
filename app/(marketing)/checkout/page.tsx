@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { MarketplaceCheckoutClient } from "@/components/marketplace/checkout-page-client";
+import { marketplaceBuyerSession } from "@/lib/auth/account-types";
 import { buildPageMetadata } from "@/lib/seo/site";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +19,11 @@ export default async function CheckoutPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { isShopper, hasOtherAccountSession } = marketplaceBuyerSession(
+    user
+      ? { user_metadata: user.user_metadata as Record<string, unknown> }
+      : null
+  );
 
   return (
     <div className="m-under-chrome">
@@ -40,14 +46,21 @@ export default async function CheckoutPage() {
       </div>
       <div className="mx-auto max-w-5xl px-6 py-10">
         <MarketplaceCheckoutClient
-          isLoggedIn={Boolean(user)}
+          isLoggedIn={isShopper}
+          hasOtherAccountSession={hasOtherAccountSession}
           defaultName={
-            (user?.user_metadata?.full_name as string | undefined) ||
-            user?.email?.split("@")[0] ||
-            ""
+            isShopper
+              ? (user?.user_metadata?.full_name as string | undefined) ||
+                user?.email?.split("@")[0] ||
+                ""
+              : ""
           }
-          defaultPhone={(user?.user_metadata?.phone as string | undefined) || ""}
-          defaultEmail={user?.email ?? ""}
+          defaultPhone={
+            isShopper
+              ? (user?.user_metadata?.phone as string | undefined) || ""
+              : ""
+          }
+          defaultEmail={isShopper ? (user?.email ?? "") : ""}
         />
       </div>
     </div>

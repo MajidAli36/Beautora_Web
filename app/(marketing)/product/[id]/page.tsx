@@ -12,6 +12,7 @@ import { buildPageMetadata, absoluteUrl } from "@/lib/seo/site";
 import { createClient } from "@/lib/supabase/server";
 import { JsonLd } from "@/components/seo/json-ld";
 import { effectiveProductPrice } from "@/lib/marketplace/pricing";
+import { marketplaceBuyerSession } from "@/lib/auth/account-types";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,11 @@ export default async function ProductDetailPage({ params }: Props) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { isShopper, hasOtherAccountSession } = marketplaceBuyerSession(
+    user
+      ? { user_metadata: user.user_metadata as Record<string, unknown> }
+      : null
+  );
 
   const price = effectiveProductPrice(product);
   const { currencyFromCountry } = await import("@/lib/currency/from-country");
@@ -166,7 +172,8 @@ export default async function ProductDetailPage({ params }: Props) {
         images={detail.images as never}
         variants={detail.variants as never}
         reviews={detail.reviews as never}
-        isLoggedIn={Boolean(user)}
+        isLoggedIn={isShopper}
+        hasOtherAccountSession={hasOtherAccountSession}
         currency={currency}
       />
       <p className="sr-only">Price {price}</p>

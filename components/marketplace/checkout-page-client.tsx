@@ -15,11 +15,13 @@ import { cn } from "@/lib/utils";
 
 export function MarketplaceCheckoutClient({
   isLoggedIn,
+  hasOtherAccountSession = false,
   defaultName,
   defaultPhone,
   defaultEmail,
 }: {
   isLoggedIn: boolean;
+  hasOtherAccountSession?: boolean;
   defaultName?: string;
   defaultPhone?: string;
   defaultEmail?: string;
@@ -35,14 +37,32 @@ export function MarketplaceCheckoutClient({
 
   if (!isLoggedIn) {
     return (
-      <div className="py-10 text-center">
-        <p className="text-[var(--m-muted)]">Sign in to checkout with COD or card.</p>
-        <Button
-          className="mt-6"
-          render={<Link href={`/login?redirect=${encodeURIComponent("/checkout")}`} />}
-        >
-          Sign in
-        </Button>
+      <div className="mx-auto max-w-md py-10 text-center">
+        {hasOtherAccountSession ? (
+          <>
+            <p className="text-[var(--m-muted)]">
+              You&apos;re signed in to a salon account. Checkout needs a shopper account
+              (separate from POS / seller login).
+            </p>
+            <Button className="mt-6" render={<Link href="/signup?as=customer" />}>
+              Create a shopper account
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-[var(--m-muted)]">
+              Sign in as a shopper to checkout with COD or card.
+            </p>
+            <Button
+              className="mt-6"
+              render={
+                <Link href={`/login?redirect=${encodeURIComponent("/checkout")}`} />
+              }
+            >
+              Sign in as shopper
+            </Button>
+          </>
+        )}
       </div>
     );
   }

@@ -67,12 +67,15 @@ export function MarketplaceShop({
   initialProducts,
   categories,
   isLoggedIn = false,
+  hasOtherAccountSession = false,
   initialQuery = "",
   initialCategory = null,
 }: {
   initialProducts: PublicProductCard[];
   categories: Category[];
+  /** True only for shopper accounts — not salon / POS sessions */
   isLoggedIn?: boolean;
+  hasOtherAccountSession?: boolean;
   initialQuery?: string;
   initialCategory?: string | null;
 }) {
@@ -225,7 +228,14 @@ export function MarketplaceShop({
   const grouped = groupCartBySeller(cart);
 
   function requireShopperLogin(action: string) {
-    notify.error(`Sign in to ${action}`);
+    if (hasOtherAccountSession) {
+      notify.error(
+        `Salon login can’t ${action}. Use a shopper account (different email), or sign out of the salon first.`
+      );
+      router.push("/signup?as=customer");
+      return;
+    }
+    notify.error(`Sign in as a shopper to ${action}`);
     router.push(`/login?redirect=${encodeURIComponent("/shop")}`);
   }
 
@@ -293,7 +303,10 @@ export function MarketplaceShop({
   } as const;
 
   return (
-    <MarketplaceQuickViewProvider isLoggedIn={isLoggedIn}>
+    <MarketplaceQuickViewProvider
+      isLoggedIn={isLoggedIn}
+      hasOtherAccountSession={hasOtherAccountSession}
+    >
       <div className="relative min-h-[70vh]">
         <div className="sticky top-[var(--m-chrome)] z-20 border-b border-[var(--m-line)] bg-[var(--m-paper)]/95 backdrop-blur">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center">

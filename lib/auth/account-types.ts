@@ -65,6 +65,25 @@ export function isCustomerAccount(meta: Record<string, unknown> | null | undefin
   return meta?.account_type === "customer";
 }
 
+/**
+ * Marketplace cart / checkout is for shopper accounts only.
+ * Salon owners, staff, partners, and platform admins use different logins and must not
+ * be treated as buyers just because they have an active session.
+ */
+export function marketplaceBuyerSession(user: {
+  user_metadata?: Record<string, unknown> | null;
+} | null): {
+  isShopper: boolean;
+  /** Signed in, but as salon / staff / partner — not a shopper */
+  hasOtherAccountSession: boolean;
+} {
+  if (!user) return { isShopper: false, hasOtherAccountSession: false };
+  if (isCustomerAccount(user.user_metadata)) {
+    return { isShopper: true, hasOtherAccountSession: false };
+  }
+  return { isShopper: false, hasOtherAccountSession: true };
+}
+
 export function safeAuthRedirect(raw: string | null | undefined, fallback: string) {
   if (!raw) return fallback;
   if (!raw.startsWith("/") || raw.startsWith("//")) return fallback;

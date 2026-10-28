@@ -4,6 +4,7 @@ import { cache } from "react";
 import { revalidatePath, unstable_cache, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { requireAuth } from "@/lib/auth/session";
+import { isCustomerAccount } from "@/lib/auth/account-types";
 import { getActiveOrganization } from "@/lib/auth/organization";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, tryCreateAdminClient } from "@/lib/supabase/admin";
@@ -642,10 +643,16 @@ export async function placeMarketplaceCodOrder(input: {
   let buyerEmail: string | null = input.buyerEmail?.trim() || null;
   try {
     const user = await requireAuth();
+    if (!isCustomerAccount(user.user_metadata as Record<string, unknown>)) {
+      return {
+        error:
+          "Marketplace orders need a shopper account. Sign out of your salon login, then create or sign in as a shopper.",
+      };
+    }
     buyerUserId = user.id;
     if (!buyerEmail) buyerEmail = user.email ?? null;
   } catch {
-    return { error: "Sign in to place a Marketplace order." };
+    return { error: "Sign in with a shopper account to place a Marketplace order." };
   }
 
   const paymentMethod = input.paymentMethod === "CARD" ? "CARD" : "COD";

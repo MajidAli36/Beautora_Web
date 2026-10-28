@@ -55,6 +55,7 @@ export function MarketplaceProductPdp({
   variants,
   reviews,
   isLoggedIn,
+  hasOtherAccountSession = false,
   currency: currencyProp,
 }: {
   product: Product;
@@ -71,6 +72,7 @@ export function MarketplaceProductPdp({
   variants: Variant[];
   reviews: Review[];
   isLoggedIn: boolean;
+  hasOtherAccountSession?: boolean;
   currency?: string;
 }) {
   const currency = currencyProp || currencyFromCountry(seller.country).code;
@@ -140,7 +142,14 @@ export function MarketplaceProductPdp({
   const productHref = marketplaceProductPath(product);
 
   function requireLogin(action: string) {
-    notify.error(`Sign in to ${action}`);
+    if (hasOtherAccountSession) {
+      notify.error(
+        `Salon login can’t ${action}. Use a shopper account, or sign out of the salon first.`
+      );
+      router.push("/signup?as=customer");
+      return;
+    }
+    notify.error(`Sign in as a shopper to ${action}`);
     router.push(`/login?redirect=${encodeURIComponent(productHref)}`);
   }
 
