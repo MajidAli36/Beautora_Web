@@ -1,0 +1,62 @@
+# Beautora — Contabo production Compose
+# Usage (on server, in /var/www/beautora):
+#   1. Create .env.production.local with real secrets (never commit)
+#   2. docker compose --env-file .env.production.local up -d --build
+#
+# App listens on 127.0.0.1:3000 for Nginx on the host. Do not publish 3000 publicly.
+
+name: beautora
+
+services:
+  beautora:
+    container_name: beautora-web
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Build-time (inlined into client bundle / next.config)
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://www.beautora.app}
+        NEXT_PUBLIC_BOOKING_SLUG: ${NEXT_PUBLIC_BOOKING_SLUG:-hair-salon}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION:-}
+        NEXT_PUBLIC_RECEIPT_WIDTH: ${NEXT_PUBLIC_RECEIPT_WIDTH:-}
+        R2_ENDPOINT: ${R2_ENDPOINT:-}
+        APP_BASE_URL: ${APP_BASE_URL:-https://www.beautora.app}
+        EMAIL_APP_BASE_URL: ${EMAIL_APP_BASE_URL:-https://www.beautora.app}
+    image: beautora-web:latest
+    restart: unless-stopped
+    env_file:
+      - .env.production.local
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      # Host Nginx → container only (not world-reachable)
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-qO-",
+          "http://127.0.0.1:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp

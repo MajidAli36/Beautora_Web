@@ -20,6 +20,9 @@ function hostnameFromUrl(raw: string | undefined): string | null {
 const r2Host = hostnameFromUrl(process.env.R2_ENDPOINT);
 
 const nextConfig: NextConfig = {
+  // Standalone output for Contabo/Docker self-hosting. Vercel ignores this and
+  // continues to use its own build pipeline — keep both deployments compatible.
+  output: "standalone",
   poweredByHeader: false,
   compress: true,
   experimental: {
