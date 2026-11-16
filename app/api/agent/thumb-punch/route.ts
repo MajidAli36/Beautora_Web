@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
+
+
 /**
  * Loopback punch ingest from SyncOps Device Agent (realtime / ADMS).
  * Auth: X-Beautora-Agent-Key must match the local Device Agent API key.

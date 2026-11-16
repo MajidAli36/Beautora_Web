@@ -2,7 +2,10 @@
 # Beautora — production multi-stage image (Next.js standalone)
 # Target: Contabo VPS / Docker Compose. Vercel deploys remain independent.
 
-ARG NODE_VERSION=22-alpine
+# Node 24 ships npm 11+, which matches the lockfile producer (Windows/npm 11).
+# Node 22's npm 10 rejects this lockfile as incomplete for Tailwind oxide WASM
+# optional deps (@emnapi/core, @emnapi/runtime) — see tailwindcss#20324 / npm#4828.
+ARG NODE_VERSION=24-alpine
 
 # -----------------------------------------------------------------------------
 # Dependencies

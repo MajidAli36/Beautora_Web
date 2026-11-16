@@ -328,9 +328,9 @@ Internet → Nginx (:443) → 127.0.0.1:3000 → Docker (beautora-web)
 External services: Supabase (DB/Auth), Cloudflare R2, Resend, Turnstile
 ```
 
-Multi-stage image:
+Multi-stage image (`node:24-alpine`, aligned with local Node/npm 11 lockfile tooling):
 
-1. **deps** — `npm ci`
+1. **deps** — `npm ci` (requires a complete `package-lock.json`; Tailwind oxide WASM optional deps must include `@emnapi/core` + `@emnapi/runtime`)
 2. **builder** — `next build` with `output: "standalone"`
 3. **runner** — copy `standalone` + `public` + `.next/static`, run as `nextjs`
 
