@@ -21,6 +21,7 @@ export type AppConfigResponse = {
       homepageHeadline: string;
       homepageDescription: string;
       bookingInstructions?: string;
+      cancellationPolicy?: string;
       promoBannerUrl?: string | null;
     };
     features: Partial<

@@ -14,6 +14,7 @@ import {
   StatusPill,
 } from "../../src/components/ui";
 import { formatMoney } from "../../src/lib/format";
+import { LoyaltyCard } from "../../src/components/LoyaltyCard";
 
 export default function HomeScreen() {
   const { ready, syncing, error, bundle, theme, loyalty, refresh, profile, bookings } =
@@ -67,33 +68,25 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {loyalty ? (
-        <Card onPress={() => router.push("/(tabs)/rewards")}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-            <View
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 18,
-                backgroundColor: `${theme.primary}14`,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ color: theme.primary, fontSize: 22, fontWeight: "900" }}>
-                {loyalty.balance}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.muted, fontSize: 12, fontWeight: "700" }}>
-                YOUR POINTS
-              </Text>
-              <Text style={{ color: theme.text, fontWeight: "800", fontSize: 16, marginTop: 2 }}>
-                {profile.phone ? "Tap to view rewards" : "Add phone to unlock points"}
-              </Text>
-              {loyalty.note ? <Muted>{loyalty.note}</Muted> : null}
-            </View>
-          </View>
+      {loyalty || bundle.config.settings.features.loyalty ? (
+        <LoyaltyCard
+          compact
+          onOpenRewards={() => router.push("/(tabs)/rewards")}
+        />
+      ) : null}
+
+      {(bundle.notifications?.length ?? 0) > 0 ? (
+        <Card onPress={() => router.push("/notifications")}>
+          <Text style={{ color: theme.muted, fontSize: 12, fontWeight: "700" }}>
+            NOTIFICATIONS
+          </Text>
+          <Text style={{ color: theme.text, fontWeight: "800", fontSize: 16, marginTop: 4 }}>
+            {bundle.notifications[0]?.title || "Salon updates"}
+          </Text>
+          <Muted>
+            {bundle.notifications.length} message
+            {bundle.notifications.length === 1 ? "" : "s"} · tap to read rules & updates
+          </Muted>
         </Card>
       ) : null}
 

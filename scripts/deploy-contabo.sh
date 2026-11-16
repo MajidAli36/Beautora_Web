@@ -47,6 +47,32 @@ cd "$APP_DIR" || die "Cannot cd to $APP_DIR"
 [[ -f "$COMPOSE_FILE" ]] || die "Missing $COMPOSE_FILE in $APP_DIR"
 [[ -f "$ENV_FILE" ]] || die "Missing $ENV_FILE — create it from .env.production.example (do not commit secrets)"
 
+# Build-time public Supabase vars (NEXT_PUBLIC_*) must be present for next build.
+# Accept ANON_KEY or PUBLISHABLE_KEY. Never require SERVICE_ROLE for the image build.
+env_has_nonempty() {
+  local key="$1"
+  # Match KEY=value lines; ignore comments / blanks / empty values / placeholders.
+  awk -F= -v k="$key" '
+    $0 ~ "^[[:space:]]*#" { next }
+    index($0, k "=") == 1 {
+      v = substr($0, length(k) + 2)
+      gsub(/\r/, "", v)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+      if (v != "" && v !~ /^your-/ && v !~ /^https:\/\/your-project/) { found = 1 }
+    }
+    END { exit found ? 0 : 1 }
+  ' "$ENV_FILE"
+}
+
+env_has_nonempty "NEXT_PUBLIC_SUPABASE_URL" \
+  || die "$ENV_FILE missing NEXT_PUBLIC_SUPABASE_URL (required for Docker build + auth)"
+if ! env_has_nonempty "NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  && ! env_has_nonempty "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"; then
+  die "$ENV_FILE must set NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+fi
+env_has_nonempty "SUPABASE_SERVICE_ROLE_KEY" \
+  || log "WARN: SUPABASE_SERVICE_ROLE_KEY missing — runtime admin/health DB checks may fail (not baked into image)"
+
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }

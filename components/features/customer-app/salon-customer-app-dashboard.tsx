@@ -21,13 +21,17 @@ import {
   salonSaveCustomerAppDraft,
   salonSaveLeaderboardRules,
   salonSaveLeaderboardTier,
+  salonCreateNotification,
+  salonDeleteNotification,
   salonSaveLoyaltyRules,
   salonToggleAppDeal,
   salonToggleAppProduct,
+  salonToggleNotification,
   salonToggleReel,
   salonUpdatePointType,
   salonUpsertAppCustomer,
 } from "@/lib/actions/customer-apps-salon";
+import type { CustomerAppNotification } from "@/lib/customer-apps/notifications";
 import type {
   AppBookingRow,
   AppCustomer,
@@ -52,6 +56,7 @@ type Tab =
   | "products"
   | "deals"
   | "points"
+  | "notifications"
   | "leaderboard"
   | "reels";
 
@@ -61,7 +66,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "bookings", label: "App bookings" },
   { id: "products", label: "App products" },
   { id: "deals", label: "Deals" },
-  { id: "points", label: "Points types" },
+  { id: "points", label: "Points & rules" },
+  { id: "notifications", label: "Notifications" },
   { id: "leaderboard", label: "Leaderboard" },
   { id: "reels", label: "Reels" },
 ];
@@ -88,6 +94,7 @@ export function SalonCustomerAppDashboard(props: {
     customer_phone: string;
     created_at: string;
   }[];
+  notifications: CustomerAppNotification[];
   services: { id: string; name: string }[];
 }) {
   const {
@@ -104,6 +111,7 @@ export function SalonCustomerAppDashboard(props: {
     pointTypes,
     leaderboardTiers,
     pointsHistory,
+    notifications,
     services,
   } = props;
 
@@ -134,6 +142,11 @@ export function SalonCustomerAppDashboard(props: {
     caption: "",
     videoUrl: "",
     posterUrl: "",
+  });
+  const [notifForm, setNotifForm] = useState({
+    title: "",
+    body: "",
+    kind: "announcement" as CustomerAppNotification["kind"],
   });
   const [tierEdits, setTierEdits] = useState<Record<number, LeaderboardTier>>(
     Object.fromEntries(leaderboardTiers.map((t) => [t.rank, t]))
@@ -600,8 +613,8 @@ export function SalonCustomerAppDashboard(props: {
             in the app.
           </p>
           {loyalty && (
-            <div className="rounded-md border bg-muted/20 p-3 space-y-2">
-              <label className="flex items-center gap-2 text-sm">
+            <div className="rounded-md border bg-muted/20 p-3 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium">
                 <input
                   type="checkbox"
                   checked={loyalty.enabled}
@@ -609,19 +622,112 @@ export function SalonCustomerAppDashboard(props: {
                 />
                 Enable points on customer app
               </label>
+              <p className="text-xs text-muted-foreground">
+                These rules are saved on the backend and shown as readable text in the customer
+                app (Rewards + Notifications → How to earn).
+              </p>
               <Textarea
                 value={loyalty.rules_note}
                 onChange={(e) => setLoyalty({ ...loyalty, rules_note: e.target.value })}
-                placeholder="Customer-facing rules note"
+                placeholder="Customer-facing rules note (shown at the top of How to earn)"
+                rows={3}
               />
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <label className="text-xs space-y-1">
+                  <span className="text-muted-foreground">Points / completed booking</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={loyalty.points_per_completed_booking}
+                    onChange={(e) =>
+                      setLoyalty({
+                        ...loyalty,
+                        points_per_completed_booking: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="text-muted-foreground">Points / product purchase</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={loyalty.points_per_product_purchase}
+                    onChange={(e) =>
+                      setLoyalty({
+                        ...loyalty,
+                        points_per_product_purchase: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="text-muted-foreground">Points per currency spent</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={loyalty.points_per_currency}
+                    onChange={(e) =>
+                      setLoyalty({
+                        ...loyalty,
+                        points_per_currency: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="text-muted-foreground">Welcome bonus</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={loyalty.welcome_bonus_points}
+                    onChange={(e) =>
+                      setLoyalty({
+                        ...loyalty,
+                        welcome_bonus_points: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="text-muted-foreground">Min redeem points</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={loyalty.min_redeem_points}
+                    onChange={(e) =>
+                      setLoyalty({
+                        ...loyalty,
+                        min_redeem_points: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </label>
+                <label className="text-xs space-y-1">
+                  <span className="text-muted-foreground">Redeem points ≈ 1 currency</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    value={loyalty.redeem_points_per_currency}
+                    onChange={(e) =>
+                      setLoyalty({
+                        ...loyalty,
+                        redeem_points_per_currency: Number(e.target.value) || 1,
+                      })
+                    }
+                  />
+                </label>
+              </div>
               <Button
                 size="sm"
                 disabled={pending}
                 onClick={() =>
-                  run(() => salonSaveLoyaltyRules(loyalty), "Loyalty settings saved")
+                  run(() => salonSaveLoyaltyRules(loyalty), "Loyalty rules saved")
                 }
               >
-                Save loyalty toggle
+                Save points rules
               </Button>
             </div>
           )}
@@ -798,6 +904,110 @@ export function SalonCustomerAppDashboard(props: {
                 </tbody>
               </table>
             </div>
+          </div>
+        </section>
+      )}
+
+      {tab === "notifications" && (
+        <section className="space-y-4 rounded-lg border p-4">
+          <p className="text-sm text-muted-foreground">
+            Messages appear in the customer app inbox. Loyalty “how to earn” rules are also
+            auto-shown there from the Points &amp; rules tab.
+          </p>
+          <div className="grid gap-2">
+            <Input
+              placeholder="Title *"
+              value={notifForm.title}
+              onChange={(e) => setNotifForm({ ...notifForm, title: e.target.value })}
+            />
+            <Textarea
+              placeholder="Message body (plain text) *"
+              rows={4}
+              value={notifForm.body}
+              onChange={(e) => setNotifForm({ ...notifForm, body: e.target.value })}
+            />
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={notifForm.kind}
+              onChange={(e) =>
+                setNotifForm({
+                  ...notifForm,
+                  kind: e.target.value as CustomerAppNotification["kind"],
+                })
+              }
+            >
+              <option value="announcement">Announcement</option>
+              <option value="promo">Promo</option>
+              <option value="rules">Rules</option>
+              <option value="reminder">Reminder</option>
+            </select>
+            <Button
+              disabled={pending || !notifForm.title.trim() || !notifForm.body.trim()}
+              onClick={() =>
+                run(async () => {
+                  const res = await salonCreateNotification({
+                    ...notifForm,
+                    publish: true,
+                  });
+                  if (!res.error) {
+                    setNotifForm({ title: "", body: "", kind: "announcement" });
+                  }
+                  return res;
+                }, "Notification published")
+              }
+            >
+              Publish to customer app
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {notifications.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No salon notifications yet.</p>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-md border px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      {n.title}{" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        · {n.kind}
+                        {n.is_published ? " · live" : " · draft"}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                      {n.body}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={pending}
+                      onClick={() =>
+                        run(
+                          () => salonToggleNotification(n.id, !n.is_published),
+                          n.is_published ? "Unpublished" : "Published"
+                        )
+                      }
+                    >
+                      {n.is_published ? "Unpublish" : "Publish"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={pending}
+                      onClick={() =>
+                        run(() => salonDeleteNotification(n.id), "Deleted")
+                      }
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
       )}

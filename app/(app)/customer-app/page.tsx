@@ -35,6 +35,7 @@ export default async function SalonCustomerAppPage() {
         pointTypes={data.pointTypes}
         leaderboardTiers={data.leaderboardTiers}
         pointsHistory={data.pointsHistory}
+        notifications={data.notifications}
         services={data.services}
       />
     </div>

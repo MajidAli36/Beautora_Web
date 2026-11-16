@@ -1,5 +1,5 @@
-import { Image, Pressable, Text, View } from "react-native";
-import { Link, router } from "expo-router";
+import { Image, Text, View } from "react-native";
+import { Link } from "expo-router";
 import { useApp } from "../../src/context/AppContext";
 import {
   Avatar,
@@ -12,6 +12,7 @@ import {
   Screen,
   SectionHeader,
 } from "../../src/components/ui";
+import { LoyaltyCard } from "../../src/components/LoyaltyCard";
 import { initials } from "../../src/lib/format";
 
 export default function RewardsScreen() {
@@ -29,58 +30,34 @@ export default function RewardsScreen() {
       <Text style={{ fontSize: 26, fontWeight: "800", color: theme.text, letterSpacing: -0.3 }}>
         Rewards
       </Text>
-      <Muted>Points and leaderboard sync live from the salon App dashboard.</Muted>
+      <Muted>
+        Virtual card, points, and leaderboard sync from the salon App dashboard. Show your QR at
+        the desk to redeem.
+      </Muted>
 
-      {f.loyalty ? (
-        <Card
-          style={{
-            backgroundColor: theme.primary,
-            borderColor: theme.primary,
-            paddingVertical: 22,
-          }}
-        >
-          <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, fontWeight: "800" }}>
-            POINT BALANCE
-          </Text>
-          <Text style={{ color: "#fff", fontSize: 48, fontWeight: "900", marginTop: 4 }}>
-            {loyalty?.balance ?? 0}
-          </Text>
-          {!profile.phone ? (
-            <View style={{ marginTop: 12, gap: 10 }}>
-              <Text style={{ color: "rgba(255,255,255,0.9)", lineHeight: 20 }}>
-                Save your phone in Profile to load your personal points history.
-              </Text>
-              <Pressable
-                onPress={() => router.push("/profile")}
-                style={{
-                  marginTop: 4,
-                  borderWidth: 1.5,
-                  borderColor: "#fff",
-                  borderRadius: 14,
-                  paddingVertical: 12,
-                  alignItems: "center",
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "800" }}>Open profile</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <Text style={{ color: "rgba(255,255,255,0.85)", marginTop: 6 }}>
-              Linked to {profile.phone}
+      {f.loyalty ? <LoyaltyCard /> : null}
+
+      {f.loyalty && loyalty?.rulesText ? (
+        <>
+          <SectionHeader title="How to get points" />
+          <Card>
+            <Text
+              style={{
+                color: theme.text,
+                fontSize: 14,
+                lineHeight: 22,
+                fontWeight: "500",
+              }}
+            >
+              {loyalty.rulesText}
             </Text>
-          )}
-          {loyalty?.note ? (
-            <Text style={{ color: "rgba(255,255,255,0.8)", marginTop: 10, lineHeight: 20 }}>
-              {loyalty.note}
-            </Text>
-          ) : null}
-        </Card>
+          </Card>
+        </>
       ) : null}
 
       {f.loyalty && loyalty?.pointTypes?.length ? (
         <>
-          <SectionHeader title="How to earn" />
+          <SectionHeader title="Point types" />
           {loyalty.pointTypes.map((t) => (
             <Card key={t.id}>
               <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>

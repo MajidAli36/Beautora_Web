@@ -14,7 +14,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Build-time (inlined into client bundle / next.config)
+        # Build-time public vars (inlined into client + available on runner).
+        # Require URL + (ANON_KEY or PUBLISHABLE_KEY) in .env.production.local.
+        # Never pass SUPABASE_SERVICE_ROLE_KEY as a build arg.
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}

@@ -72,6 +72,7 @@ export async function getSalonCustomerAppDashboard() {
       pointTypes: [],
       leaderboardTiers: [],
       pointsHistory: [],
+      notifications: [],
       services: [] as { id: string; name: string }[],
     };
   }
@@ -108,6 +109,7 @@ export async function getSalonCustomerAppDashboard() {
     leaderboardTiers,
     servicesRes,
     pointsHistory,
+    notifications,
   ] = await Promise.all([
     getAppConfigBundle(app.id),
     getLoyaltyRules(app.id),
@@ -130,6 +132,9 @@ export async function getSalonCustomerAppDashboard() {
       .order("name")
       .limit(200),
     getPointsHistory({ customerAppId: app.id, limit: 40 }),
+    import("@/lib/customer-apps/notifications").then((m) =>
+      m.listNotificationsForApp(app.id).catch(() => [])
+    ),
   ]);
 
   const productVisibility: Record<string, boolean> = {};
@@ -151,6 +156,7 @@ export async function getSalonCustomerAppDashboard() {
     pointTypes,
     leaderboardTiers,
     pointsHistory,
+    notifications,
     services: (servicesRes.data ?? []) as { id: string; name: string }[],
   };
 }
@@ -192,7 +198,7 @@ export async function salonPublishCustomerApp(): Promise<ActionResult> {
 async function syncFeatureOnDraftAndLive(
   customerAppId: string,
   actorUserId: string,
-  feature: "loyalty" | "leaderboard" | "product_catalog",
+  feature: "loyalty" | "leaderboard" | "product_catalog" | "notifications",
   enabled: boolean,
   appStatus: string
 ) {
@@ -236,6 +242,69 @@ export async function salonSaveLoyaltyRules(rules: LoyaltyRules): Promise<Action
     return { success: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not save points rules" };
+  }
+}
+
+export async function salonCreateNotification(input: {
+  title: string;
+  body: string;
+  kind?: "announcement" | "promo" | "rules" | "reminder";
+  publish?: boolean;
+}): Promise<ActionResult> {
+  try {
+    const { app, user, org } = await requireEnabledApp();
+    const { createNotification } = await import("@/lib/customer-apps/notifications");
+    await createNotification({
+      customerAppId: app.id,
+      organizationId: org.organizationId,
+      actorUserId: user.id,
+      title: input.title,
+      body: input.body,
+      kind: input.kind,
+      publish: input.publish ?? true,
+    });
+    await syncFeatureOnDraftAndLive(
+      app.id,
+      user.id,
+      "notifications",
+      true,
+      app.status
+    );
+    revalidatePath("/customer-app");
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not create notification" };
+  }
+}
+
+export async function salonToggleNotification(
+  notificationId: string,
+  published: boolean
+): Promise<ActionResult> {
+  try {
+    const { app } = await requireEnabledApp();
+    const { setNotificationPublished } = await import(
+      "@/lib/customer-apps/notifications"
+    );
+    await setNotificationPublished(app.id, notificationId, published);
+    revalidatePath("/customer-app");
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not update notification" };
+  }
+}
+
+export async function salonDeleteNotification(
+  notificationId: string
+): Promise<ActionResult> {
+  try {
+    const { app } = await requireEnabledApp();
+    const { deleteNotification } = await import("@/lib/customer-apps/notifications");
+    await deleteNotification(app.id, notificationId);
+    revalidatePath("/customer-app");
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not delete notification" };
   }
 }
 

@@ -54,6 +54,20 @@ export default function MoreScreen() {
           onPress={() => router.push("/profile")}
         />
         <MenuRow
+          title="Appearance"
+          subtitle="Themes & look"
+          onPress={() => router.push("/appearance")}
+        />
+        <MenuRow
+          title="Notifications"
+          subtitle={
+            bundle.notifications?.length
+              ? `${bundle.notifications.length} message(s) · rules & updates`
+              : "Rules, tips & salon updates"
+          }
+          onPress={() => router.push("/notifications")}
+        />
+        <MenuRow
           title="My bookings"
           subtitle={
             profile.phone

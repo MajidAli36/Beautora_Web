@@ -36,4 +36,12 @@ export function themeFromBrand(primary?: string, accent?: string) {
   };
 }
 
-export type AppTheme = ReturnType<typeof themeFromBrand>;
+export {
+  THEME_PRESETS,
+  buildThemeFromPreset,
+  getThemePreset,
+  isDarkTheme,
+  type AppTheme,
+  type ThemePreset,
+  type ThemePresetId,
+} from "./presets";

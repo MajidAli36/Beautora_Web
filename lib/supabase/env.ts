@@ -5,18 +5,24 @@ function requireEnv(name: string, value: string | undefined): string {
   return value;
 }
 
+/** Empty Docker build-args become "" — treat those as unset (?? would keep ""). */
+function readPublicEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
 export function getSupabaseUrl() {
   return requireEnv(
     "NEXT_PUBLIC_SUPABASE_URL",
-    process.env.NEXT_PUBLIC_SUPABASE_URL
+    readPublicEnv("NEXT_PUBLIC_SUPABASE_URL")
   );
 }
 
 /** Supports both legacy anon key and Supabase publishable key naming. */
 export function getSupabaseAnonKey() {
   const key =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    readPublicEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
+    readPublicEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
 
   return requireEnv(
     "NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",

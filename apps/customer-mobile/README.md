@@ -7,15 +7,18 @@ Syncs only with Beautora **Customer API** (`/api/customer/v1/*`) — never marke
 
 | Screen | What it does |
 |--------|----------------|
-| **Home** | Brand hero, points snapshot, next visit, featured deal/reel, quick actions |
+| **Onboarding** | Profile (name + phone) → theme picker (8 looks) |
+| **Home** | Brand hero, virtual card, notifications teaser, next visit, deals/reels |
 | **Shop** | Deals + product grid (feature-flagged), pull-to-refresh |
-| **Rewards** | Balance, earn rules, ledger, leaderboard + tiers |
-| **More** | Profile shortcut, bookings, salons, reels, WhatsApp / call |
+| **Rewards** | Virtual card + QR, **How to get points** (backend rules text), history, leaderboard |
+| **More** | Profile, Appearance, Notifications, bookings, salons, reels, WhatsApp / call |
+| **Notifications** | Salon messages + auto rules / welcome / booking tips |
+| **Appearance** | Change theme anytime |
 | **Book** | 3-step flow: salon/service → stylist/day/time → details |
 | **Bookings** | Upcoming + history with status pills |
 | **Profile** | Local profile (AsyncStorage); phone unlocks loyalty & bookings |
 | **Salons** | Assigned locations with call / book |
-| **Reels** | Full-screen vertical feed with play-out link |
+| **Reels** | Full-screen vertical feed |
 
 Pull-to-refresh on Home / Shop / Rewards / More re-runs `syncCustomerAppBundle()`.
 
@@ -47,21 +50,39 @@ Every request sends:
 
 Slug must be a **published** customer app. Draft/suspended → 403.
 
+Loyalty QR redeem:
+
+- `GET /api/customer/v1/loyalty/qr?phone=` → signed QR payload
+- `POST /api/customer/v1/loyalty/redeem` `{ token, points }` → deduct points (salon desk)
+
+Notifications:
+
+- `GET /api/customer/v1/notifications` → salon + system how-to rules
+
 ## App structure
 
 ```
 app/
   (tabs)/          Home · Shop · Rewards · More
-  book.tsx         3-step booking
+  onboarding.tsx   Profile + theme
+  appearance.tsx
+  notifications.tsx
+  book.tsx
   bookings.tsx
   profile.tsx
   reels.tsx
   salons.tsx
 src/
   api/             Typed Customer API client + bundle sync
-  context/         AppProvider (config, cache, profile, loyalty)
-  components/      Shared UI kit
-  lib/format.ts    Money / dates / status helpers
-  storage/         Phone / name persistence
-  theme/           Brand-aware colors
+  context/         AppProvider (config, theme, profile, loyalty)
+  components/      UI kit + LoyaltyCard
+  storage/         Profile, preferences, notification read state
+  theme/           Presets + brand-aware colors
 ```
+
+## Salon dashboard (web)
+
+Under **Customer app**:
+
+- **Points & rules** — set earn/redeem numbers + customer-facing note
+- **Notifications** — publish inbox messages (requires DB migration `20261116120000_customer_app_notifications.sql`)

@@ -103,6 +103,21 @@ export function fetchReels() {
   return customerFetch<{ reels: ReelRow[] }>("/api/customer/v1/reels");
 }
 
+export type PublicNotification = {
+  id: string;
+  title: string;
+  body: string;
+  kind: string;
+  createdAt: string;
+  source: "salon" | "system";
+};
+
+export function fetchNotifications() {
+  return customerFetch<{ notifications: PublicNotification[] }>(
+    "/api/customer/v1/notifications"
+  );
+}
+
 export function fetchLoyalty(phone?: string) {
   const q = phone ? `?phone=${encodeURIComponent(phone)}` : "";
   return customerFetch<{
@@ -120,6 +135,34 @@ export function fetchLoyalty(phone?: string) {
     recent: { delta_points: number; reason: string; created_at: string }[];
     history: PointsHistoryRow[];
   }>(`/api/customer/v1/loyalty${q}`);
+}
+
+/** Short-lived QR payload for salon desk to redeem / reduce points. */
+export function fetchLoyaltyQrToken(phone: string) {
+  const q = new URLSearchParams({ phone });
+  return customerFetch<{
+    code: string;
+    qrPayload: string;
+    balance: number;
+    expiresAt: string;
+    minRedeemPoints: number;
+  }>(`/api/customer/v1/loyalty/qr?${q.toString()}`);
+}
+
+/** Salon / kiosk redeem — deducts points using a scanned QR token. */
+export function redeemLoyaltyPoints(body: {
+  token: string;
+  points: number;
+  reason?: string;
+}) {
+  return customerFetch<{
+    ok: boolean;
+    balance: number;
+    redeemed: number;
+  }>("/api/customer/v1/loyalty/redeem", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export function fetchPointsHistory(phone: string) {
@@ -176,20 +219,24 @@ export async function syncCustomerAppBundle() {
   const config = await fetchAppConfig();
   const features = config.settings.features;
 
-  const [salons, services, products, deals, reels, leaderboard] = await Promise.all([
-    fetchSalons().catch(() => ({ salons: [] as SalonRow[] })),
-    features.online_appointments
-      ? fetchServices().catch(() => ({ services: [] as ServiceRow[] }))
-      : Promise.resolve({ services: [] as ServiceRow[] }),
-    features.product_catalog
-      ? fetchProducts().catch(() => ({ products: [] as ProductRow[] }))
-      : Promise.resolve({ products: [] as ProductRow[] }),
-    fetchDeals().catch(() => ({ deals: [] as DealRow[] })),
-    fetchReels().catch(() => ({ reels: [] as ReelRow[] })),
-    features.leaderboard
-      ? fetchLeaderboard().catch(() => null)
-      : Promise.resolve(null),
-  ]);
+  const [salons, services, products, deals, reels, leaderboard, notifications] =
+    await Promise.all([
+      fetchSalons().catch(() => ({ salons: [] as SalonRow[] })),
+      features.online_appointments
+        ? fetchServices().catch(() => ({ services: [] as ServiceRow[] }))
+        : Promise.resolve({ services: [] as ServiceRow[] }),
+      features.product_catalog
+        ? fetchProducts().catch(() => ({ products: [] as ProductRow[] }))
+        : Promise.resolve({ products: [] as ProductRow[] }),
+      fetchDeals().catch(() => ({ deals: [] as DealRow[] })),
+      fetchReels().catch(() => ({ reels: [] as ReelRow[] })),
+      features.leaderboard
+        ? fetchLeaderboard().catch(() => null)
+        : Promise.resolve(null),
+      fetchNotifications().catch(() => ({
+        notifications: [] as PublicNotification[],
+      })),
+    ]);
 
   return {
     config,
@@ -199,6 +246,7 @@ export async function syncCustomerAppBundle() {
     deals: deals.deals,
     reels: reels.reels,
     leaderboard,
+    notifications: notifications.notifications,
     syncedAt: new Date().toISOString(),
   };
 }
