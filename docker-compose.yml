@@ -14,10 +14,11 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Build-time public vars (inlined into client + available on runner).
-        # Require URL + (ANON_KEY or PUBLISHABLE_KEY) in .env.production.local.
+        # Build-time public vars (Next.js inlines these into the browser bundle).
+        # Must run: docker compose --env-file .env.production.local ... --build
+        # Require NEXT_PUBLIC_SUPABASE_URL + (ANON_KEY or PUBLISHABLE_KEY).
         # Never pass SUPABASE_SERVICE_ROLE_KEY as a build arg.
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL is required for Docker build}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://www.beautora.app}
